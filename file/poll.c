@@ -9,13 +9,17 @@
 /**
  * execute:
  *
- * forrest@ubuntu:~/lsp/file$ gcc poll.c;./a.out  < rw.c
+ * forrest@ubuntu:~/lsp/file$ gcc poll.c;./a.out
+ * Poll ret 1
+ * Write ready
+ * Poll ret 0
+ * Timeout
+ * forrest@ubuntu:~/lsp/file$ gcc poll.c;./a.out < rw.c
  * Poll ret 2
  * Read ready
  * Write ready
- * forrest@ubuntu:~/lsp/file$ ./a.out
  * Poll ret 1
- * Write ready
+ * Read ready
  */
 int main(void) {
     struct pollfd fds[2];
@@ -43,6 +47,24 @@ int main(void) {
 
     if(fds[1].revents & POLLOUT)
         DBG("Write ready");
+
+    /**
+     * Here we wait input to test timeout
+     */
+    ret = poll(fds, 1, TIMEOUT * 1000);
+    DBG("Poll ret %d", ret);
+    if(ret == -1) {
+        perror("poll");
+        return 1;
+    }
+
+    if(!ret) {
+        DBG("Timeout");
+        return 2;
+    }
+
+    if(fds[0].revents & POLLIN)
+        DBG("Read ready");
 
     return 0;
 }
