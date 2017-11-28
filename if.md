@@ -27,14 +27,24 @@ poll      | poll event based on fds, better usage than select()
 ppoll     | poll and wait signals
 
 # IO
-function   | description
---------   | --------------
-fopen | open file(r, r+, w, w+, a, a+)
-fclose | close file
+function  | description
+--------  | --------------
+fopen     | open file(r, r+, w, w+, a, a+)
+fclose    | close file
 fcloseall | close all files
-fgetc | get one single char from stream
-ungetc | push char back to stream
-fgets | read string from stream(\n stored if reach)
+fgetc     | get one single char from stream
+fputc     | put one single char to stream
+ungetc    | push char back to stream
+fgets     | read string from stream(\n stored if reach)
+fputs     | write string(NULL terminated) into stream
+fread     | read binary data blocks from stream
+fwrite    | write bianry data blocks to stream
+fseek     | set file stream position
+ferror    | get file operation error
+clearerr  | clear file error cause by any FILE operations
+feof      | test if the file is in EOF
+rewind    | = fseek(f, 0, SEEK_SET);
+ftell     | get current position(offset) of file stream
 
 function   | description
 --------   | --------------

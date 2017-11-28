@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -72,5 +73,71 @@ int main(void) {
 
     fclose(f);
 
+    int nr = 4;
+    int sz = 8;
+
+    f = fopen("test", "w+");
+    if(!f) {
+        perror("open test");
+        return 1;
+    }
+
+    int wr = nr * sz - 1;
+    char *buf = (char *)malloc(wr+1);
+    if(!buf) {
+        DBG("No mem");
+        return 9;
+    }
+    memset(buf, 0, nr * sz);
+
+    if(wr != fwrite(buf, 1, wr, f)) {
+        perror("bin write");
+        free(buf);
+        return 9;
+    }
+
+    if( -1 == fseek(f, 0, SEEK_SET)) {
+        perror("seek");
+        free(buf);
+        return 9;
+    }
+
+    int rd = fread(buf, sz, nr, f);
+    DBG("Wr %dB Rd %dB", wr,rd);
+    if(rd < nr) {
+        if(feof(f))
+            /**
+             * In this test, here it runs
+             */
+            DBG("Rd EOF");
+        else {
+            int err = ferror(f);
+            if(err){
+                DBG("Rd err %d", err);
+            }
+        }
+
+        clearerr(f);
+
+        long pos = ftell(f);
+        if(pos == -1) {
+            perror("ftell");
+            return 9;
+        }
+        DBG("Pos: %d", pos);
+
+        rewind(f);
+
+        pos = ftell(f);
+        if(pos == -1) {
+            perror("ftell after rewind");
+            return 9;
+        }
+        DBG("Pos after rewind: %d", pos);
+
+    }
+
+    free(buf);
+    fclose(f);
 
 }

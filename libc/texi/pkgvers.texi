@@ -1,0 +1,6 @@
+@ifclear PKGVERS
+@set PKGVERS
+@set PKGVERSION (GNU libc) 
+@set PKGVERSION_DEFAULT
+@set REPORT_BUGS_TO @uref{http://www.gnu.org/software/libc/bugs.html}
+@end ifclear
