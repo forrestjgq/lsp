@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 
 #define DBG(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 #define CH_CNT 3
@@ -25,6 +26,11 @@ int main(void) {
         perror("open test");
         return 1;
     }
+
+    if(setvbuf(f, NULL, _IOFBF, 4*1024) != 0)
+        DBG("setvbuf err %d", ferror(f));
+
+    DBG("BUFSIZE: %d", BUFSIZ);
 
     int cnt;
     int c;
@@ -96,6 +102,14 @@ int main(void) {
         return 9;
     }
 
+    /**
+     * flush NULL indicates flush all files of current process
+     */
+    if(EOF == fflush(NULL)) {
+        perror("fflush");
+        return 9;
+    }
+
     if( -1 == fseek(f, 0, SEEK_SET)) {
         perror("seek");
         free(buf);
@@ -126,7 +140,12 @@ int main(void) {
         }
         DBG("Pos: %d", pos);
 
+        errno = 0;//clear errno
         rewind(f);
+        if(errno){
+            perror("rewind");
+            return 9;
+        }
 
         pos = ftell(f);
         if(pos == -1) {

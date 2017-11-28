@@ -45,6 +45,14 @@ clearerr  | clear file error cause by any FILE operations
 feof      | test if the file is in EOF
 rewind    | = fseek(f, 0, SEEK_SET);
 ftell     | get current position(offset) of file stream
+fflush    | flush all writtern data to kernel
+fileno    | get file descriptor from FILE stream
+setvbuf | set file stream buffer and type(_IONBF, _IOLBF, _IOFBF)
+flockfile | lock file to start atomic functions
+funlockfile | unlock file 
+ftrylockfile | attempt to lock file
+xxxx_unlocked | no-locking version of previous file interfaces
+
 
 function   | description
 --------   | --------------
