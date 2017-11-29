@@ -61,7 +61,10 @@ int main(void) {
     if(ret != length)
         DBG("Write %d less than expected %d", ret, length);
 
-    close(fd);
+    if( close(fd) ) {
+        perror("close wr");
+        return 1;
+    }
 
 
     fd = open(TFILE, O_RDONLY);
@@ -84,7 +87,10 @@ int main(void) {
         DBG("Read %d less than expected %d", ret, length);
     }
 
-    close(fd);
+    if( close(fd) ) {
+        perror("close rd");
+        return 1;
+    }
 
     for(i = 0; i < VCNT; i++) {
         free(rd[i].iov_base);

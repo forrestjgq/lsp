@@ -23,8 +23,6 @@ ftruncate | truncate file to a smaller or larger file
 truncate  | truncate file as a path to a smaller or larger file
 select    | monitor multiple fd until IO is ready or timeout
 pselect   | select multiple fds and waiting signals
-poll      | poll event based on fds, better usage than select()
-ppoll     | poll and wait signals
 
 ## Standard C FILE IO
 function      | description
@@ -64,8 +62,15 @@ pwrite   | write to specified position of file from vector without change offset
 pread2   | normally do not care
 pwrite2  | normally do not care
 
-function   | description
---------   | --------------
+## Event poll
+function      | description
+--------      | --------------
+poll          | poll event based on fds, better usage than select()
+ppoll         | poll and wait signals
+epoll_create1 | create an event poll file
+epoll_ctl     | control event poll
+epoll_wait    | wait event for files
+
 function   | description
 --------   | --------------
 function   | description
