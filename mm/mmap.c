@@ -13,7 +13,8 @@
 
 #define FAIL(str)\
     do { \
-        perror("errno");\
+        if(errno)\
+            perror("errno");\
         printf("fail @ %s:%d\n", __FILE__, __LINE__);\
         printf("\t%s\n", str);\
         return 1;\
@@ -32,6 +33,9 @@ int main(int argc, char *argv[]) {
     struct stat st;
     if(fstat(fd, &st) == -1)
         FAIL("fstat");
+
+    if(!S_ISREG(st.st_mode))
+        FAIL("Not Regular File");
 
     char *addr = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
     if(MAP_FAILED == addr)
