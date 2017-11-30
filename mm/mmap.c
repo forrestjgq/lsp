@@ -36,6 +36,21 @@
     }while(0)
 
 int main(int argc, char *argv[]) {
+    int i;
+    int fd;
+    char *pwr, *addr;
+    struct stat st;
+#define PUT_MEM()\
+    do{\
+        for(i = 0; i < st.st_size; i++)\
+            if(addr[i])\
+                putchar(addr[i]);\
+            else {\
+                putchar('\\');\
+                putchar('0');\
+            }\
+    }while(0)
+
     if(argc < 2) {
         DBG("Usage: %s <file>", argv[0]);
         return 1;
@@ -48,20 +63,19 @@ int main(int argc, char *argv[]) {
      * if O_RDONLY is used, mprotect will fail to change
      * the permission to WRITE
      */
-    int fd = open(argv[1], /*O_RDONLY*/O_RDWR);
+    fd = open(argv[1], /*O_RDONLY*/O_RDWR);
 
 
     if(fd == -1)
         FAIL("Open");
 
-    struct stat st;
     if(fstat(fd, &st) == -1)
         FAIL("fstat");
 
     if(!S_ISREG(st.st_mode))
         FAIL("Not Regular File");
 
-    char *addr = mmap(NULL, st.st_size/2, PROT_READ, MAP_SHARED, fd, 0);
+    addr = mmap(NULL, st.st_size/2, PROT_READ, MAP_SHARED, fd, 0);
     if(MAP_FAILED == addr)
         FAIL("mmap");
     DBG("Start map size %d addr %p", st.st_size/2, addr);
@@ -75,15 +89,7 @@ int main(int argc, char *argv[]) {
         FAIL("Close");
 
     DBG("Print to size %d", st.st_size);
-    int i;
-    for(i = 0; i < st.st_size; i++)
-        if(addr[i])
-            putchar(addr[i]);
-        else {
-            putchar('\\');
-            putchar('0');
-        }
-
+    PUT_MEM();
 
     addr = mremap(addr, st.st_size/2, st.st_size, MREMAP_MAYMOVE);
     if(addr == MAP_FAILED)
@@ -96,18 +102,12 @@ int main(int argc, char *argv[]) {
         FAIL("madvise");
 
     DBG("Print to size %d", st.st_size);
-    for(i = 0; i < st.st_size; i++)
-        if(addr[i])
-            putchar(addr[i]);
-        else {
-            putchar('\\');
-            putchar('0');
-        }
+    PUT_MEM();
 
     /**
      * mprotect only accept an addr which is page aligned
      */
-    char *pwr = addr + getpagesize();
+    pwr = addr + getpagesize();
 
     if(mprotect(pwr, 10, PROT_WRITE) == -1)
         FAIL("mprotect");
@@ -121,14 +121,7 @@ int main(int argc, char *argv[]) {
      * It is still readable for i386
      * which means PROT_WRITE implies PROT_READ
      */
-    for(i = 0; i < st.st_size; i++)
-        if(addr[i])
-            putchar(addr[i]);
-        else {
-            putchar('\\');
-            putchar('0');
-        }
-
+    PUT_MEM();
 
     if(msync(addr, st.st_size, MS_SYNC) == -1)
         FAIL("msync");
