@@ -80,7 +80,14 @@ munmap | unmap memory
 mremap | remap memory to tune size and flag
 mprotect | change protect for a mapped memory region
 msync | synchronize memory to kernel
-madvice | give advise to kernel how the memory will be processed
+
+## Advise
+function   | description
+--------   | --------------
+madvise | give advise to kernel how the memory will be processed
+posix_fadvise | basicly it is madvise, only defined by POSIX
+readahead | posix_fadvise(POSIX_FADV_WILLNEED)
+
 
 function   | description
 --------   | --------------
