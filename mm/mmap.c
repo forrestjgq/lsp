@@ -1,4 +1,13 @@
-
+/**
+ * This macro must be defined before any real code
+ * due to <features.h> MAY be included by any files
+ * included before mman.h, and that will make feature.h
+ * be included before macro definition
+ *
+ * The best way to implement is to define it by gcc
+ * command line arguments
+ */
+#define _GNU_SOURCE
 #include <stdio.h>
 
 #include <sys/stat.h>
@@ -7,6 +16,12 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
+
+/**
+ * If we define _GNU_SOURCE here instead of in the begging
+ * of this file, it won't work
+ */
+/*#define _GNU_SOURCE*/
 #include <sys/mman.h>
 
 #define DBG(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
@@ -26,7 +41,16 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    int fd = open(argv[1], O_RDONLY);
+    DBG("Open file %s", argv[1]);
+
+    /**
+     * Here O_RDWR is a must.
+     * if O_RDONLY is used, mprotect will fail to change
+     * the permission to WRITE
+     */
+    int fd = open(argv[1], /*O_RDONLY*/O_RDWR);
+
+
     if(fd == -1)
         FAIL("Open");
 
@@ -37,19 +61,85 @@ int main(int argc, char *argv[]) {
     if(!S_ISREG(st.st_mode))
         FAIL("Not Regular File");
 
-    char *addr = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+    char *addr = mmap(NULL, st.st_size/2, PROT_READ, MAP_SHARED, fd, 0);
     if(MAP_FAILED == addr)
         FAIL("mmap");
+    DBG("Start map size %d addr %p", st.st_size/2, addr);
 
+    DBG("Advise");
+    if(madvise(addr, st.st_size/2, MADV_SEQUENTIAL) == -1)
+        FAIL("madvise");
+
+    DBG("Close FD");
     if(close(fd))
         FAIL("Close");
 
+    DBG("Print to size %d", st.st_size);
     int i;
     for(i = 0; i < st.st_size; i++)
-        putchar(addr[i]);
+        if(addr[i])
+            putchar(addr[i]);
+        else {
+            putchar('\\');
+            putchar('0');
+        }
+
+
+    addr = mremap(addr, st.st_size/2, st.st_size, MREMAP_MAYMOVE);
+    if(addr == MAP_FAILED)
+        FAIL("Remap");
+    DBG("Remap to size %d addr %p", st.st_size, addr);
+
+
+    DBG("Advise2");
+    if(madvise(addr, st.st_size, MADV_SEQUENTIAL) == -1)
+        FAIL("madvise");
+
+    DBG("Print to size %d", st.st_size);
+    for(i = 0; i < st.st_size; i++)
+        if(addr[i])
+            putchar(addr[i]);
+        else {
+            putchar('\\');
+            putchar('0');
+        }
+
+    /**
+     * mprotect only accept an addr which is page aligned
+     */
+    char *pwr = addr + getpagesize();
+
+    if(mprotect(pwr, 10, PROT_WRITE) == -1)
+        FAIL("mprotect");
+
+    DBG("Print after change protect to write");
+    for(i = 0; i < 10; i++)
+        pwr[i] = i + '0';
+
+    /**
+     * Although mprotect change permission to WRITE
+     * It is still readable for i386
+     * which means PROT_WRITE implies PROT_READ
+     */
+    for(i = 0; i < st.st_size; i++)
+        if(addr[i])
+            putchar(addr[i]);
+        else {
+            putchar('\\');
+            putchar('0');
+        }
+
+
+    if(msync(addr, st.st_size, MS_SYNC) == -1)
+        FAIL("msync");
 
     if(munmap(addr, st.st_size) == -1)
         FAIL("munmap");
+
+    /**
+     * The following phrase will trigger a segmentation fault
+     */
+    /*pwr[0] = 'a';*/
 
     return 0;
 }
