@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
         DBG("Try %s", argv[i]);
         DBG("==============");
 
-        int fd = open(argv[1], O_RDONLY);
+        int fd = open(argv[i], O_RDONLY);
         if(fd == -1) {
             perror("open");
             continue;
@@ -44,9 +44,20 @@ int main(int argc, char *argv[]) {
             goto CLEANUP;
         }
 
-        DBG("inode nr: %d", st.st_blocks);
+        /**
+         * number of 512B blocks
+         */
+        blkcnt_t nb = st.st_blocks;
+        /**
+         * logic block size
+         */
+        blksize_t szb = st.st_blksize;
 
-        ino_t nb = st.st_blocks;
+        DBG("inode nr: %ld, sz: %ld", nb, szb);
+
+        nb = nb * 512 / szb;
+        DBG("Logic blocks: %ld", nb);
+
         int j;
         for(j = 0; j < nb; j++) {
             int logic_block = j;
