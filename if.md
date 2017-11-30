@@ -71,8 +71,17 @@ epoll_create1 | create an event poll file
 epoll_ctl     | control event poll
 epoll_wait    | wait event for files
 
+# Memory
+## Map
 function   | description
 --------   | --------------
+mmap | map a file into memory
+munmap | unmap memory
+mremap | remap memory to tune size and flag
+mprotect | change protect for a mapped memory region
+msync | synchronize memory to kernel
+madvice | give advise to kernel how the memory will be processed
+
 function   | description
 --------   | --------------
 function   | description
