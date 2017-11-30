@@ -52,7 +52,19 @@ ftrylockfile  | attempt to lock file
 xxxx_unlocked | no-locking version of previous file interfaces
 
 
-## Scatter and Gather IO
+## Asynchronous I/O
+
+function | description
+-------- | --------------
+aio_read | async read()
+aio_write | async write
+aio_error | async 
+aio_return | async
+aio_cancel | async
+aio_fsync | async
+aio_suspend | async
+
+## Scatter and Gather I/O
 function | description
 -------- | --------------
 readv    | read into vector from file
