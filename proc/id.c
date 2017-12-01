@@ -18,13 +18,17 @@
         printf("\t%s\n", str);\
         return 1;\
     }while(0)
+
+#define PERR(fmt, ...) dprintf(STDOUT_FILENO, fmt "\n", ##__VA_ARGS__)
 /**
  * This example demostrate user id and group id
  */
-int main(void) {
+int main(int argc, char *argv[]) {
     int fout = STDOUT_FILENO;
     int fd = STDIN_FILENO;
     int ferr = STDERR_FILENO;
+
+    PERR("Program: %s", argv[0]);
 
     dprintf(ferr, "====> pid %jd ppid %jd\n", (intmax_t)getpid(), (intmax_t)getppid());
     dprintf(ferr, "====> uid %jd euid %jd\n", (intmax_t)getuid(), (intmax_t)geteuid());
