@@ -53,7 +53,6 @@ xxxx_unlocked | no-locking version of previous file interfaces
 
 
 ## Asynchronous I/O
-
 function | description
 -------- | --------------
 aio_read | async read()
@@ -100,8 +99,16 @@ madvise | give advise to kernel how the memory will be processed
 posix_fadvise | basicly it is madvise, only defined by POSIX
 readahead | posix_fadvise(POSIX_FADV_WILLNEED)
 
+# Process
+## User and Group
+function | description
+-------- | --------------
+getuid   | get process user id
+geteuid  | get process effective user id
 
-function   | description
---------   | --------------
-function   | description
---------   | --------------
+## Process property
+function | description
+-------- | --------------
+getpid   | get process id
+getppid  | get parent process id
+
