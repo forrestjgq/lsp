@@ -1,18 +1,39 @@
 #!/bin/bash
 
+clean() 
+{
+    for cfile in *.c
+    do
+        obj=${cfile%.c}
+        rm -f $obj $obj.exe
+    done
+}
+
+for cfile in *.c
+do
+    obj=${cfile%.c}
+    gcc $cfile -o $obj
+    if [ $? -ne 0 ]; then
+        echo "$cfile compiling failed"
+        clean
+        return 2
+    fi
+done
+
+echo ""
 echo "Start test id.c"
 echo "======================================="
-gcc id.c -o id
-if [ $? -eq 0 ]; then
-    echo "Please input 0 to 9 to start"
-    ./id | ./id | ./id | ./id
+echo "Please input 0 to 9 to start, q to end"
+./id | ./id | ./id | ./id
 
-    if [ -e id ]; then
-        rm id
-    fi
+echo ""
+echo "Start test execl.c"
+echo "======================================="
+echo "Please input 0 to 9 to start, q to end"
+./execl ./id id_execl
 
-    if [ -e id.exe ]; then
-        rm id
-    fi
-fi
 
+echo ""
+echo ""
+echo "Done"
+clean
