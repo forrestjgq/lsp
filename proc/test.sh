@@ -58,6 +58,11 @@ echo "======================================="
 ./execve
 
 echo ""
+echo "Start test exec.c"
+echo "======================================="
+./exec 0
+
+echo ""
 echo ""
 echo "Done"
 clean
