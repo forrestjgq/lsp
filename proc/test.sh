@@ -24,7 +24,12 @@ done
 echo ""
 echo "Start test fork.c"
 echo "======================================="
+cp fork.c test.txt
 ./fork
+sleep 1
+cat test.txt
+rm test.txt
+
 
 echo ""
 echo "Start test id.c"
