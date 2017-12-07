@@ -20,6 +20,12 @@ do
     fi
 done
 
+
+echo ""
+echo "Start test fork.c"
+echo "======================================="
+./fork
+
 echo ""
 echo "Start test id.c"
 echo "======================================="
