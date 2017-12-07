@@ -12,7 +12,7 @@ clean()
 for cfile in *.c
 do
     obj=${cfile%.c}
-    gcc -I../include $cfile -o $obj
+    gcc -Wall -I../include $cfile -o $obj
     if [ $? -ne 0 ]; then
         echo "$cfile compiling failed"
         clean
@@ -33,6 +33,11 @@ echo "Please input 0 to 9 to start, q to end"
 ./execl ./id id_execl
 
 echo ""
+echo "Start test execle.c"
+echo "======================================="
+./execle
+
+echo ""
 echo "Start test execlp.c"
 echo "======================================="
 ./execlp vim vi_bin
@@ -46,6 +51,11 @@ echo ""
 echo "Start test execvp.c"
 echo "======================================="
 ./execvp vim vi_bin execvp.c
+
+echo ""
+echo "Start test execve.c"
+echo "======================================="
+./execve
 
 echo ""
 echo ""

@@ -13,10 +13,8 @@
 
 #define ENV_KEY  "forrest"
 #define ENV_VAL  "jiang"
-/**
- * First execle will take nothing in
- * then execle with this executable and env
- */
+
+#define MAX_ARGS 20
 int main(int argc, char *argv[]) {
 
     int more = 1;
@@ -31,25 +29,35 @@ int main(int argc, char *argv[]) {
     }
 
     /**
-     * tp: uid/pid/ppid/gid won't change through execle()
+     * tp: uid/pid/ppid/gid won't change through execve()
      */
 
     PERR("Program: %s", argv[0]);
+    SEPERATE();
 
-    PERR("====> pid %jd ppid %jd", (intmax_t)getpid(), (intmax_t)getppid());
-    PERR("====> uid %jd euid %jd", (intmax_t)getuid(), (intmax_t)geteuid());
 
     if(more) {
         char *env[] = {
             ENV_KEY "=" ENV_VAL,
             NULL
         };
-        if(execle(argv[0], argv[0], NULL, env) == -1) {
-            perror("execle");
-            PERR("Fail to exec");
+        char *v[MAX_ARGS] = {
+            argv[0],
+            NULL
+        };
+
+        int i, j;
+        for(i = 0, j = 0; i < argc; i++, j++)
+            v[j] = argv[i];
+        v[j] = NULL;
+
+        if(execve(argv[0], v, env) == -1) {
+            perror("execve");
+            PERR("Fail to exec: %s %s", argv[1], argv[2]);
             return 2;
         }
     }
 
+    DBG("Done");
     return 0;
 }
