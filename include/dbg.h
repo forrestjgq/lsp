@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <errno.h>
+#include <assert.h>
 
 #define DBG(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 
@@ -18,4 +19,13 @@
     }while(0)
 
 #define PERR(fmt, ...) dprintf(STDOUT_FILENO, fmt "\n", ##__VA_ARGS__)
+
+#define ENSURE(expr) \
+    do {\
+        if(!(expr)) {\
+            DBG("Fail @ file %s:%d", __FILE__, __LINE__);\
+            assert(expr);\
+        }\
+    }while(0)
+extern const char *strsig(int sig);
 #endif /* __DBG__H__ */

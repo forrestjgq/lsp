@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 
 #include <sys/types.h>
@@ -10,98 +9,217 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include "dbg.h"
 
-void fexit1(void) {
-    DBG("fexit1");
+static int bParent = 1;
+void parent_exit(int v, void *p){
+    DBG("parent exit %d on %s", v, (char *)p);
 }
-void fexit2(void) {
-    DBG("fexit2");
-}
-void fexit3(void) {
-    DBG("fexit3");
-}
-void fexit4(int v, void *p){
-    DBG("fexit4 %d on %s", v, (char *)p);
-}
-char *str_arg = "forrest jiang";
-int main(int argc, char *argv[]) {
 
-    int ret_st =0;
-    char *str;
-    int len;
+/**
+ * test wait for failed normal exit
+ */
+int p_wait_fpg(pid_t pid) {
+    int status;
 
-    int fd = open("test.txt", O_RDWR);
-    if(fd == -1)
-        FAIL("Open");
-
-    int ret = fork();
-    if(ret == -1) {
-        FAIL("Exec fail");
-
-    } else if (ret == 0) {
-        ret_st = 10;
-        DBG("====> child pid %jd ppid %jd", (intmax_t)getpid(), (intmax_t)getppid());
-        if(lseek(fd, 10, SEEK_SET) == (off_t)-1)
-            FAIL("Child Seek");
-        str = "jiang";
-        len = strlen(str);
-        if(len != write(fd, str, len))
-            FAIL("Child write");
-        sleep(10);
-        DBG("Child exit");
-#if 0 // for core dump test
-        char *s = NULL;
-        *s = 1;
-#endif
-
-    } else {
-        DBG("====> parent pid %jd ppid %jd", (intmax_t)getpid(), (intmax_t)getppid());
-        if(lseek(fd, 100, SEEK_SET) == (off_t)-1)
-            FAIL("Parent Seek");
-        str = "forrest";
-        len = strlen(str);
-        if(len != write(fd, str, len))
-            FAIL("Parent write");
-
-        /**
-         * will be called in the reverse order of registering
-         */
-        if(atexit(fexit1) != 0)
-            FAIL("Reg 1");
-        if(atexit(fexit2) != 0)
-            FAIL("Reg 2");
-        if(on_exit(fexit4, str_arg) != 0)
-            FAIL("Reg 4");
-        if(atexit(fexit3) != 0)
-            FAIL("Reg 3");
-
-
-        int st;
-        pid_t pid = wait(&st);
-        DBG("wait fork pid %d st %d", pid, st);
-        if(ret != pid)
-            DBG("Child ret pid %d mismatch", ret);
-
-        if(WIFEXITED(st)) {
-            DBG("Child exit normally with status %d", WEXITSTATUS(st));
-        }
-        else if(WIFSIGNALED(st)) {
-            DBG("Child exit by signal with sig %d%s",
-                    WTERMSIG(st),
-                    WCOREDUMP(st) ? ", core dumped" : "");
-        }
-        else if(WIFSTOPPED(st)) {
-            DBG("Child exit stopped by sig %d", WSTOPSIG(st));
-        }
-        else if(WIFCONTINUED(st)) {
-            DBG("Child exit continued");
+    pid_t c_pid = wait(&status);
+    if(c_pid == -1)
+        FAIL("wait child fail");
+    else {
+        DBG("parent waited st %d(0x%08X)", status, status);
+        if(pid != c_pid) {
+            DBG("pid %d mismatch waited %d", pid, c_pid);
+            FAIL("pid mismatch");
         }
 
+        ENSURE(WIFSIGNALED(status));
+        DBG("Term sig %s", strsig(WTERMSIG(status)));
+        ENSURE(WCOREDUMP(status));
     }
 
+    return 0;
+}
+int c_wait_fpg(void) {
 
+    int a = 19;
+    int b = 0;
+    int c = a/b;
+    DBG("c = %d", c);
+    return 0;
+}
+/**
+ * test wait for failed normal exit
+ */
+int p_wait_coredump(pid_t pid) {
+    int status;
 
-    close(fd);
-    return ret_st;
+    siginfo_t si;
+    int ret = waitid(P_PID, pid, &si,  WEXITED);
+    if(ret == -1)
+        FAIL("wait child fail");
+    else {
+        if(si.si_pid != pid ) {
+            DBG("pid %d mismatch waited %d", pid, si.si_pid);
+            FAIL("pid mismatch");
+        }
+        status = si.si_status;
+        DBG("parent waited st %d(0x%08X)", status, status);
+        ENSURE(si.si_code == CLD_DUMPED);
+
+        ENSURE(WIFSIGNALED(status));
+        DBG("Term sig %s", strsig(WTERMSIG(status)));
+        /**
+         * core dump flag is not included in si.status
+         * but si.si_code can be used to get this indication
+         */
+        /*ENSURE(WCOREDUMP(status));*/
+    }
+
+    return 0;
+}
+int c_wait_coredump(void) {
+
+    ENSURE(0);
+    return 0;
+}
+/**
+ * test wait for failed normal exit
+ */
+int p_wait_sigterm(pid_t pid) {
+    int status;
+
+    pid_t c_pid = waitpid(-1, &status, WNOHANG);
+    ENSURE(c_pid == 0);
+
+    kill(pid, SIGTERM);
+
+    sleep(1);
+    c_pid = waitpid(-1, &status, WNOHANG);
+    if(c_pid == -1)
+        FAIL("wait child fail");
+    else {
+        DBG("parent waited st %d(0x%08X)", status, status);
+        if(pid != c_pid) {
+            DBG("pid %d mismatch waited %d", pid, c_pid);
+            FAIL("pid mismatch");
+        }
+
+        ENSURE(WIFSIGNALED(status));
+        ENSURE(WTERMSIG(status) == SIGTERM);
+    }
+
+    return 0;
+}
+int c_wait_sigterm(void) {
+
+    /**
+     * Child will exit by SIGTERM even in sleep
+     */
+    sleep(10);
+    return 0;
+}
+/**
+ * test wait for failed normal exit
+ */
+int p_wait_normal_fail(pid_t pid) {
+    int status;
+
+    pid_t c_pid = wait(&status);
+    if(c_pid == -1)
+        FAIL("wait child fail");
+    else {
+        DBG("parent waited st %d(0x%08X)", status, status);
+        if(pid != c_pid) {
+            DBG("pid %d mismatch waited %d", pid, c_pid);
+            FAIL("pid mismatch");
+        }
+
+        ENSURE(WIFEXITED(status));
+        ENSURE(WEXITSTATUS(status) == 1);
+    }
+
+    return 0;
+}
+int c_wait_normal_fail(void) {
+
+    return 1;
+}
+
+/**
+ * test wait for succeed normal exit
+ */
+int p_wait_normal_succeed(pid_t pid) {
+    int status;
+
+    pid_t c_pid = wait(&status);
+    if(c_pid == -1)
+        FAIL("wait child fail");
+    else {
+        if(pid != c_pid) {
+            DBG("pid %d mismatch waited %d", pid, c_pid);
+            FAIL("pid mismatch");
+        }
+
+        ENSURE(WIFEXITED(status));
+        ENSURE(WEXITSTATUS(status) == 0);
+    }
+
+    return 0;
+}
+int c_wait_normal_succeed(void) {
+
+    return 0;
+}
+
+#define START_FORK(case) \
+    do {\
+        int ret = start_fork("test_"#case, p_##case, c_##case);\
+        if(!bParent)\
+            return ret;\
+        else if(ret)\
+            FAIL("Test failed");\
+    }while(0)
+
+void child_exit(void) {
+    DBG("Child %lld exit", (intmax_t)getpid());
+}
+int start_fork(const char * strcase, int (*parent)(pid_t pid), int (*child)(void)) {
+    pid_t pid;
+    int ret = 0;
+
+    DBG("=====================================");
+    DBG("Start case %s", strcase);
+
+    pid = fork();
+    if(pid == -1)
+        FAIL("Forking");
+    else if(pid == 0) {
+        bParent = 0;
+
+        if(child) ret = child();
+        DBG("Child ret %d", ret);
+
+        if(atexit(child_exit) != 0)
+            FAIL("child atexit fail");
+    } else {
+        sleep(1);
+        if(parent) ret = parent(pid);
+    }
+
+    return ret;
+}
+
+int main(int argc, char *argv[]) {
+
+    START_FORK(wait_normal_succeed);
+    START_FORK(wait_normal_fail);
+    START_FORK(wait_sigterm);
+    START_FORK(wait_coredump);
+    START_FORK(wait_fpg);
+
+    if(bParent && on_exit(parent_exit, "Jiang") != 0)
+        FAIL("Parent exit");
+
+    return 0;
 }

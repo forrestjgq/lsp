@@ -19,7 +19,7 @@ compile() {
     for cfile in *.c
     do
         obj=${cfile%.c}
-        gcc -Wall -I../include $cfile -o $obj
+        gcc -Wall -I../include $cfile ../util/dbg.c -o $obj
         if [ $? -ne 0 ]; then
             echo "$cfile compiling failed"
             clean
@@ -33,12 +33,9 @@ t_fork() {
     echo ""
     echo "Start test fork.c"
     echo "======================================="
-    cp fork.c test.txt
     ./fork
-    head -c 120 test.txt
     echo ""
     echo "fork done"
-    rm test.txt
 
 }
 
