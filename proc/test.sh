@@ -6,6 +6,11 @@ if [ $# -eq 1 ]; then
 fi
 
 echo "target = $target"
+
+lspath="/bin/ls"
+if ! [ -e $lspath ]; then
+    lspath="/usr/bin/ls"
+fi
 clean() 
 {
     for cfile in *.c
@@ -71,7 +76,7 @@ t_execl() {
     echo "Start test execl.c"
     echo "======================================="
     echo "Please input 0 to 9 to start, q to end"
-    ./execl /usr/bin/ls dir
+    ./execl $lspath dir
     ret=$?
     echo ""
     echo "id done"
@@ -117,7 +122,7 @@ t_execv() {
     echo ""
     echo "Start test execv.c"
     echo "======================================="
-    ./execv /usr/bin/ls dir -l
+    ./execv $lspath dir -l
 
     ret=$?
 
