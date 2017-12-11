@@ -1,8 +1,12 @@
+#define _DEFAULT_SOURCE
+
 #include <stdio.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <time.h>
+#include <sys/resource.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
@@ -18,12 +22,42 @@ void parent_exit(int v, void *p){
 }
 
 /**
- * test wait for failed normal exit
+ * test wait4 for NULL ptr write(SIGSEGV)
+ */
+int p_wait_segv(pid_t pid) {
+    int status;
+    struct rusage rs;
+
+    pid_t c_pid = wait4(pid, &status, 0, &rs);
+    if(c_pid == -1)
+        FAIL("wait child fail");
+    else {
+        DBG("parent waited st %d(0x%08X)", status, status);
+        if(pid != c_pid) {
+            DBG("pid %d mismatch waited %d", pid, c_pid);
+            FAIL("pid mismatch");
+        }
+
+        ENSURE(WIFSIGNALED(status));
+        DBG("Term sig %s", strsig(WTERMSIG(status)));
+        ENSURE(WCOREDUMP(status));
+    }
+
+    return 0;
+}
+int c_wait_segv(void) {
+    char *s = NULL;
+    *s = 0;
+    return 0;
+}
+/**
+ * test wait3 for divide-0 (SIGFPE)
  */
 int p_wait_fpg(pid_t pid) {
     int status;
+    struct rusage rs;
 
-    pid_t c_pid = wait(&status);
+    pid_t c_pid = wait3(&status, 0, &rs);
     if(c_pid == -1)
         FAIL("wait child fail");
     else {
@@ -49,13 +83,14 @@ int c_wait_fpg(void) {
     return 0;
 }
 /**
- * test wait for failed normal exit
+ * test waitid for assert/abort(SIGABT)
  */
 int p_wait_coredump(pid_t pid) {
     int status;
-
     siginfo_t si;
+
     int ret = waitid(P_PID, pid, &si,  WEXITED);
+
     if(ret == -1)
         FAIL("wait child fail");
     else {
@@ -84,7 +119,7 @@ int c_wait_coredump(void) {
     return 0;
 }
 /**
- * test wait for failed normal exit
+ * test waitpid for termination(SIGTERM)
  */
 int p_wait_sigterm(pid_t pid) {
     int status;
@@ -182,7 +217,7 @@ int c_wait_normal_succeed(void) {
     }while(0)
 
 void child_exit(void) {
-    DBG("Child %lld exit", (intmax_t)getpid());
+    DBG("Child %jd exit", (intmax_t)getpid());
 }
 int start_fork(const char * strcase, int (*parent)(pid_t pid), int (*child)(void)) {
     pid_t pid;
@@ -217,6 +252,7 @@ int main(int argc, char *argv[]) {
     START_FORK(wait_sigterm);
     START_FORK(wait_coredump);
     START_FORK(wait_fpg);
+    START_FORK(wait_segv);
 
     if(bParent && on_exit(parent_exit, "Jiang") != 0)
         FAIL("Parent exit");

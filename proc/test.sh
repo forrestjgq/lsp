@@ -139,8 +139,28 @@ t_exec() {
     echo "exec done"
 }
 
+t_system() {
 
+    echo ""
+    echo "Start test exec.c"
+    echo "======================================="
+    ./system
+
+    echo ""
+    echo "exec done"
+}
+
+if [[ "$target" == "clean" ]]; then
+    clean
+    echo Cleaned
+    exit 0
+fi
 compile
+if [[ "$target" == "system" ]]; then
+    t_system
+    exit 0
+fi
+
 case $target in
     all)
         t_fork
@@ -163,6 +183,7 @@ case $target in
     execvp) t_execvp;;
     execve) t_execve;;
     exec) t_exec;;
+
     *)
         echo "invalid target $target"
         exit 3
