@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
     else
         DBG("fork test done, status %d", WEXITSTATUS(ret));
 
-    ret = system("./test.sh");
+    ret = system("./test.sh fork");
     if(ret == -1)
         FAIL("system 2");
     else
