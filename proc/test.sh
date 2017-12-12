@@ -41,156 +41,82 @@ compile() {
     return 0
 }
 
-t_fork() {
-    ret=0
-    echo ""
-    echo "Start test fork.c"
-    echo "======================================="
-    ./fork
-    ret=$?
-    echo ""
-    echo "fork done"
+test_single() {
+    if [ $# -ne 1 ]; then
+        echo "test target must be given"
+        return 1
+    fi
+    
+    target=$1
+    case $target in
+        fork)
+            ./fork
+            ret=$?
+            ;;
+        id)
+            ./id | ./id | ./id | ./id
+            ret=$?
+            ;;
+        execl)
+            ./execl $lspath dir
+            ret=$?
+            ;;
+        execle)
+            ./execle
+            ret=$?
+            ;;
+        execlp)
+            ./execlp ls dir
+            ret=$?
+            ;;
+        execv)
+            ./execv $lspath dir -l
+            ret=$?
+            ;;
+        execvp)
+            ./execvp ls dir -l
+            ret=$?
+            ;;
+        execve)
+            ./execve
+            ret=$?
+            ;;
+        exec)
+            ./exec 0
+            ret=$?
+            ;;
+        system)
+            ./system
+            ret=$?
+            ;;
+        session)
+            ./session
+            ret=$?
+            ;;
+        daemon|daemon1)
+            ./$target
+            sleep 1
+            pid=`ps aux | grep ./$target | grep -v grep | awk '{print $2}'`
+            echo "daemon pid $pid"
+            if [ "x$pid" == "x" ]; then
+                ret=1
+            else
+                kill -9 $pid
+                pid=`ps aux | grep ./$target | grep -v grep | awk '{print $2}'`
+                if [ "x$pid" != "x" ]; then
+                    ret=2
+                fi
+            fi
+            ;;
+        *)
+            echo "$target test not supported"
+            ret=10
+    esac
 
     return $ret
 }
 
-t_id() {
-
-    ret=0
-    echo ""
-    echo "Start test id.c"
-    echo "======================================="
-    echo "Please input 0 to 9 to start, q to end"
-    ./id | ./id | ./id | ./id
-    ret=$?
-
-    echo ""
-    echo "id done"
-    return $ret
-}
-
-t_execl() {
-
-    ret=0
-    echo ""
-    echo "Start test execl.c"
-    echo "======================================="
-    echo "Please input 0 to 9 to start, q to end"
-    ./execl $lspath dir
-    ret=$?
-    echo ""
-    echo "id done"
-    return $ret
-}
-
-
-t_execle() {
-
-    ret=0
-    echo ""
-    echo "Start test execle.c"
-    echo "======================================="
-    ./execle
-    ret=$?
-
-
-    echo ""
-    echo "execle done"
-    return $ret
-}
-
-
-t_execlp() {
-
-    ret=0
-    echo ""
-    echo "Start test execlp.c"
-    echo "======================================="
-    ./execlp ls dir
-
-    ret=$?
-
-    echo ""
-    echo "execlp done"
-    return $ret
-}
-
-
-t_execv() {
-
-    ret=0
-    echo ""
-    echo "Start test execv.c"
-    echo "======================================="
-    ./execv $lspath dir -l
-
-    ret=$?
-
-    echo ""
-    echo "execv done"
-    return $ret
-}
-
-
-t_execvp() {
-
-    ret=0
-    echo ""
-    echo "Start test execvp.c"
-    echo "======================================="
-    ./execvp ls dir -l
-    ret=$?
-
-
-    echo ""
-    echo "execvp done"
-    return $ret
-}
-
-
-t_execve() {
-
-    ret=0
-    echo ""
-    echo "Start test execve.c"
-    echo "======================================="
-    ./execve
-
-    ret=$?
-
-    echo ""
-    echo "execve done"
-    return $ret
-}
-
-
-t_exec() {
-
-    ret=0
-    echo ""
-    echo "Start test exec.c"
-    echo "======================================="
-    ./exec 0
-
-    ret=$?
-    echo ""
-    echo "exec done"
-    return $ret
-}
-
-t_system() {
-
-    ret=0
-    echo ""
-    echo "Start test exec.c"
-    echo "======================================="
-    ./system
-    ret=$?
-
-    echo ""
-    echo "exec done"
-    return $ret
-}
+    
 t_all() {
     ret=0
     for cfile in *.c
@@ -202,12 +128,23 @@ t_all() {
             break
         fi
 
-        t_$obj
-        if [ $? -ne 0 ]; then
+        echo ""
+        echo "Start test $obj.c"
+        echo "----------------------------------------"
+
+        test_single $obj
+        code=$?
+
+        echo "----------------------------------------"
+        if [ $code -eq 0 ]; then
+            echo "$obj.c succeed"
+        else
+            echo "$obj.c failed"
             ret=2
             break
         fi
     done
+
     clean
     return $ret
 }
@@ -220,7 +157,7 @@ case $target in
         echo Cleaned
         ;;
     all)
-        t_$target
+        t_all
         code=$?
         ;;
 
@@ -228,8 +165,17 @@ case $target in
         compile $target
         code=$?
         if [ $code -eq 0 ]; then
-            t_$target
+            echo ""
+            echo "Start test $target.c"
+            echo "----------------------------------------"
+            test_single $target
             code=$?
+            echo "----------------------------------------"
+            if [ $code -eq 0 ]; then
+                echo "$target.c succeed"
+            else
+                echo "$target.c failed"
+            fi
         fi
         rm -f $target $target.exe
 esac

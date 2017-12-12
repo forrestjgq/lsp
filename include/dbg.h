@@ -18,7 +18,7 @@
         return 1;\
     }while(0)
 
-#define PERR(fmt, ...) dprintf(STDOUT_FILENO, fmt "\n", ##__VA_ARGS__)
+#define PERR(fmt, ...) dprintf(STDERR_FILENO, fmt "\n", ##__VA_ARGS__)
 
 #define ENSURE(expr) \
     do {\
