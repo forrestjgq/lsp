@@ -49,20 +49,12 @@ test_single() {
     
     target=$1
     case $target in
-        fork)
-            ./fork
-            ret=$?
-            ;;
         id)
             ./id | ./id | ./id | ./id
             ret=$?
             ;;
         execl)
             ./execl $lspath dir
-            ret=$?
-            ;;
-        execle)
-            ./execle
             ret=$?
             ;;
         execlp)
@@ -77,20 +69,8 @@ test_single() {
             ./execvp ls dir -l
             ret=$?
             ;;
-        execve)
-            ./execve
-            ret=$?
-            ;;
         exec)
             ./exec 0
-            ret=$?
-            ;;
-        system)
-            ./system
-            ret=$?
-            ;;
-        session)
-            ./session
             ret=$?
             ;;
         daemon|daemon1)
@@ -109,8 +89,14 @@ test_single() {
             fi
             ;;
         *)
-            echo "$target test not supported"
-            ret=10
+            if [ -e ./$target ]; then
+                ./$target
+                ret=$?
+            else
+                echo "$target test not supported"
+                ret=10
+            fi
+            ;;
     esac
 
     return $ret
