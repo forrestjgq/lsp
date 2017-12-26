@@ -1,12 +1,28 @@
+# From the maker
+
+\<\<Programming with POSIX thread\>\> by David R. Butenhof is a guide book for pthread development. Unfortunately this book is published too early and never been updated. That is why no all-text PDF can be found on internet.
+
+I'm really troubled reading ugly ebook.
+
+So I extract text from djvu file by OCR and re-structure and correct them with markdown, which you are reading.
+
+It's a huge work for me, and I wish I can finish it.
+
+The OCR is not that clever, and I'm not that careful. So mistakes might be hidden in the book. Please tell me if you found any.
+
+Forrest
+
+mr.jianggq@gmail.com
+
+12/26/2017
+
 # Preface
 
 Lewis Carroll, Alice's Adventures in Wonderland
-
-> The White Rabbit put on his spectacles,
-> "Where shall I begin, please your Majesty?" he asked.
-> "Begin at the beginning," the King said, very gravely,
+> The White Rabbit put on his spectacles,  
+> "Where shall I begin, please your Majesty?" he asked.  
+> "Begin at the beginning," the King said, very gravely,  
 > "and go on till you come to the end: then stop."
-
 
 This book is about "threads" and how to use them. "Thread" is just a name for a basic software "thing" that can do work on a computer. A thread is smaller, faster, and more maneuverable than a traditional process. In fact, once threads have been added to an operating system, a "process" becomes just data-address space, files, and so forth-plus one or more threads that do something with all that data.
 
@@ -74,12 +90,11 @@ December 1996
 
 # 1 Introduction
 Lewis Carroll, Through the Looking-Glass:
-
-> 'The time has come," the Walrus said,
-> "To talk of many things;
-> Of shoes-and ships-and sealing wax-
-> Of cabbages-and kings-
-> And why the sea is boiling hot-
+> 'The time has come," the Walrus said,  
+> "To talk of many things;  
+> Of shoes-and ships-and sealing wax-  
+> Of cabbages-and kings-  
+> And why the sea is boiling hot-  
 > And whether pigs have wings."
 
 In a dictionary, you would probably see that one of several definitions for "thread" is along the lines of the third definition in the American Heritage paperback dictionary on my desk: "Anything suggestive of the continuousness and sequence of thread." In computer terms, a thread is the set of properties that suggest "continuousness and sequence" within the machine. A thread comprises the machine state necessary to execute a sequence of machine instructions-the location of the current instruction, the machine's address and data registers, and so forth.
@@ -94,9 +109,8 @@ Section 1.1 presents the framework for a number of analogies that I will use to 
 
 Section 1.2 defines some essential concepts and terms used in this book. The most important of these concepts deserves a special introduction, which will also serve to demonstrate the convention with which various particularly important points shall be emphasized throughout this book:
 
-> **I Asynchronous**:
-> Any two operations are "asynchronous" when they can proceed
-> independently of each other.
+> **I Asynchronous**:  
+> Any two operations are "asynchronous" when they can proceed independently of each other
 
 Section 1.3 describes how you already use asynchronous programming on a regular basis, both as a UNIX programmer and user, and as a human being in the real world. I wouldn't dare to claim that asynchronous programming is easy, but the basic concepts it tries to model are so easy and natural that you rarely need even to think about them until you try to apply them to software. 
 
@@ -113,9 +127,9 @@ You will know at that point what threads are, what they do, and when to use them
 ## 1.1 The "bailing programmers"
 
 Lewis Carroll, The Hunting of the Snark:
-> This was charming, no doubt: but they shortly found out
-> That the Captain they trusted so well
-> Had only one notion for crossing the ocean,
+> This was charming, no doubt: but they shortly found out  
+> That the Captain they trusted so well  
+> Had only one notion for crossing the ocean,  
 > And that was to tingle his bell.
 
 Three programmers sail out to sea one fine day in a small boat, They sail quite some distance from shore, enjoying the sun and sea breeze, allowing the wind to carry them. The sky darkens, and a storm strikes. The small boat is tossed violently about, and when the storm abates the programmers are missing their boat's sail and most of the mast. The boat has sprung a small leak, and there is no land in sight.
@@ -138,8 +152,7 @@ So, just what do the Bailing Programmers have to do with threads? I'm glad you a
 ## 1.2 Definitions and terminology
 
 Lewis Carroll, Through the Looking-Glass:
-
-> "When I use a word," Humpty Dumpty said, in rather a scornful tone,
+> "When I use a word," Humpty Dumpty said, in rather a scornful tone,  
 > "it means just what I choose it to mean-neither more nor less."
 
 This book will use several critical terms that may be unfamiliar to you unless you've already had some experience with parallel or asynchronous programming. Even if you are familiar with them, some of the terms have seen assorted and even contradictory uses within research and industry, and that is clearly not going to help communication. We need to begin by coming to a mutual agreement regarding the meaning of these terms, and, since I am writing the book, we will agree to use my definitions. (Thank you.)
@@ -202,9 +215,7 @@ There are many ways to provide each of these facilities-but they are always pres
 | Real traffic          | automobile        | traffic lights and signs | turn signals and brake lights        |
 | UNIX (before threads) | process           | priority (nice)          | wait and pipes                       |
 | Pthreads              | thread            | policy, priority         | condition variables and mutexes      |
-
-
-**TABLE 1.1** *Execution contexts, schedulers, and synchronization*
+<center>**TABLE 1.1** *Execution contexts, schedulers, and synchronization*</center>
 
 A system's scheduling facility may allow each thread to run until it voluntarily yields the processor to another thread ("run until block"). It may provide timeslicing, where each thread is forced to periodically yield so that other threads may run ("round-robin"). It may provide various scheduling policies that allow the application to control how each thread is scheduled according to that thread's function. It may provide a "class scheduler" where dependencies between threads are described so that, for example, the scheduler can ensure that members of a tightly coupled parallel algorithm are scheduled at the same time.
 
@@ -218,11 +229,10 @@ The terms thread, mutex, and condition variable are the main topics of this book
 ## 1.3 Asynchronous programming is intuitive ...
 
 Lewis Carroll, Through the Looking-Glass:
-
-> "In most gardens," the Tiger-lily said,
-> "they make the beds too soft-so that the flowers are always asleep.'
-> This sounded a very good reason, and Alice was quite
-> pleased to know it.
+> "In most gardens," the Tiger-lily said,  
+> "they make the beds too soft-so that the flowers are always asleep.'  
+> This sounded a very good reason, and Alice was quite  
+> pleased to know it.  
 > "I never thought of that before!" she said.
 
 If you haven't been involved in traditional realtime programming, asynchronous programming may seem new and different. But you've probably been using asynchronous programming techniques all along. You've probably used UNIX, for example, and, even as a user, the common UNIX shells from sh to ksh have been designed for asynchronous programming. You've also been using asynchronous "programming" techniques in real life since you were born.
@@ -286,7 +296,7 @@ All of these programs do something, but many do not do anything of any particula
 
 Within the book, examples are presented in sections, usually one function at a time. The source code is separated from the surrounding text by a header and trailer block which include the file name and, if the example comprises more than one section, a section number and the name of the function. Each line of the source code has a line number at the left margin. Major functional blocks of each section are described in specially formatted paragraphs preceding the source code. These paragraphs are marked by line numbers outside the left margin of the paragraph, denoting the line numbers in the source listing to which the paragraph refers. Here's an example:
 
-> **Example 1-2**
+> **Example 1-2**  
 > These lines show the header files included in most of the examples. The \<pthread.h\> header file declares constants and prototypes for the Pthreads functions, and the errors.h header file includes various other headers and some error-checking functions.
 
  ```c
@@ -305,10 +315,9 @@ On Solaris 2.5 systems, several of the examples require calls to **thr\_setconcu
 ## 1.5 Asynchronous programming, by example
 
 Lewis Carroll, The Hunting of the Snark:
-
-> "In one moment I've seen what has hitherto been
-> Enveloped in absolute mystery,
-> And without extra charge I will give you at large
+> "In one moment I've seen what has hitherto been  
+> Enveloped in absolute mystery,  
+> And without extra charge I will give you at large  
 > A Lesson in Natural History."
 
 This section demonstrates some basic asynchronous programming, using a simple program that does something vaguely useful, by pretending to be an alarm clock with a command interface for which you would not consider paying a dime in a store. But then, this book is about threads, not user interfaces, and the code that I need to show takes up quite enough space already.
@@ -529,11 +538,11 @@ A more sophisticated version of **alarm\_thread.c** might use only two threads: 
 
 
 ## 1.6 Benefits of threading
-Lewis Carroll, Through the Looking-Glass:
 
-> "'O Looklng-Glass creatures,'quoth Alice, 'draw near!
-> 'Tis an honour to see me, a favour to hear:
-> 'Tis a privilege high to have dinner and tea
+Lewis Carroll, Through the Looking-Glass:
+> "'O Looklng-Glass creatures,'quoth Alice, 'draw near!  
+> 'Tis an honour to see me, a favour to hear:  
+> 'Tis a privilege high to have dinner and tea  
 > Along with the Red Queen, the White Queen, and me!'"
 
 Some advantages of the multithreaded programming model follow:
@@ -547,12 +556,12 @@ These advantages are detailed in the following sections.
 ### 1.6.1 Parallelism
 
 On a multiprocessor system, threading allows a process to perform more than one independent computation at the same time. A computation-intensive threaded application running on two processors may achieve nearly twice the performance of a traditional single-threaded version. "Nearly twice" takes into account the fact that you'll always have some overhead due to creating the extra thread(s) and performing synchronization. This effect is often referred to as "scaling." A two-processor system may perform 1.95 times as fast as a single processor, a three-processor system 2.9 times as fast, a four-processor system 3.8 times as fast, and so forth. Scaling almost always falls off as the number of processors increases because there's more chance of lock and memory collisions, which cost time.
-
+<div align="center">
 $$
 Speedup = \frac{1}{\left ( 1 - p \right ) + \frac{p}{n}}
 $$
-
-**FIGURE 1.1** Amdahl's law
+</div>
+<center>**FIGURE 1.1** Amdahl's law</center>
 
 Scaling can be predicted by "Amdahl's law," which is shown in Figure 1.1. In the equation, *p* represents the ratio of "parallelizable code" over "total execution time", and *n* represents the number of processors the code can use. The total elapsed time for a parallel job is the sum of the elapsed time for the nonparallelizable work *(1 - p)* and the elapsed time for each processor executing the parallelizable work *(p/n)*.
 
@@ -560,7 +569,9 @@ Amdahl's law is a simple relationship showing how parallelism is limited by the 
 
 The diagram in Figure 1.2 shows the effect of Amdahl's law. "Clock time" progresses from left to right across the page, and the diagram shows the number of processors working in parallel at any moment. Areas where the diagram has only a single horizontal line show that the process is serialized. Areas that have several horizontal lines in parallel show where the process benefits from multiple processors. If you can apply multiple processors for only 10% of your program's execution time, and you have four processors, then Amdahl's law predicts a speedup of **1 / (0.9+ (0.1 /4))**, or about 8%.
 
+<div align="center">
 ![**FIGURE 1.2** Parallelism charted against time](./img/fig1.2.png)
+</div>
 
 Operations on large matrices can often be "parallelized" by splitting the matrix into pieces. For example, each thread may be able to operate on a set of rows or columns without requiring any data written by threads operating on other slices. You still generally need to synchronize threads at the beginning and end of processing the matrix, frequently using a barrier.(see below) Amdahl's law shows that you'll get better performance by giving each thread a large and relatively independent "chunk" of work, requiring infrequent synchronization, than by giving them smaller chunks.
 
@@ -616,10 +627,9 @@ An assembly language programmer can write better, more maintainable assembly cod
 
 ## 1.7 Costs of threading
 Lewis Carroll, Through the Looking-Glass:
-
-> All this time the Guard was looking at her, first through a telescope, then
-> through a microscope, and then through an opera-glass.
-> At last he said, "You're traveling the wrong way,"
+> All this time the Guard was looking at her, first through a telescope, then  
+> through a microscope, and then through an opera-glass.  
+> At last he said, "You're traveling the wrong way,"  
 > and shut up the window, and went away.
 
 Of course there's always "the flip side." As I showed in the previous section, threads provide definite and powerful advantages, even on uniprocessor systems. They provide even more advantages on a multiprocessor.
@@ -663,10 +673,9 @@ Your most powerful and portable thread debugging tool is your mind, applied thro
 ## 1.8 To thread or not to thread?
 
 Lewis Carroll, The Hunting of the Snark:
-
-> "My poor client's fate now depends on your votes."
-> Here the speaker sat down in his place,
-> And directed the Judge to refer to his notes
+> "My poor client's fate now depends on your votes."  
+> Here the speaker sat down in his place,  
+> And directed the Judge to refer to his notes  
 > And briefly to sum up the case.
 
 Threads don't necessarily provide the best solution to every programming problem. They're not always easier to use, and they don't always result in better performance.
@@ -685,12 +694,11 @@ So should you use threads? You probably won't find them appropriate for every pr
 ## 1.9 POSIX thread concepts
 
 Lewis Carroll. Through the Looking-Glass:
-
-> "You seem very clever at explaining words, Sir," said Alice.
-> "Would you kindly tell me the meaning of the poem
-> called 'Jabberwocky'?"
-> "Let's hear it," said Humpty Dumpty. "I can explain all
-> the poems that ever were invented-and a good many
+> "You seem very clever at explaining words, Sir," said Alice.  
+> "Would you kindly tell me the meaning of the poem  
+> called 'Jabberwocky'?"  
+> "Let's hear it," said Humpty Dumpty. "I can explain all  
+> the poems that ever were invented-and a good many  
 > that haven't been invented just yet."
 
 First of all, this book focuses on "POSIX threads." Technically, that means the thread "application programming interfaces" (API) specified by the international formal standard POSIX 1003.1c-1995. This standard was approved by the IEEE in June 1995. A new edition of POSIX 1003.1, called ISO/IEC 9945-1:1996 (ANSI/ IEEE Std 1003.1, 1996 Edition) is available from the IEEE.(see below) This new document includes 1003.1b-1993 (realtime), 1003.1c-1995 (threads), and 1003.H-1995 (corrections to 1003.1b-1993). Unless you are writing an implementation of the standard, or are extremely curious, you probably don't want to bother buying the POSIX standard. For writing threaded code, you'll find books like this one much more useful, supplemented by the programming documentation for the operating system you're using.
@@ -721,26 +729,21 @@ pthread\_attr\_t      | 5.2.3   | thread attributes object
 pthread\_mutexattr\_t | 5.2.1   | mutex attributes object
 pthread\_condattr\_t  | 5.2.2   | condition variable attributes object
 pthread\_once\_t      | 5.1     | "one time initialization" control context
+<center>**TABLE 1.2** *POSIX threads types*</center>
 
-**TABLE 1.2** POSIX threads types
-
-> All Pthreads types are "opaque,"
-> Portable code cannot make assumptions regarding the representation
-> of these types.
+> All Pthreads types are "opaque," Portable code cannot make assumptions regarding the representation of these types.
 
 All of the "pthread" types listed in Table 1.2 are considered opaque. There is no public definition of these types' representation, and programmers should never assume anything about the representation. You should use them only in the manner specifically described by the standard. A thread identifier, for example, may be an integer, or a pointer, or a structure, and any code that uses a thread identifier in a way that is not compatible with all of those definitions is incorrect.
 
 ### 1.9.3 Checking for errors
 
-> Pthreads introduces a new way to report errors, without using the
-> errno variable.
+> Pthreads introduces a new way to report errors, without using the errno variable.
 
 The Pthreads amendment is the first part of POSIX to depart from the ancient UNIX and C language conventions regarding error status. Traditionally, functions that succeed returned a useful value if appropriate, or otherwise indicated success by returning the value 0. On failure, they returned the special value -1, and set the global value errno to a code specifying the type of error.
 
 The old mechanism has a number of problems, including the fact that it is difficult to create a function that can both report an error and return a useful value of -1. There are even worse problems when you add multiple threads to a process. In traditional UNIX systems, and in the original POSIX. 1-1990 standard, errno was an extern int variable. Since such a variable can have only one value at a time, it can support only a single stream of execution within the process.
 
-> Pthreads functions don't set errno on errors!
-> (But most other POSIX functions do.)
+> Pthreads functions don't set errno on errors! (But most other POSIX functions do.)
 
 New functions in the Pthreads standard reserve the return value for error status, and errno is not used. Pthreads functions return the value 0 on success, and include an extra output parameter to specify an address where "useful results" are stored. When a function cannot complete successfully, an error code from the <errno.h> header file is returned instead of 0 as the function value.
 
@@ -839,13 +842,13 @@ The one exception to the Pthreads error rules is **pthread\_getspecific**, which
 
 
 # 2 Threads
-Lewis Carroll, Through the Looking-Glass:
 
-> "If seven maids with seven mops
-> Swept it for half a year,
-> Do you suppose," the Walrus said,
-> "That they could get it clear?"
-> "I doubt it," said the Carpenter,
+Lewis Carroll, Through the Looking-Glass:
+> "If seven maids with seven mops  
+> Swept it for half a year,  
+> Do you suppose," the Walrus said,  
+> "That they could get it clear?"  
+> "I doubt it," said the Carpenter,  
 > And shed a bitter tear.
 
 Threads are (and perhaps this will come as no surprise) the essential basis of the style of programming that I am advocating. Although this chapter focuses on threads, you will never learn everything you need to know about threads by simply skipping to this chapter and reading it. Threads are a critical part of the landscape, but you can't do much with only threads. Nevertheless, one must start somewhere, and here we are.
@@ -856,12 +859,11 @@ Section 2.2 describes the life cycle of a thread, from creation through "recycli
 
 ## 2.1 Creating and using threads
 Lewis Carroll, Through the Looking-Glass:
-
-> "A loaf of bread," the Walrus said,
-> "Is what we chiefly need:
-> Pepper and vinegar besides
-> Are very good indeed-
-> Now, if you're ready, Oysters dear,
+> "A loaf of bread," the Walrus said,  
+> "Is what we chiefly need:  
+> Pepper and vinegar besides  
+> Are very good indeed-  
+> Now, if you're ready, Oysters dear,  
 > We can begin to feed."
 
 ```c
@@ -954,10 +956,9 @@ When the call to **pthread\_join** returns, the joinee has been detached and you
 ## 2.2 The life of a thread
 
 Lewis Carroll, The Hunting of the Snark:
-
-> Come, listen, my men, while I tell you again
-> The five unmistakable marks
-> By which you may know, wheresoever you go,
+> Come, listen, my men, while I tell you again  
+> The five unmistakable marks  
+> By which you may know, wheresoever you go,  
 > The warranted genuine Snarks.
 
 At any instant, a thread is in one of the four basic states described in Table 2.1. In implementations, you may see additional "states" that distinguish between various reasons for entering the four basic states. Digital UNIX, for example, represents these finer distinctions as "substates," of which each state may have several. Whether they're called "substates" or additional states, "terminated" might be divided into "exited" and "cancelled"; "blocked" might be broken up into "blocked on condition variable," "blocked on mutex," "blocked in read," and so forth.
@@ -968,8 +969,7 @@ Ready | The thread is able to run, but is waiting for a processor. It may have j
 Running | The thread is currently running; on a multiprocessor there may be more than one running thread in the process.
 Blocked | The thread is not able to run because it is waiting for something; for example, it may be waiting for a condition variable, or waiting to lock a mutex, or waiting for an I/O operation to complete.
 Terminated | The thread has terminated by returning from its start function, calling pthread exit, or having been cancelled and completing all cleanup handlers. It was not detached, and has not yet been joined. Once it is detached or joined, it will be recycled.
-
-**TABLE 2.1** Thread states
+<center>**TABLE 2.1** *Thread states*</center>
 
 These finer distinctions can be important in debugging and analyzing threaded programs. However, they do not add substantially to the basic understanding of thread scheduling, and we will not deal with them here.
 
@@ -980,7 +980,9 @@ The "initial thread" of a process is created when the process is created. In a s
 
 Additional threads are created by explicit calls. The primary way to create threads on a Pthreads system is to call **pthread\_create**. Threads may also be created when the process receives a POSIX signal if the process signal notify mechanism is set to **sigev\_thread**. Your system may provide additional nonstandard mechanisms to create a thread.
 
+<div align="center">
 ![FIGURE 2.1 Thread state transitions](./img/fig2.1.png)
+</div>
 
 When a new thread is created, its state is ready. Depending on scheduling constraints, it may remain in that state for a substantial period of time before executing. Section 5.5 contains more information on thread scheduling. Going back to lifecycle.c, the thread running **thread\_routine** becomes ready during main's call to **pthread\_create**, at line 18.
 
@@ -1033,9 +1035,8 @@ Recycling releases any system or process resources that weren't released at term
 # 3 Synchronization
 
 Lewis Carroll, Through the Looking-Glass:
-
-> "That's right!" said the Tiger-lily. "The daisies are worst of all.
-> When one speaks, they all begin together, and it's
+> "That's right!" said the Tiger-lily. "The daisies are worst of all.  
+> When one speaks, they all begin together, and it's  
 > enough to make one wither to hear the way they go on!"
 
 To write a program of any complexity using threads, you'll need to share data between threads, or cause various actions to be performed in some coherent order across multiple threads. To do this, you need to synchronize the activity of your threads.
@@ -1051,11 +1052,10 @@ Section 3.4 completes this chapter on synchronization with some important inform
 ## 3.1 Invariants, critical sections, and predicates
 
 Lewis Carroll, Through the Looking-Glass:
-
-> "/ know what you're thinking about,"
-> said Tweedledum; "but it isn't so, nohow."
-> "Contrariwise," continued Tweedledee,
-> "if it was so, it might be; and if it were so, it would be;
+> "/ know what you're thinking about,"  
+> said Tweedledum; "but it isn't so, nohow."  
+> "Contrariwise," continued Tweedledee,  
+> "if it was so, it might be; and if it were so, it would be;  
 > but as it isn't, it ain't. That's logic."
 
 Invariants are assumptions made by a program, especially assumptions about the relationships between sets of variables. When you build a queue package, for example, you need certain data. Each queue has a queue header, which is a pointer to the first queued data element. Each data element includes a pointer to the next data element. But the data isn't all that's important-your queue package relies on relationships between that data. The queue header, for example, must either be null or contain a pointer to the first queued data element. Each data element must contain a pointer to the next data element, or NULL if it is the last. Those relationships are the invariants of your queue package.
@@ -1073,11 +1073,10 @@ Synchronization is voluntary, and the participants must cooperate for the system
 ## 3.2 Mutexes
 
 Lewis Carroll, Alice's Adventures in Wonderland:
-
-> "How are you getting on?" said the Cat,
-> as soon as there was mouth enough for it to speak with.
-> Alice waited till the eyes appeared, and then nodded.
-> "It's no use speaking to it," she thought,
+> "How are you getting on?" said the Cat,  
+> as soon as there was mouth enough for it to speak with.  
+> Alice waited till the eyes appeared, and then nodded.  
+> "It's no use speaking to it," she thought,  
 > "till its ears have come, or at least one of them."
 
 Most threaded programs need to share some data between threads. There may be trouble if two threads try to access shared data at the same time, because one thread may be in the midst of modifying some data invariant while another acts on the data as if it were consistent. This section is all about protecting the program from that sort of trouble.
@@ -1090,7 +1089,9 @@ The programmers' bailing bucket is something like a mutex (Figure 3.1). Both are
 
 Synchronization isn't important just when you modify data. You also need synchronization when a thread needs to read data that was written by another thread, if the order in which the data was written matters. As we'll see a little later, in Section 3.4, many hardware systems don't guarantee that one processor will see shared memory accesses in the same order as another processor without a "nudge" from software.
 
+<div align="center">
 ![**FIGURE 3.1** Mutex analogy](./img/fig3.1.png)
+</div>
 
 Consider, for example, a thread that writes new data to an element in an array, and then updates a **max\_index** variable to indicate that the array element is valid. Now consider another thread, running simultaneously on another processor, that steps through the array performing some computation on each valid element. If the second thread "sees" the new value of **max\_index** before it sees the new value of the array element, the computation would be incorrect. This may seem irrational, but memory systems that work this way can be substantially faster than memory systems that guarantee predictable ordering of memory accesses. A mutex is one general solution to this sort of problem. If each thread locks a mutex around the section of code that's using shared data, only one thread will be able to enter the section at a time.
 
@@ -1098,7 +1099,9 @@ Figure 3.2 shows a timing diagram of three threads sharing a mutex. Sections of 
 
 Initially, the mutex is unlocked. Thread 1 locks the mutex and, because there is no contention, it succeeds immediately-thread l's line moves below the center of the box. Thread 2 then attempts to lock the mutex and, because the mutex is already locked, thread 2 blocks, its line remaining above the center line. Thread 1 unlocks the mutex, unblocking thread 2, which then succeeds in locking the mutex. Slightly later, thread 3 attempts to lock the mutex, and blocks. Thread 1 calls **pthread\_mutex\_trylock** to try to lock the mutex and, because the mutex is locked, returns immediately with EBUSY status. Thread 2 unlocks the mutex, which unblocks thread 3 so that it can lock the mutex. Finally, thread 3 unlocks the mutex to complete our example.
 
+<div align="center">
 ![**FIGURE 3.2** Mutex operation](./img/fig3.2.png)
+</div>
 
 ### 3.2.1 Creating and destroying a mutex
 
