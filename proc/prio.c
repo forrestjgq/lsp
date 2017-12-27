@@ -117,7 +117,7 @@ int t_prio(void){
         int prio1 = getpriority(PRIO_PROCESS, 0);
         if(errno)
             perror("get prio fail");
-        else if(prio1 != prio + 4)
+        else if(prio1 != prio + 3)
             DBG("Set prio mismatch %d", prio1);
         else
             DBG("prio1 %d", prio1);

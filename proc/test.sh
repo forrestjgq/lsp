@@ -69,6 +69,14 @@ test_single() {
             ./execvp ls dir -l
             ret=$?
             ;;
+        prio)
+            sudo ./prio
+            ret=$?
+            ;;
+        rt)
+            sudo ./rt
+            ret=$?
+            ;;
         exec)
             ./exec 0
             ret=$?

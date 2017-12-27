@@ -2511,3 +2511,26 @@ t+5  |                                | read "1" from address 1
 t+6  |                                | read "2" from address 2
 t+7  |                                | (memory barrier) unlock mutex
 <center>**FIGURE 3.10** *Memory ordering with synchronization*</center>
+
+
+
+
+# 4 A few ways to use threads
+Lewis Carroll, Alice's Adventures in Wonderland;
+> "They were obliged to have him with them," the Mock Turtle said.
+> "No wise fish would go anywhere without a porpoise."
+> "Wouldn't it, really?" said Alice, in a tone of great surprise.
+> "Of course not," said the Mock Turtle. "Why, if a fish came to me,
+> and told me he was going on a journey, I should say 'With what porpoise?'"
+
+During the introduction to this book, I mentioned some of the ways you can structure a threaded solution to a problem. There are infinite variations, but the primary models of threaded programming are shown in Table 4.1.
+
+|               |                                                                                                                                                                                      |
+| -------       | --------                                                                                                                                                                             |
+| Pipeline      | Each thread repeatedly performs the same operation on a sequence of data sets, passing each result to another thread for the next step. This is also known as an "assembly line."    |
+| Work crew     | Each thread performs an operation on its own data. Threads in a work crew may all perform the same operation, or each a sep- arate operation, but they always proceed independently. |
+| Client/server | A client "contracts" with an independent server for each job. Often the "contract" is anonymous-a request is made through some interface that queues the work item.                  |
+
+<center>**TABLE 4.**1 *Thread programming models*</center>
+
+All of these models can be combined in arbitrary ways and modified beyond all recognition to fit individual situations. A step in a pipeline could involve request- ing a service from a server thread, and the server might use a work crew, and one or more workers in the crew might use a pipeline. Or a parallel search "engine" might initiate several threads, each trying a different search algorithm.

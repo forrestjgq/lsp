@@ -1,43 +1,13 @@
 
-# 4 A few ways to use threads
-"They were obliged to have him with them," the Mock Turtle said.
-"No wise fish would go anywhere without a porpoise."
-"Wouldn't it, really?" said Alice, in a tone of great surprise.
-"Of course not," said the Mock Turtle. "Why, if a fish came to me,
-and told me he was going on a journey, I should say 'With what porpoise?'"
--Lewis Carroll, Alice's Adventures in Wonderland
-During the introduction to this book, I mentioned some of the ways you can
-structure a threaded solution to a problem. There are infinite variations, but the
-primary models of threaded programming are shown in Table 4.1.
-Pipeline
-Work crew
-Client/server
-Each thread repeatedly performs the same operation on a
-sequence of data sets, passing each result to another thread for
-the next step. This is also known as an "assembly line."
-Each thread performs an operation on its own data. Threads in
-a work crew may all perform the same operation, or each a sep-
-arate operation, but they always proceed independently.
-A client "contracts" with an independent server for each job.
-Often the "contract" is anonymous-a request is made through
-some interface that queues the work item.
-TABLE 4.1 Thread programming models
-All of these models can be combined in arbitrary ways and modified beyond all
-recognition to fit individual situations. A step in a pipeline could involve request-
-ing a service from a server thread, and the server might use a work crew, and one
-or more workers in the crew might use a pipeline. Or a parallel search "engine"
-might initiate several threads, each trying a different search algorithm.
-97
-98
-CHAPTER 4 A few ways to use threads
 ## 4.1 Pipeline
-"/ want a clean cup," interrupted the Hatter: "let's all move one place on."
-He moved on as he spoke, and the Dormouse followed him: the March Hare
-moved into the Dormouse's place, and Alice rather unwillingly took the
-place of the March Hare. The Hatter was the only one who got any
-advantage from the change; and Alice was a good deal worse off than
-before, as the March Hare had just upset the milk-jug into his plate.
--Lewis Carroll, Alice's Adventures in Wonderland
+Lewis Carroll, Alice's Adventures in Wonderland;
+> "/ want a clean cup," interrupted the Hatter: "let's all move one place on."
+> He moved on as he spoke, and the Dormouse followed him: the March Hare
+> moved into the Dormouse's place, and Alice rather unwillingly took the
+> place of the March Hare. The Hatter was the only one who got any
+> advantage from the change; and Alice was a good deal worse off than
+> before, as the March Hare had just upset the milk-jug into his plate.
+
 In pipelining, a stream of "data items" is processed serially by an ordered set
 of threads (Figure 4.1). Each thread performs a specific operation on each item in
 sequence, passing the data on to the next thread in the pipeline.
