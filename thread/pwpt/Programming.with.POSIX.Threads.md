@@ -1,2073 +1,5 @@
 
-3.2.2 Locking and unlocking a mutex
-```c
-int pthread_mutex_lock (pthread_mutex_t *mutex);
-int pthread_mutex_trylock (pthread_mutex_t *mutex);
-int pthread_mutex_unlock (pthread_mutex_t *mutex);
-```
-
-In the simplest case, using a mutex is easy. You lock the mutex by calling either pthread\_mutex\_lock or pthread\_mutex\_trylock, do something with the shared data, and then unlock the mutex by calling pthread\_mutex\_unlock. To make sure that a thread can read consistent values for a series of variables, you need to lock your mutex around any section of code that reads or writes those variables.
-
-You cannot lock a mutex when the calling thread already has that mutex locked. The result of attempting to do so may be an error return, or it may be a self-deadlock, with the unfortunate thread waiting forever for itself to unlock the mutex. (If you have access to a system supporting the UNIX98 thread extensions, you can create mutexes of various types, including recursive mutexes, which allow a thread to relock a mutex it already owns. The mutex type attribute is dis- cussed in Section 10.1.2.)
-
-The following program, alarm\_mutex.c, is an improved version of alarm\_ thread.c (from Chapter 1). It lines up multiple alarm requests in a single "alarm server" thread.
-
-The alarm\_t structure now contains an absolute time, as a standard UNIX time\_t, which is the number of seconds from the UNIX Epoch (Jan 1 1970 00:00) to the expiration time. This is necessary so that alarm\_t structures can be sorted by "expiration time" instead of merely by the requested number of seconds. In addition, there is a link member to connect the list of alarms.
-
-The alarm\_mutex mutex coordinates access to the list head for alarm requests, called alarm\_list. The mutex is statically initialized using default attributes, with the pthread\_mutex\_initializer macro. The list head is initial- ized to null, or empty.
-
-```c
-/** alarm_mutex.c part 1 definitions */
-#include <pthread.h>
-#include <time.h>
-#include "errors.h"
-
-/*
- * The "alarm" structure now contains the time_t (time since the
- * Epoch, in seconds) for each alarm, so that they can be
- * sorted. Storing the requested number of seconds would not be
- * enough, since the "alarm thread" cannot tell how long it has
- * been on the list.
- */
-typedef struct alarm_tag {
-    struct alarm_tag *link;
-    int seconds;
-    time_t time; /* seconds from EPOCH */
-    char message[64];
-} alarm_t;
-
-pthread_mutex_t alarm_mutex = PTHREAD_MUTEX_INITIALIZER;
-alarm_t *alarm_list = NULL;
-```
-
-The code for the alarm\_thread function follows. This function is run as a thread, and processes each alarm request in order from the list alarm\_list. The thread never terminates-when main returns, the thread simply "evaporates." The only consequence of this is that any remaining alarms will not be delivered- the thread maintains no state that can be seen outside the process.
-
-If you would prefer that the program process all outstanding alarm requests before exiting, you can easily modify the program to accomplish this. The main thread must notify alarm\_thread, by some means, that it should terminate when it finds the alarm\_list empty. You could, for example, have main set a new global variable alarm\_done and then terminate using pthread\_exit rather than exit. When alarm\_thread finds alarm\_list empty and alarm\_done set, it would immediately call pthread\_exit rather than waiting for a new entry.
-
-If there are no alarms on the list, alarm\_thread needs to block itself, with the mutex unlocked, at least for a short time, so that main will be able to add a new alarm. It does this by setting sleep\_time to one second.
-
-If an alarm is found, it is removed from the list. The current time is retrieved by calling the time function, and it is compared to the requested time for the alarm. If the alarm has already expired, then alarm\_thread will set sleep\_time to 0. If the alarm has not expired, alarm\_thread computes the difference between the current time and the alarm expiration time, and sets sleep\_time to that number of seconds.
-
-The mutex is always unlocked before sleeping or yielding. If the mutex remained locked, then main would be unable to insert a new alarm on the list. That would make the program behave synchronously-the user would have to wait until the alarm expired before doing anything else. (The user would be able to enter a single command, but would not receive another prompt until the next alarm expired.) Calling sleep blocks alarm\_thread for the required period of time-it cannot run until the timer expires.
-
-Calling sched\_yield instead is slightly different. We'll describe sched\_yield in detail later (in Section 5.5.2)-for now, just remember that calling sched\_yield will yield the processor to a thread that is ready to run, but will return immedi- ately if there are no ready threads. In this case, it means that the main thread will be allowed to process a user command if there's input waiting-but if the user hasn't entered a command, sched yield will return immediately.
-
-If the alarm pointer is not null, that is, if an alarm was processed from alarm\_list, the function prints a message indicating that the alarm has expired. After printing the message, it frees the alarm structure. The thread is now ready to process another alarm.
-
-```c
-/** alarm_mutex.c part 2 alarm_thread */
-/*
- * The alarm thread's start routine.
- */
-void *alarm_thread (void *arg)
-{
-    alarm_t *alarm;
-    int sleep_time;
-    time_t now;
-    int status;
-
-    /*
-     * Loop forever, processing commands. The alarm thread will
-     * be disintegrated when the process exits.
-     */
-    while (1) {
-        status = pthread_mutex_lock (&alarm_mutex);
-        if (status != 0)
-            err_abort (status, "Lock mutex");
-        alarm = alarm_list;
-
-        /*
-         * If the alarm list is empty, wait for one second. This
-         * allows the main thread to run, and read another
-         * command. If the list is not empty, remove the first
-         * item. Compute the number of seconds to wait - if the
-         * result is less than 0 (the time has passed), then set
-         * the sleep_time to 0.
-         */
-        if (alarm == NULL)
-            sleep_time = 1;
-        else {
-            alarm_list = alarm->link;
-            now = time (NULL);
-            if (alarm->time <= now)
-                sleep_time = 0;
-            else
-                sleep_time = alarm->time - now;
-        #ifdef DEBUG
-            printf ("[waiting: %d(%d)\"%s\"]\n", alarm->time,
-                sleep_time, alarm->message);
-        #endif
-        }
-
-        /*
-         * Unlock the mutex before waiting, so that the main
-         * thread can lock it to insert a new alarm request. If
-         * the sleep_time is 0, then call sched_yield, giving
-         * the main thread a chance to run if it has been
-         * readied by user input, without delaying the message
-         * if there's no input.
-         */
-        status = pthread_mutex_unlock (&alarm_mutex);
-        if (status != 0)
-            err_abort (status, "Unlock mutex");
-        if (sleep_time > 0)
-            sleep (sleep_time);
-        else
-            sched_yield ();
-
-        /*
-         * If a timer expired, print the message and free the
-         * structure.
-         */
-        if (alarm != NULL) {
-            printf ("(%d) %s\n", alarm->seconds, alarm->message);
-            free (alarm);
-        }
-    }
-}
-```
-And finally, the code for the main program for alarnwnutex.c. The basic
-structure is the same as all of the other versions of the alarm program that we've
-developed-a loop, reading simple commands from stdin and processing each in
-turn. This time, instead of waiting synchronously as in alarm, c, or creating a
-new asynchronous entity to process each alarm command as in alarm\_fork.c
-and alarm\_thread.c, each request is queued to a server thread, alarm\_thread.
-As soon as main has queued the request, it is free to read the next command.
-8-n Create the server thread that will process all alarm requests. Although we
-don't use it, the thread's ID is returned in local variable thread.
-13-28 Read and process a command, much as in any of the other versions of our
-alarm program. As in alarm\_thread.c, the data is stored in a heap structure
-allocated by ma Hoc.
-30-32 The program needs to add the alarm request to alarm\_list, which is shared
-by both alarm\_thread and main. So we start by locking the mutex that synchro-
-nizes access to the shared data, alarm\_mutex.
-33 Because alarm\_thread processes queued requests, serially, it has no way of
-knowing how much time has elapsed between reading the command and process-
-ing it. Therefore, the alarm structure includes the absolute time of the alarm
-expiration, which we calculate by adding the alarm interval, in seconds, to the
-56 CHAPTER 3 Synchronization
-current number of seconds since the UNIX Epoch, as returned by the time
-function.
-39-49 The alarms are sorted in order of expiration time on the alarm\_list queue.
-The insertion code searches the queue until it finds the first entry with a time
-greater than or equal to the new alarm's time. The new entry is inserted preced-
-ing the located entry. Because alarm\_list is a simple linked list, the traversal
-maintains a current entry pointer (this) and a pointer to the previous entry's
-link member, or to the alarm\_list head pointer (last).
-56-59 If no alarm with a time greater than or equal to the new alarm's time is found,
-then the new alarm is inserted at the end of the list. That is, if the alarm pointer
-is null on exit from the search loop (the last entry on the list always has a link
-pointer of null), the previous entry (or queue head) is made to point to the new
-entry.
-| alarm\_mutex.c part 3 main
-1 int main (int argc, char *argv[])
-2 {
-3 int status;
-4 char line[128];
-5 alarm\_t *alarm, **last, *next;
-6 pthread\_t thread;
-7
-8 status = pthread\_create (
-9 Sthread, NULL, alarm\_thread, NULL);
-10 if (status != 0)
-11 err\_abort (status, "Create alarm thread");
-12 while A) {
-13 printf ("alarm\> ");
-14 if (fgets (line, sizeof (line), stdin) == NULL) exit @);
-15 if (strlen (line) \<= 1) continue;
-16 alarm = (alarm\_t*)malloc (sizeof (alarm\_t));
-17 if (alarm == NULL)
-18 errno\_abort ("Allocate alarm");
-19
-20 /*
-21 * Parse input line into seconds (%d) and a message
-22 * (%64[A\n]), consisting of up to 64 characters
-23 * separated from the seconds by whitespace.
-24 */
-25 if (sscanf (line, "%d %64p\n]",
-26 &alarm-\>seconds, alarm-\>message) \< 2) {
-27 fprintf (stderr, "Bad command\n");
-28 free (alarm);
-29 } else {
-30 status = pthread\_mutex\_lock (&alarm\_mutex);
-Mutexes 57
-31 if (status != 0)
-32 err\_abort (status, "Lock mutex");
-33 alarm-\>time = time (NULL) + alarm-\>seconds;
-34
-35 /*
-36 * Insert the new alarm into the list of alarms,
-37 * sorted by expiration time.
-38 */
-39 last = &alarm\_list;
-40 next = *last;
-41 while (next != NULL) {
-42 if (next-\>time \>= alarm-\>time) {
-43 alarm-\>link = next;
-44 *last = alarm;
-45 break;
-46 }
-47 last = &next-\>link;
-48 next = next-\>link;
-49 }
-50 /*
-51 * If we reached the end of the list, insert the new
-52 * alarm there, ("next" is NULL, and "last" points
-53 * to the link field of the last item, or to the
-54 * list header).
-55 */
-56 if (next == NULL) {
-57 *last = alarm;
-58 alarm-\>link = NULL;
-59 }
-60 #ifdef DEBUG
-61 printf ("[list: ");
-62 for (next = alarm\_list; next != NULL; next = next-\>link)
-63 printf ("%d(%d)[\"%s\"] ", next-\>time,
-64 next-\>time - time (NULL), next-\>message);
-65 printf ("]\n");
-66 #endif
-67 status = pthread\_mutex\_unlock (&alarm\_mutex);
-68 if (status != 0)
-69 err\_abort (status, "Unlock mutex");
-70 }
-71 }
-72 }
-| alarm\_mutex. c part 3 main
-This simple program has a few severe failings. Although it has the advantage,
-compared to alarm\_f ork. c or alarm\_thread. c, of using fewer resources, it is less
-responsive. Once alarm\_thread has accepted an alarm request from the queue, it
-58 CHAPTER 3 Synchronization
-sleeps until that alarm expires. When it fails to find an alarm request on the list,
-it sleeps for a second anyway, to allow main to accept another alarm command.
-During all this sleeping, it will fail to notice any alarm requests added to the head
-of the queue by main, until it returns from sleep.
-This problem could be addressed in various ways. The simplest, of course,
-would be to go back to alarm\_thread.c, where a thread was created for each
-alarm request. That wasn't so bad, since threads are relatively cheap. They're still
-not as cheap as the alarm\_t data structure, however, and we'd like to make effi-
-cient programs-not just responsive programs. The best solution is to make use
-of condition variables for signaling changes in the state of shared data, so it
-shouldn't be a surprise that you'll be seeing one final version of the alarm pro-
-gram, alarm\_cond.c, in Section 3.3.4.
-3.2.2.1 Nonlocking mutex locks
-When you lock a mutex by calling pthread\_mutex\_lock, the calling thread
-will block if the mutex is already locked. Normally, that's what you want. But
-occasionally you want your code to take some alternate path if the mutex is
-locked. Your program may be able to do useful work instead of waiting. Pthreads
-provides the pthread\_mutex\_trylock function, which will return an error status
-(ebusy) instead of blocking if the mutex is already locked.
-When you use a nonblocking mutex lock, be careful to unlock the mutex only
-if pthread\_mutex\_trylock returned with success status. Only the thread that
-owns a mutex may unlock it. An erroneous call to pthread\_mutex\_unlock may
-return an error, or it may unlock the mutex while some other thread relies on
-having it locked-and that will probably cause your program to break in ways
-that may be very difficult to debug.
-The following program, trylock.c, uses pthread\_mutex\_trylock to occasion-
-ally report the value of a counter-but only when its access does not conflict with
-the counting thread.
-4 This definition controls how long counter\_thread holds the mutex while
-updating the counter. Making this number larger increases the chance that the
-pthread\_mutex\_trylock in monitor\_thread will occasionally return EBUSY.
-14-39 The counter\_thread wakes up approximately each second, locks the mutex,
-and spins for a while, incrementing counter. The counter is therefore increased
-by SPIN each second.
-46-72 The monitor\_thread wakes up every three seconds, and tries to lock the
-mutex. If the attempt fails with ebusy, monitor\_thread counts the failure and
-waits another three seconds. If the pthread\_mutex\_trylock succeeds, then
-monitor\_thread prints the current value of counter (scaled by SPIN).
-80-88 On Solaris 2.5, call thr\_setconcurrency to set the thread concurrency level
-to 2. This allows the counter\_thread and monitor\_thread to run concurrently
-on a uniprocessor. Otherwise, monitor\_thread would not run until counter\_
-thread terminated.
-Mutexes 59
-| trylock.c
-1 #include \<pthread.h\>
-2 #include "errors.h"
-3
-4 tdefine SPIN 10000000
-5
-6 pthread\_mutex\_t mutex = PTHREAD\_MUTEX\_INITIALIZER;
-7 long counter;
-8 time\_t end\_time;
-9
-10 /*
-11 * Thread start routine that repeatedly locks a mutex and
-12 * increments a counter.
-13 */
-14 void *counter\_thread (void *arg)
-15 {
-16 int status;
-17 int spin;
-18
-19 /*
-20 * Until end\_time, increment the counter each second. Instead of
-21 * just incrementing the counter, it sleeps for another second
-22 * with the mutex locked, to give monitor\_thread a reasonable
-23 * chance of running.
-24 */
-25 while (time (NULL) \< end\_time)
-26 {
-27 status = pthread\_mutex\_lock (Smutex);
-28 if (status != 0)
-29 err\_abort (status, "Lock mutex");
-30 for (spin = 0; spin \< SPIN; spin++)
-31 counter++;
-32 status = pthread\_mutex\_unlock (Smutex);
-33 if (status != 0)
-34 err\_abort (status, "Unlock mutex");
-35 sleep A);
-36 }
-37 printf ("Counter is %#lx\n", counter);
-38 return NULL;
-39 }
-40
-41 /*
-42 * Thread start routine to "monitor" the counter. Every 3
-43 * seconds, try to lock the mutex and read the counter. If the
-44 * trylock fails, skip this cycle.
-45 */
-46 void *monitor thread (void *arg)
-60 CHAPTER 3 Synchronizatton
-47 {
-48 int status;
-49 int misses = 0;
-50
-51
-52 /*
-53 * Loop until end\_time, checking the counter every 3 seconds.
-54 */
-55 while (time (NULL) \< end\_time)
-56 {
-57 sleep C);
-58 status = pthread\_mutex\_trylock (Smutex);
-59 if (status != EBUSY)
-60 {
-61 if (status != 0)
-62 err\_abort (status, "Trylock mutex");
-63 printf ("Counter is %ld\n", counter/SPIN);
-64 status = pthread\_mutex\_unlock (smutex);
-65 if (status != 0)
-66 err\_abort (status, "Unlock mutex");
-67 } else
-68 misses++; /* Count "misses" on the lock */
-69 }
-70 printf ("Monitor thread missed update %d times.\n", misses);
-71 return NULL;
-72 }
-73
-74 int main (int argc, char *argv[])
-75 {
-76 int status;
-77 pthread\_t counter\_thread\_id;
-78 pthread\_t monitor\_thread\_id;
-79
-80 #ifdef sun
-81 /*
-82 * On Solaris 2.5, threads are not timesliced. To ensure
-83 * that our threads can run concurrently, we need to
-84 * increase the concurrency level to 2.
-85 */
-86 DPRINTF (("Setting concurrency level to 2\n"));
-87 thr\_setconcurrency B);
-88 #endif
-89
-90 end\_time = time (NULL) + 60; /* Run for 1 minute */
-91 status = pthread\_create (
-92 &counter\_thread\_id, NULL, counter\_thread, NULL);
-93 if (status != 0)
-94 err abort (status, "Create counter thread");
-Mutexes 61
-95 status = pthread\_create (
-96 &monitor\_thread\_id, NULL, monitor\_thread, NULL);
-97 if (status != 0)
-98 err\_abort (status, "Create monitor thread");
-99 status = pthread\_join (counter\_thread\_id, NULL);
-100 if (status != 0)
-101 err\_abort (status, "Join counter thread");
-102 status = pthread\_join (monitor\_thread\_id, NULL);
-103 if (status != 0)
-104 err\_abort (status, "Join monitor thread");
-105 return 0;
-106 }
-| trylock.c
-3.2.3 Using mutexes for atomicity
-Invariants, as we saw in Section 3.1, are statements about your program that
-must always be true. But we also saw that invariants probably aren't always
-true, and many can't be. To be always true, data composing an invariant must be
-modified atomically. Yet it is rarely possible to make multiple changes to a pro-
-gram state atomically. It may not even be possible to guarantee that a single
-change is made atomically, without substantial knowledge of the hardware and
-architecture and control over the executed instructions.
-"Atomic" means indivisible. But most of the time, we just mean
-that threads don't see things that would confuse them.
-Although some hardware will allow you to set an array element and increment
-the array index in a single instruction that cannot be interrupted, most won't.
-Most compilers don't let you control the code to that level of detail even if the
-hardware can do it, and who wants to write in assembler unless it is really impor-
-tant? And, more importantly, most interesting invariants are more complicated
-than that.
-By "atomic," we really mean only that other threads can't accidentally find
-invariants broken (in intermediate and inconsistent states), even when the
-threads are running simultaneously on separate processors. There are two basic
-ways to do that when the hardware doesn't support making the operation indi-
-visible and noninterruptable. One is to detect that you're looking at a broken
-invariant and try again, or reconstruct the original state. That's hard to do reli-
-ably unless you know a lot about the processor architecture and are willing to
-design nonportable code.
-When there is no way to enlist true atomicity in your cause, you need to create
-your own synchronization. Atomicity is nice, but synchronization will do just as
-well in most cases. So when you need to update an array element and the index
-variable atomically, just perform the operation while a mutex is locked.
-62 CHAPTER 3 Synchronization
-Whether or not the store and increment operations are performed indivisibly
-and noninterruptably by the hardware, you know that no cooperating thread can
-peek until you're done. The transaction is, for all practical purposes, "atomic."
-The key, of course, is the word "cooperating." Any thread that is sensitive to the
-invariant must use the same mutex before modifying or examining the state of
-the invariant.
-3.2.4 Sizing a mutex to fit the job
-How big is a mutex? No, I don't mean the amount of memory consumed by a
-pthread\_mutex\_t structure. I'm talking about a colloquial and completely inac-
-curate meaning that happens to make sense to most people. This colorful usage
-became common during discussions about modifying existing nonthreaded code
-to be thread-safe. One relatively simple way to make a library thread-safe is to
-create a single mutex, lock it on each entry to the library, and unlock it on each
-exit from the library. The library becomes a single serial region, preventing any
-conflict between threads. The mutex protecting this big serial region came to be
-referred to as a "big" mutex, clearly larger in some metaphysical sense than a
-mutex that protects only a few lines of code.
-By irrelevant but inevitable extension, a mutex that protects two variables
-must be "bigger" than a mutex protecting only a single variable. So we can ask,
-"How big should a mutex be?" And we can answer only, "As big as necessary, but
-no bigger."
-When you need to protect two shared variables, you have two basic strategies:
-You can assign a small mutex to each variable, or assign a single larger mutex to
-both variables. Which is better will depend on a lot of factors. Furthermore, the
-factors will probably change during development, depending on how many
-threads need the data and how they use it.
-These are the main design factors:
-1. Mutexes aren't free. It takes time to lock them, and time to unlock them.
-Therefore, code that locks fewer mutexes will usually run faster than code
-that locks more mutexes. So use as few as practical, each protecting as
-much as makes sense.
-2. Mutexes, by their nature, serialize execution. If a lot of threads frequently
-need to lock a single mutex, the threads will spend most of their time wait-
-ing. That's bad for performance. If the pieces of data (or code) protected by
-the mutex are unrelated, you can often improve performance by splitting
-the big mutex into several smaller mutexes. Fewer threads will need the
-smaller mutexes at any time, so they'll spend less time waiting. So use as
-many as makes sense, each protecting as little as is practical.
-3. Items 1 and 2 conflict. But that's nothing new or unique, and you can deal
-with it once you understand what's going on.
-Mutexes 63
-In a complicated program it will usually take some experimentation to get the
-right balance. Your code will be simpler in most cases if you start with large
-mutexes and then work toward smaller mutexes as experience and performance
-data show where the heavy contention happens. Simple is good. Don't spend too
-much time optimizing until you know there's a problem.
-On the other hand, in cases where you can tell from the beginning that the
-algorithms will make heavy contention inevitable, don't oversimplify. Your job will
-be a lot easier if you start with the necessary mutexes and data structure design
-rather than adding them later. You will get it wrong sometimes, because, espe-
-cially when you are working on your first major threaded project, your intuition
-will not always be correct. Wisdom, as they say, comes from experience, and
-experience comes from lack of wisdom.
-3.2.5 Using more than one mutex
-Sometimes one mutex isn't enough. This happens when your code "crosses
-over" some boundary within the software architecture. For example, when multi-
-ple threads will access a queue data structure at the same time, you may need a
-mutex to protect the queue header and another to protect data within a queue
-element. When you build a tree structure for threaded programming, you may
-need a mutex for each node in the tree.
-Complications can arise when using more than one mutex at the same time.
-The worst is deadlock-when each of two threads holds one mutex and needs the
-other to continue. More subtle problems such as priority inversion can occur when
-you combine mutexes with priority scheduling. For more information on deadlock,
-priority inversion, and other synchronization problems, refer to Section 8.1.
-3.2.5.1 Lock hierarchy
-If you can apply two separate mutexes to completely independent data, do it.
-You'll almost always win in the end by reducing the time when a thread has to
-wait for another thread to finish with data that this thread doesn't even need.
-And if the data is independent you're unlikely to run into many cases where a
-given function will need to lock both mutexes.
-The complications arise when data isn't completely independent. If you have
-some program invariant-even one that's rarely changed or referenced-that
-affects data protected by two mutexes, sooner or later you'll need to write code
-that must lock both mutexes at the same time to ensure the integrity of that
-invariant. If one thread locks mutex\_a and then locks mutex\_b, while another
-thread locks mutex\_b and then mutex\_a, you've coded a classic deadlock, as
-shown in Table 3.1.
-64
-First thread
-pthread mutex
-pthread mutex
-\_lock
-lock
-(Smutex a);
-(Smutex b);
-Second thread
-pthread mutex
-pthread mutex
-CHAPTER 3 Synchronization
-lock
-"lock
-(Smutex
-(Smutex
-b);
-.a);
-TABLE 3.1 Mutex deadlock
-Both of the threads shown in Table 3.1 may complete the first step about the
-same time. Even on a uniprocessor, a thread might complete the first step and
-then be timesliced (preempted by the system), allowing the second thread to com-
-plete its first step. Once this has happened, neither of them can ever complete the
-second step because each thread needs a mutex that is already locked by the
-other thread.
-Consider these two common solutions to this type of deadlock:
-? Fixed locking hierarchy: All code that needs both mutex\_a and mutex\_b
-must always lock mutex\_a first and then mutex\_b.
-? Try and back off: After locking the first mutex of some set (which can be
-allowed to block), use pthread\_mutex\_trylock to lock additional mutexes
-in the set. If an attempt fails, release all mutexes in the set and start again.
-There are any number of ways to define a fixed locking hierarchy. Sometimes
-there's an obvious hierarchical order to the mutexes anyway, for example, if one
-mutex controls a queue header and one controls an element on the queue, you'll
-probably have to have the queue header locked by the time you need to lock the
-queue element anyway.
-When there's no obvious logical hierarchy, you can create an arbitrary hierar-
-chy; for example, you could create a generic "lock a set of mutexes" function that
-sorts a list of mutexes in order of their identifier address and locks them in that
-order. Or you could assign them names and lock them in alphabetical order, or
-integer sequence numbers and lock them in numerical order.
-To some extent, the order doesn't really matter as long as it is always the
-same. On the other hand, you will rarely need to lock "a set of mutexes" at one
-time. Function A will need to lock mutex 1, and then call function B, which needs
-to also lock mutex 2. If the code was designed with a functional locking hierarchy,
-you will usually find that mutex 1 and mutex 2 are being locked in the proper
-order, that is, mutex 1 is locked first and then mutex 2. If the code was designed
-with an arbitrary locking order, especially an order not directly controlled by the
-code, such as sorting pointers to mutexes initialized in heap structures, you may
-find that mutex 2 should have been locked before mutex 1.
-If the code invariants permit you to unlock mutex 1 safely at this point, you
-would do better to avoid owning both mutexes at the same time. That is, unlock
-mutex 1, and then lock mutex 2. If there is a broken invariant that requires
-mutex 1 to be owned, then mutex 1 cannot be released until the invariant is
-restored. If this situation is possible, you should consider using a backoff (or "try
-and back off) algorithm.
-"Backoff means that you lock the first mutex normally, but any additional
-mutexes in the set that are required by the thread are locked conditionally by
-Mutexes 65
-calling pthread\_mutex\_trylock. If pthread\_mutex\_trylock returns EBUSY, indi-
-cating that the mutex is already locked, you must unlock all of the mutexes in the
-set and start over.
-The backoff solution is less efficient than a fixed hierarchy. You may waste a
-lot of time trying and backing off. On the other hand, you don't need to define and
-follow strict locking hierarchy conventions, which makes backoff more flexible.
-You can use the two techniques in combination to minimize the cost of backing
-off. Follow some fixed hierarchy for well-defined areas of code, but apply a backoff
-algorithm where a function needs to be more flexible.
-The program below, backoff .c, demonstrates how to avoid mutex deadlocks
-by applying a backoff algorithm. The program creates two threads, one running
-function lock\_f orward and the other running function lock\_backward. The two
-threads loop iterations times, each iteration attempting to lock all of three
-mutexes in sequence. The lock\_f orward thread locks mutex 0, then mutex 1,
-then mutex 2, while lock\_backward locks the three mutexes in the opposite
-order. Without special precautions, this design will always deadlock quickly
-(except on a uniprocessor system with a sufficiently long timeslice that either
-thread can complete before the other has a chance to run).
-15 You can see the deadlock by running the program as backoff 0. The first
-argument is used to set the backoff variable. If backoff is 0, the two threads will
-use pthread\_mutex\_lock to lock each mutex. Because the two threads are start-
-ing from opposite ends, they will crash in the middle, and the program will hang.
-When backoff is nonzero (which it is unless you specify an argument), the
-threads use pthread\_mutex\_trylock, which enables the backoff algorithm. When
-the mutex lock fails with ebusy, the thread will release all mutexes it currently
-owns, and start over.
-16 It is possible that, on some systems, you may not see any mutex collisions,
-because one thread is always able to lock all mutexes before the other thread has
-a chance to lock any. You can resolve that problem by setting the yield\_f lag
-variable, which you do by running the program with a second argument, for
-example, backoff 1 1. When yield\_f lag is 0, which it is unless you specify a sec-
-ond argument, each thread's mutex locking loop may run uninterrupted,
-preventing a deadlock (at least, on a uniprocessor). When yield\_f lag has a value
-greater than 0, however, the threads will call sched\_yield after locking each
-mutex, ensuring that the other thread has a chance to run. And if you set yield\_
-flag to a value less than 0, the threads will sleep for one second after locking
-each mutex, to be really sure the other thread has a chance to run.
-70-75 After locking all of the three mutexes, each thread reports success, and tells
-how many times it had to back off before succeeding. On a multiprocessor, or
-when you've set yield\_f lag to a nonzero value, you'll usually see a lot more non-
-zero backoff counts. The thread unlocks all three mutexes, in the reverse order of
-locking, which helps to avoid unnecessary backoffs in other threads. Calling
-sched\_yield at the end of each iteration "mixes things up" a little so one thread
-doesn't always start each iteration first. The sched\_yield function is described in
-Section 5.5.2.
-66 CHAPTER 3 Synchronization
-| backoff.c
-1 #include \<pthread.h\>
-2 #include "errors.h"
-3
-4 #define ITERATIONS 10
-5
-6 /*
-7 * Initialize a static array of 3 mutexes.
-8 */
-9 pthread\_mutex\_t mutex[3] = {
-10 PTHREAD\_MUTEX\_INITIALIZER,
-11 PTHREAD\_MUTEX\_INITIALIZER,
-12 PTHREAD\_MUTEX\_INITIALIZER
-13 };
-14
-15 int backoff = 1; /* Whether to backoff or deadlock */
-16 int yield\_flag =0; /* 0: no yield, \>0: yield, \<0: sleep */
-17
-18 /*
-19 * This is a thread start routine that locks all mutexes in
-20 * order, to ensure a conflict with lock\_reverse, which does the
-21 * opposite.
-22 */
-23 void *lock\_forward (void *arg)
-24 {
-25 int i, iterate, backoffs;
-26 int status;
-27
-28 for (iterate = 0; iterate \< ITERATIONS; iterate++) {
-29 backoffs = 0;
-30 for (i = 0; i \< 3; i++) {
-31 if (i == 0) {
-32 status = pthread\_mutex\_lock (Smutex[i]);
-33 if (status != 0)
-34 err\_abort (status, "First lock");
-35 } else {
-36 if (backoff)
-37 status = pthread\_mutex\_trylock (Smutex[i]);
-38 else
-39 status = pthread\_mutex\_lock (&mutex[i]);
-40 if (status == EBUSY) {
-41 backoffs++;
-42 DPRINTF ((
-43 " [forward locker backing off at %d]\n",
-44 i));
-45 for (; i \>= 0; i-) {
-46 status = pthread\_mutex\_unlock (Smutex[i]);
-47 if (status != 0)
-Mutexes 67
-48 err\_abort (status, "Backoff");
-49 }
-50 } else {
-51 if (status != 0)
-52 err\_abort (status, "Lock mutex");
-53 DPRINTF ((" forward locker got %d\n", i));
-54 }
-55 }
-56 /*
-57 * Yield processor, if needed to be sure locks get
-58 * interleaved on a uniprocessor.
-59 */
-60 if (yield\_flag) {
-61 if (yield\_flag \> 0)
-62 sched\_yield ();
-63 else
-64 sleep A);
-65 }
-66 }
-67 /*
-68 * Report that we got 'em, and unlock to try again.
-69 */
-70 printf (
-71 "lock forward got all locks, %d backoffs\n", backoffs);
-72 pthread\_mutex\_unlock (&mutex[2]);
-73 pthread\_mutex\_unlock (&mutex[1]);
-74 pthread\_mutex\_unlock (smutex[0]);
-75 sched\_yield ();
-76 }
-77 return NULL;
-78 }
-79
-80 /*
-81 * This is a thread start routine that locks all mutexes in
-82 * reverse order, to ensure a conflict with lock\_forward, which
-83 * does the opposite.
-84 */
-85 void *lock\_backward (void *arg)
-86 {
-87 int i, iterate, backoffs;
-88 int status;
-89
-90 for (iterate = 0; iterate \< ITERATIONS; iterate++) {
-91 backoffs = 0;
-92 for (i = 2; i \>= 0; i-) {
-93 if (i == 2) {
-94 status = pthread\_mutex\_lock (Smutex[i]);
-95 if (status != 0)
-96 err abort (status, "First lock");
-68
-CHAPTER 3 Synchronization
-97
-98
-99
-100
-101
-102
-103
-104
-105
-106
-107
-108
-109
-110
-111
-112
-113
-114
-115
-116
-117
-118
-119
-120
-121
-122
-123
-124
-125
-126
-127
-128
-129
-130
-131
-132
-133
-134
-135
-136
-137
-138
-139
-140
-141
-142
-143
-144
-int
-} else {
-if (backoff)
-status = pthread\_mutex\_trylock (&mutex[i]);
-else
-status = pthread\_mutex\_lock (&mutex[i]);
-if (status == EBUSY) {
-backoffs++;
-DPRINTF ((
-" [backward locker backing off at %d]\n",
-i));
-for (; i \< 3; i++) {
-status = pthread\_mutex\_unlock (Smutex[i]);
-if (status != 0)
-err\_abort (status, "Backoff");
-} else {
-if (status != 0)
-err\_abort (status, "Lock mutex");
-DPRINTF ((" backward locker got %d\n", i));
-/*
-* Yield processor, if needed to be sure locks get
-* interleaved on a uniprocessor.
-*/
-if (yield\_flag) {
-if (yield\_flag \> 0)
-sched\_yield ();
-else
-sleep A);
-/*
-* Report that we got 'em, and unlock to try again.
-*/
-printf (
-"lock backward got all locks, %d backoffsXn", backoffs);
-pthread\_mutex\_unlock (&mutex[0]);
-pthread\_mutex\_unlock (&mutex[1])
-pthread\_mutex\_unlock (Smutex[2]);
-sched\_yield ();
-return NULL;
-main (int argc, char *argv[])
-pthread\_t forward, backward;
-Mutexes 69
-145 int status;
-146
-147 #ifdef sun
-148 /*
-149 * On Solaris 2.5, threads are not timesliced. To ensure
-150 * that our threads can run concurrently, we need to
-151 * increase the concurrency level.
-152 */
-153 DPRINTF (("Setting concurrency level to 2\n"));
-154 thr\_setconcurrency B);
-155 #endif
-156
-157 /*
-158 * If the first argument is absent, or nonzero, a backoff
-159 * algorithm will be used to avoid deadlock. If the first
-160 * argument is zero, the program will deadlock on a lock
-161 * "collision."
-162 */
-163 if (argc \> 1)
-164 backoff = atoi (argv[l]);
-165
-166 /*
-167 * If the second argument is absent, or zero, the two threads
-168 * run "at speed." On some systems, especially uniprocessors,
-169 * one thread may complete before the other has a chance to run,
-170 * and you won't see a deadlock or backoffs. In that case, try
-171 * running with the argument set to a positive number to cause
-172 * the threads to call sched\_yield() at each lock; or, to make
-173 * it even more obvious, set to a negative number to cause the
-174 * threads to call sleep(l) instead.
-175 */
-176 if (argc \> 2)
-177 yield\_flag = atoi (argv[2]);
-178 status = pthread\_create (
-179 sforward, NULL, lock\_forward, NULL);
-180 if (status != 0)
-181 err\_abort (status, "Create forward");
-182 status = pthread\_create (
-183 sbackward, NULL, lock\_backward, NULL);
-184 if (status != 0)
-185 err\_abort (status, "Create backward");
-186 pthread\_exit (NULL);
-187 }
-| backoff.c
-Whatever type of hierarchy you choose, document it, carefully, completely, and
-often. Document it in each function that uses any of the mutexes. Document it
-where the mutexes are denned. Document it where they are declared in a project
-70 CHAPTER 3 Synchronization
-header file. Document it in the project design notes. Write it on your whiteboard.
-And then tie a string around your finger to be sure that you do not forget.
-You are free to unlock the mutexes in whatever order makes the most sense.
-Unlocking mutexes cannot result in deadlock. In the next section, I will talk
-about a sort of "overlapping hierarchy" of mutexes, called a "lock chain," where
-the normal mode of operation is to lock one mutex, lock the next, unlock the first,
-and so on. If you use a "try and back off algorithm, however, you should always
-try to release the mutexes in reverse order. That is, if you lock mutex 1, mutex 2,
-and then mutex 3, you should unlock mutex 3, then mutex 2, and finally mutex 1.
-If you unlock mutex 1 and mutex 2 while mutex 3 is still locked, another thread
-may have to lock both mutex 1 and mutex 2 before finding it cannot lock the
-entire hierarchy, at which point it will have to unlock mutex 2 and mutex 1, and
-then retry. Unlocking in reverse order reduces the chance that another thread will
-need to back off.
-3.2.5.2 Lock chaining
-"Chaining" is a special case of locking hierarchy, where the scope of two locks
-overlap. With one mutex locked, the code enters a region where another mutex is
-required. After successfully locking that second mutex, the first is no longer
-needed, and can be released. This technique can be very valuable in traversing
-data structures such as trees or linked lists. Instead of locking the entire data
-structure with a single mutex, and thereby preventing any parallel access, each
-node or link has a unique mutex. The traversal code would first lock the queue
-head, or tree root, find the desired node, lock it, and then release the root or
-queue head mutex.
-Because chaining is a special form of hierarchy, the two techniques are com-
-patible, if you apply them carefully. You might use hierarchical locking when
-balancing or pruning a tree, for example, and chaining when searching for a spe-
-cific node.
-Apply lock chaining with caution, however. It is exceptionally easy to write
-code that spends most of its time locking and unlocking mutexes that never
-exhibit any contention, and that is wasted processor time. Use lock chaining only
-when multiple threads will almost always be active within different parts of the
-hierarchy.
-3.3 Condition variables
-"There's no sort of use in knocking," said the Footman, "and that for two
-reasons. First, because I'm on the same side of the door as you are:
-secondly, because they're making such a noise inside, no one could
-possibly hear you."
--Lewis Carroll, Alice's Adventures In Wonderland
-Condition variables
-71
-FIGURE 3.3 Condition variable analogy
-A condition variable is used for communicating information about the state of
-shared data. You would use a condition variable to signal that a queue was no
-longer empty, or that it had become empty, or that anything else needs to be done
-or can be done within the shared data manipulated by threads in your program.
-Our seafaring programmers use a mechanism much like condition variables to
-communicate (Figure 3.3). When the rower nudges a sleeping programmer to sig-
-nal that the sleeping programmer should wake up and start rowing, the original
-rower "signals a condition." When the exhausted ex-rower sinks into a deep slum-
-ber, secure that another programmer will wake him at the appropriate time, he is
-"waiting on a condition." When the horrified bailer discovers that water is seeping
-into the boat faster than he can remove it, and he yells for help, he is "broadcast-
-ing a condition."
-When a thread has mutually exclusive access to some shared state, it may
-find that there is no more it can do until some other thread changes the state.
-The state may be correct, and consistent-that is, no invariants are broken-but
-the current state just doesn't happen to be of interest to the thread. If a thread
-servicing a queue finds the queue empty, for example, the thread must wait until
-an entry is added to the queue.
-The shared data, for example, the queue, is protected by a mutex. A thread
-must lock the mutex to determine the current state of the queue, for example, to
-determine that it is empty. The thread must unlock the mutex before waiting (or
-72 CHAPTER 3 Synchronization
-no other thread would be able to insert an entry onto the queue), and then it
-must wait for the state to change. The thread might, for example, by some means
-block itself so that a thread inserting a new queue entry can find its identifier and
-awaken it. There is a problem here, though-the thread is running between
-unlocking and blocking.
-If the thread is still running while another thread locks the mutex and inserts
-an entry onto the queue, that other thread cannot determine that a thread is
-waiting for the new entry. The waiting thread has already looked at the queue and
-found it empty, and has unlocked the mutex, so it will now block itself without
-knowing that the queue is no longer empty. Worse, it may not yet have recorded
-the fact that it intends to wait, so it may wait forever because the other thread
-cannot find its identifier. The unlock and wait operations must be atomic, so that
-no other thread can lock the mutex before the waiter has become blocked, and is
-in a state where another thread can awaken it.
-I A condition variable wait always returns with the mutex locked.
-That's why condition variables exist. A condition variable is a "signaling mech-
-anism" associated with a mutex and by extension is also associated with the
-shared data protected by the mutex. Waiting on a condition variable atomically
-releases the associated mutex and waits until another thread signals (to wake
-one waiter) or broadcasts (to wake all waiters) the condition variable. The mutex
-must always be locked when you wait on a condition variable and, when a thread
-wakes up from a condition variable wait, it always resumes with the mutex
-locked.
-The shared data associated with a condition variable, for example, the queue
-"full" and "empty" conditions, are the predicates we talked about in Section 3.1. A
-condition variable is the mechanism your program uses to wait for a predicate to
-become true, and to communicate to other threads that it might be true. In other
-words, a condition variable allows threads using the queue to exchange informa-
-tion about the changes to the queue state.
-I Condition variables are for signaling, not for mutual exclusion.
-Condition variables do not provide mutual exclusion. You need a mutex to
-synchronize access to the shared data, including the predicate for which you
-wait. That is why you must specify a mutex when you wait on a condition vari-
-able. By making the unlock atomic with the wait, the Pthreads system ensures
-that no thread can change the predicate after you have unlocked the mutex but
-before your thread is waiting on the condition variable.
-Why isn't the mutex created as part of the condition variable? First, mutexes
-are used separately from any condition variable as often as they're used with con-
-dition variables. Second, it is common for one mutex to have more than one
-associated condition variable. For example, a queue may be "full" or "empty."
-Although you may have two condition variables to allow threads to wait for either
-Condition variables
-73
-condition, you must have one and only one mutex to synchronize all access to the
-queue header.
-A condition variable should be associated with a single predicate. If you try to
-share one condition variable between several predicates, or use several condition
-variables for a single predicate, you're risking deadlock or race problems. There's
-nothing wrong with doing either, as long as you're careful-but it is easy to con-
-fuse your program (computers aren't very smart) and it is usually not worth the
-risk. I will expound on the details later, but the rules are as follows: First, when
-you share a condition variable between multiple predicates, you must always
-broadcast, never signal; and second, signal is more efficient than broadcast.
-Both the condition variable and the predicate are shared data in your pro-
-gram; they are used by multiple threads, possibly at the same time. Because
-you're thinking of the condition variable and predicate as being locked together, it
-is easy to remember that they're always controlled using the same mutex. It is
-possible (and legal, and often even reasonable) to signal or broadcast a condition
-variable without having the mutex locked, but it is safer to have it locked.
-Figure 3.4 is a timing diagram showing how three threads, thread 1, thread 2,
-and thread 3, interact with a condition variable. The rounded box represents the
-condition variable, and the three lines represent the actions of the three threads.
-thread 1
-thread 2
-thread 3
-'Condition
-variable
-i i
-thread 1 signals
-with no waiters
-thread 1 waits
-thread 2 waits
-thread 3 signals,
-waking thread 1
-thread 3 waits
-thread 3's wait
-times out
-thread 3 waits with
-a timeout
-thread 1 broadcasts,
-waking thread 2 and
-thread 3
-FIGURE 3.4 Condition variable operation
-74 CHAPTER 3 Synchronization
-When a line goes within the box, it is "doing something" with the condition vari-
-able. When a thread's line stops before reaching below the middle line through
-the box, it is waiting on the condition variable; and when a thread's line reaches
-below the middle line, it is signaling or broadcasting to awaken waiters.
-Thread 1 signals the condition variable, which has no effect since there are no
-waiters. Thread 1 then waits on the condition variable. Thread 2 also blocks on
-the condition variable and, shortly thereafter, thread 3 signals the condition vari-
-able. Thread 3's signal unblocks thread 1. Thread 3 then waits on the condition
-variable. Thread 1 broadcasts the condition variable, unblocking both thread 2
-and thread 3. Thread 3 waits on the condition variable shortly thereafter, with a
-timed wait. Some time later, thread 3's wait times out, and the thread awakens.
-3.3.1 Creating and destroying a condition variable
-pthread\_cond\_t cond = PTHREAD\_COND\_INITIALIZER;
-int pthread\_cond\_init (pthread\_cond\_t *cond,
-pthread\_condattr\_t *condattr);
-int pthread\_cond\_destroy (pthread\_cond\_t *cond);
-A condition variable is represented in your program by a variable of type
-pthread\_cond\_t. You should never make a copy of a condition variable, because
-the result of using a copied condition variable is undefined. It would be like tele-
-phoning a disconnected number and expecting an answer. One thread could, for
-example, wait on one copy of the condition variable, while another thread sig-
-naled or broadcast the other copy of the condition variable-the waiting thread
-would not be awakened. You can, however, freely pass pointers to a condition
-variable so that various functions and threads can use it for synchronization.
-Most of the time you'll probably declare condition variables using the extern
-or static storage class at file scope, that is, outside of any function. They should
-have normal (extern) storage class if they are used by other files, or static stor-
-age class if used only within the file that declares the variable. When you declare
-a static condition variable that has default attributes, you should use the
-pthread\_cond\_initializer initialization macro, as shown in the following exam-
-ple, cond\_static.c.
-| cond\_static.c
-1 #include \<pthread.h\>
-2 #include "errors.h"
-3
-4 /*
-5 * Declare a structure, with a mutex and condition variable,
-6 * statically initialized. This is the same as using
-Condition variables 75
-7 * pthread\_mutex\_init and pthread\_cond\_init, with the default
-8 * attributes.
-9 */
-10 typedef struct my\_struct\_tag {
-11 pthread\_mutex\_t mutex; /* Protects access to value */
-12 pthread\_cond\_t cond; /* Signals change to value */
-13 int value; /* Access protected by mutex */
-14 } my\_struct\_t;
-15
-16 my\_struct\_t data = {
-17 PTHREAD\_MUTEX\_INITIALIZER, PTHREAD\_COND\_INITIALIZER, 0};
-18
-19 int main (int argc, char *argv[])
-20 {
-21 return 0;
-22 }
-| cond\_static.c
-I Condition variables and their predicates are "linked"-for best results,
-treat them that way!
-When you declare a condition variable, remember that a condition variable
-and the associated predicate are "locked together." You may save yourself (or your
-successor) some confusion by always declaring the condition variable and predi-
-cate together, if possible. I recommend that you try to encapsulate a set of
-invariants and predicates with its mutex and one or more condition variables as
-members in a structure, and carefully document the association.
-Sometimes you cannot initialize a condition variable statically; for example,
-when you use malloc to create a structure that contains a condition variable.
-Then you will need to call pthread\_cond\_init to initialize the condition variable
-dynamically, as shown in the following example, cond\_dynamic.c. You can also
-dynamically initialize condition variables that you declare statically-but you
-must ensure that each condition variable is initialized before it is used, and that
-each is initialized only once. You may initialize it before creating any threads, for
-example, or by using pthread\_once (Section 5.1). If you need to initialize a condi-
-tion variable with nondefault attributes, you must use dynamic initialization (see
-Section 5.2.2).
-| cond\_dynamic.c
-1 iinclude \<pthread.h\>
-2 #include "errors.h"
-3
-4 /*
-5 * Define a structure, with a mutex and condition variable.
-6 */
-7 typedef struct my\_struct\_tag {
-76 CHAPTER 3 Synchronization
-8 pthread\_mutex\_t mutex; /* Protects access to value */
-9 pthread\_cond\_t cond; /* Signals change to value */
-10 int value; /* Access protected by mutex */
-11 } my\_struct\_t;
-12
-13 int main (int argc, char *argv[])
-14 {
-15 my\_struct\_t *data;
-16 int status;
-17
-18 data = malloc (sizeof (my\_struct\_t));
-19 if (data == NULL)
-20 errno\_abort ("Allocate structure");
-21 status = pthread\_mutex\_init (&data-\>mutex, NULL);
-22 if (status != 0)
-23 err\_abort (status, "Init mutex");
-24 status = pthread\_cond\_init (&data-\>cond, NULL);
-25 if (status != 0)
-26 err\_abort (status, "Init condition");
-27 status = pthread\_cond\_destroy (&data-\>cond);
-28 if (status != 0)
-29 err\_abort (status, "Destroy condition");
-30 status = pthread\_mutex\_destroy (&data-\>mutex);
-31 if (status != 0)
-32 err\_abort (status, "Destroy mutex");
-33 (void)free (data);
-34 return status;
-35 }
-| cond\_dynamic.c
-When you dynamically initialize a condition variable, you should destroy the
-condition variable when you no longer need it, by calling pthread\_cond\_destroy.
-You do not need to destroy a condition variable that was statically initialized
-using the pthread\_cond\_initializer macro.
-It is safe to destroy a condition variable when you know that no threads can
-be blocked on the condition variable, and no additional threads will try to wait on,
-signal, or broadcast the condition variable. The best way to determine this is usu-
-ally within a thread that has just successfully broadcast to unblock all waiters,
-when program logic ensures that no threads will try to use the condition variable
-later.
-When a thread removes a structure containing a condition variable from a list,
-for example, and then broadcasts to awaken any waiters, it is safe (and also a
-very good idea) to destroy the condition variable before freeing the storage that
-the condition variable occupies. The awakened threads should check their wait
-predicate when they resume, so you must make sure that you don't free
-resources required for the predicate before they've done so-this may require
-additional synchronization.
-Condition variables 77
-3.3.2 Waiting on a condition variable
-int pthread\_cond\_wait (pthread\_cond\_t *cond,
-pthread\_mutex\_t *mutex);
-int pthread\_cond\_timedwait (pthread\_cond\_t *cond,
-pthread\_mutex\_t *mutex,
-struct timespec *expiration);
-Each condition variable must be associated with a specific mutex, and with a
-predicate condition. When a thread waits on a condition variable it must always
-have the associated mutex locked. Remember that the condition variable wait
-operation will unlock the mutex for you before blocking the thread, and it will
-relock the mutex before returning to your code.
-All threads that wait on any one condition variable concurrently (at the same
-time) must specify the same associated mutex. Pthreads does not allow thread 1,
-for example, to wait on condition variable A specifying mutex A while thread 2
-waits on condition variable A specifying mutex B. It is, however, perfectly reason-
-able for thread 1 to wait on condition variable A specifying mutex A while thread 2
-waits on condition variable B specifying mutex A. That is, each condition variable
-must be associated, at any given time, with only one mutex-but a mutex may
-have any number of condition variables associated with it.
-It is important that you test the predicate after locking the appropriate mutex
-and before waiting on the condition variable. If a thread signals or broadcasts a
-condition variable while no threads are waiting, nothing happens. If some other
-thread calls pthread\_cond\_wait right after that, it will keep waiting regardless of
-the fact that the condition variable was just signaled, which means that if a
-thread waits when it doesn't have to, it may never wake up. Because the mutex
-remains locked until the thread is blocked on the condition variable, the predi-
-cate cannot become set between the predicate test and the wait-the mutex is
-locked and no other thread can change the shared data, including the predicate.
-I Always test your predicate; and then test it again!
-It is equally important that you test the predicate again when the thread
-wakes up. You should always wait for a condition variable in a loop, to protect
-against program errors, multiprocessor races, and spurious wakeups. The follow-
-ing short program, cond.c, shows how to wait on a condition variable. Proper
-predicate loops are also shown in all of the examples in this book that use condi-
-tion variables, for example, alarm\_cond.c in Section 3.3.4.
-20-37 The wait\_thread sleeps for a short time to allow the main thread to reach its
-condition wait before waking it, sets the shared predicate (data, value), and then
-signals the condition variable. The amount of time for which wait\_thread will
-sleep is controlled by the hibernation variable, which defaults to one second.
-78 CHAPTER 3 Synchronization
-51-52 If the program was run with an argument, interpret the argument as an inte-
-ger value, which is stored in hibernation. This controls the amount of time for
-which wait-thread will sleep before signaling the condition variable.
-68-83 The main thread calls pthread\_cond\_timedwait to wait for up to two seconds
-(from the current time). If hibernation has been set to a value of greater than two
-seconds, the condition wait will time out, returning ETIMEDOUT. If hibernation
-has been set to two, the main thread and wait\_thread race, and, in principle, the
-result could differ each time you run the program. If hibernation is set to a value
-less than two, the condition wait should not time out.
-| cond.c
-1 #include \<pthread.h\>
-2 #include \<time.h\>
-3 #include "errors.h"
-4
-5 typedef struct my\_struct\_tag {
-6 pthread\_mutex\_t mutex; /* Protects access to value */
-7 pthread\_cond\_t cond; /* Signals change to value */
-8 int value; /* Access protected by mutex */
-9 } my\_struct\_t;
-10
-11 my\_struct\_t data = {
-12 PTHREAD\_MUTEX\_INITIALIZER, PTHREAD\_COND\_INITIALIZER, 0};
-13
-14 int hibernation =1; /* Default to 1 second */
-15
-16 /*
-17 * Thread start routine. It will set the main thread's predicate
-18 * and signal the condition variable.
-19 */
-20 void *
-21 wait\_thread (void *arg)
-22 {
-23 int status;
-24
-25 sleep (hibernation);
-26 status = pthread\_mutex\_lock (Sdata.mutex);
-27 if (status != 0)
-28 err\_abort (status, "Lock mutex");
-29 data.value =1; /* Set predicate */
-30 status = pthread\_cond\_signal (Sdata.cond);
-31 if (status != 0)
-32 err\_abort (status, "Signal condition");
-33 status = pthread\_mutex\_unlock (sdata.mutex);
-34 if (status != 0)
-35 err\_abort (status, "Unlock mutex");
-36 return NULL;
-37 }
-Condition variables 79
-38
-39 int main (int argc, char *argv[])
-40 {
-41 int status;
-42 pthread\_t wait\_thread\_id;
-43 struct timespec timeout;
-44
-45 /*
-46 * If an argument is specified, interpret it as the number
-47 * of seconds for wait\_thread to sleep before signaling the
-48 * condition variable. You can play with this to see the
-49 * condition wait below time out or wake normally.
-50 */
-51 if (argc \> 1)
-52 hibernation = atoi (argv[l]);
-53
-54 /*
-55 * Create wait\_thread.
-56 */
-57 status = pthread\_create (
-58 &wait\_thread\_id, NULL, wait\_thread, NULL);
-59 if (status != 0)
-60 err\_abort (status, "Create wait thread");
-61
-62 /*
-63 * Wait on the condition variable for 2 seconds, or until
-64 * signaled by the wait\_thread. Normally, wait\_thread
-65 * should signal. If you raise "hibernation" above 2
-66 * seconds, it will time out.
-67 */
-68 timeout.tv\_sec = time (NULL) + 2;
-69 timeout.tv\_nsec = 0;
-70 status = pthread\_mutex\_lock (Sdata.mutex);
-71 if (status != 0)
-72 err\_abort (status, "Lock mutex");
-73
-74 while (data, value == 0) { , ' ''|\<.|\<
-75 status = pthread\_cond\_timedwait (
-76 Sdata.cond, Sdata.mutex, stimeout);
-77 if (status == ETIMEDOUT) {
-78 printf ("Condition wait timed out.\n");
-79 break;
-80 }
-81 else if (status != 0)
-82 err\_abort (status, "Wait on condition");
-83 }
-84
-85 if (data.value != 0)
-86 printf ("Condition was signaled.\n");
-80 CHAPTER 3 Synchronization
-87 status = pthread\_mutex\_unlock (sdata.mutex);
-88 if (status != 0)
-89 err\_abort (status, "Unlock mutex");
-90 return 0;
-91 }
-| cond.c
-There are a lot of reasons why it is a good idea to write code that does not
-assume the predicate is always true on wakeup, but here are a few of the main
-reasons:
-Intercepted wakeups: Remember that threads are asynchronous. Waking up
-from a condition variable wait involves locking the associated mutex. But
-what if some other thread acquires the mutex first? It may, for example, be
-checking the predicate before waiting itself. It doesn't have to wait, since
-the predicate is now true. If the predicate is "work available," it will accept
-the work. When it unlocks the mutex there may be no more work. It would
-be expensive, and usually counterproductive, to ensure that the latest
-awakened thread got the work.
-Loose predicates: For a lot of reasons it is often easy and convenient to use
-approximations of actual state. For example, "there may be work" instead
-of "there is work." It is often much easier to signal or broadcast based on
-"loose predicates" than on the real "tight predicates." If you always test the
-tight predicates before and after waiting on a condition variable, you're free
-to signal based on the loose approximations when that makes sense. And
-your code will be much more robust when a condition variable is signaled
-or broadcast accidentally. Use of loose predicates or accidental wakeups
-may turn out to be a performance issue; but in many cases it won't make a
-difference.
-Spurious wakeups: This means that when you wait on a condition variable,
-the wait may (occasionally) return when no thread specifically broadcast or
-signaled that condition variable. Spurious wakeups may sound strange,
-but on some multiprocessor systems, making condition wakeup completely
-predictable might substantially slow all condition variable operations. The
-race conditions that cause spurious wakeups should be considered rare.
-It usually takes only a few instructions to retest your predicate, and it is a
-good programming discipline. Continuing without retesting the predicate could
-lead to serious application errors that might be difficult to track down later. So
-don't make assumptions: Always wait for a condition variable in a while loop
-testing the predicate.
-You can also use the pthread\_cond\_timedwait function, which causes the
-wait to end with an etimedout status after a certain time is reached. The time is
-an absolute clock time, using the POSIX. lb struct timespec format. The time-
-out is absolute rather than an interval (or "delta time") so that once you've
-computed the timeout it remains valid regardless of spurious or intercepted
-Condition variables 81
-wakeups. Although it might seem easier to use an interval time, you'd have to
-recompute it every time the thread wakes up, before waiting again-which would
-require determining how long it had already waited.
-When a timed condition wait returns with the etimedout error, you should
-test your predicate before treating the return as an error. If the condition for
-which you were waiting is true, the fact that it may have taken too long usually
-isn't important. Remember that a thread always relocks the mutex before return-
-ing from a condition wait, even when the wait times out. Waiting for a locked
-mutex after timeout can cause the timed wait to appear to have taken a lot longer
-than the time you requested.
-3.3.3 Waking condition variable waiters
-int pthread\_cond\_signal (pthread\_cond\_t *cond);
-int pthread\_cond\_broadcast (pthread\_cond\_t *cond);
-Once you've got a thread waiting on a condition variable for some predicate,
-you'll probably want to wake it up. Pthreads provides two ways to wake a condi-
-tion variable waiter. One is called "signal" and the other is called "broadcast." A
-signal operation wakes up a single thread waiting on the condition variable, while
-broadcast wakes up all threads waiting on the condition variable.
-The term "signal" is easily confused with the "POSIX signal" mechanisms that
-allow you to define "signal actions," manipulate "signal masks," and so forth.
-However, the term "signal," as we use it here, had independently become well
-established in threading literature, and even in commercial implementations,
-and the Pthreads working group decided not to change the term. Luckily, there
-are few situations where we might be tempted to use both terms together-it is a
-very good idea to avoid using signals in threaded programs when at all possible. If
-we are careful to say "signal a condition variable" or "POSIX signal" (or "UNIX sig-
-nal") where there is any ambiguity, we are unlikely to cause anyone severe
-discomfort.
-It is easy to think of "broadcast" as a generalization of "signal," but it is more
-accurate to think of signal as an optimization of broadcast. Remember that it is
-never wrong to use broadcast instead of signal since waiters have to account for
-intercepted and spurious wakes. The only difference, in fact, is efficiency: A
-broadcast will wake additional threads that will have to test their predicate and
-resume waiting. But, in general, you can't replace a broadcast with a signal.
-"When in doubt, broadcast."
-Use signal when only one thread needs to wake up to process the changed
-state, and when any waiting thread can do so. If you use one condition variable
-for several program predicate conditions, you can't use the signal operation; you
-couldn't tell whether it would awaken a thread waiting for that predicate, or for
-82 CHAPTER 3 Synchronization
-another predicate. Don't try to get around that by resignaling the condition vari-
-able when you find the predicate isn't true. That might not pass on the signal as
-you expect; a spurious or intercepted wakeup could result in a series of pointless
-resignals.
-If you add a single item to a queue, and only threads waiting for an item to
-appear are blocked on the condition variable, then you should probably use a sig-
-nal. That'll wake up a single thread to check the queue and let the others sleep
-undisturbed, avoiding unnecessary context switches. On the other hand, if you
-add more than one item to the queue, you will probably need to broadcast. For
-examples of both broadcast and signal operations on condition variables, check
-out the "read/write lock" package in Section 7.1.2.
-Although you must have the associated mutex locked to wait on a condition
-variable, you can signal (or broadcast) a condition variable with the associated
-mutex unlocked if that is more convenient. The advantage of doing so is that, on
-many systems, this may be more efficient. When a waiting thread awakens, it
-must first lock the mutex. If the thread awakens while the signaling thread holds
-the mutex, then the awakened thread must immediately block on the mutex-
-you've gone through two context switches to get back where you started.*
-Weighing on the other side is the fact that, if the mutex is not locked, any
-thread (not only the one being awakened) can lock the mutex prior to the thread
-being awakened. This race is one source of intercepted wakeups. A lower-priority
-thread, for example, might lock the mutex while another thread was about to
-awaken a very high-priority thread, delaying scheduling of the high-priority
-thread. If the mutex remains locked while signaling, this cannot happen-the
-high-priority waiter will be placed before the lower-priority waiter on the mutex,
-and will be scheduled first.
-3.3.4 One final alarm program
-It is time for one final version of our simple alarm program. In alarm\_
-mutex.c, we reduced resource utilization by eliminating the use of a separate
-execution context (thread or process) for each alarm. Instead of separate execu-
-tion contexts, we used a single thread that processed a list of alarms. There was
-one problem, however, with that approach-it was not responsive to new alarm
-commands. It had to finish waiting for one alarm before it could detect that
-another had been entered onto the list with an earlier expiration time, for exam-
-ple, if one entered the commands 0 message 1" followed by  message 2."
-* There is an optimization, which I've called "wait morphing," that moves a thread directly
-from the condition variable wait queue to the mutex wait queue in this case, without a context
-switch, when the mutex is locked. This optimization can produce a substantial performance ben-
-efit for many applications.
-Condition variables 83
-Now that we have added condition variables to our arsenal of threaded pro-
-gramming tools, we will solve that problem. The new version, creatively named
-alarm\_cond. c, uses a timed condition wait rather than sleep to wait for an alarm
-expiration time. When main inserts a new entry at the head of the list, it signals
-the condition variable to awaken alarm\_thread immediately. The alarm\_thread
-then requeues the alarm on which it was waiting, to sort it properly with respect
-to the new entry, and tries again.
-20,22 Part 1 shows the declarations for alarm\_cond.c. There are two additions to
-this section, compared to alarm\_mutex.c: a condition variable called alarm\_cond
-and the current\_alarm variable, which allows main to determine the expiration
-time of the alarm on which alarm\_thread is currently waiting. The current\_alarm
-variable is an optimization-main does not need to awaken alarm\_thread unless
-it is either idle, or waiting for an alarm later than the one main has just inserted.
-| alarm\_cond.c part 1 declarations
-1 #include \<pthread.h\>
-2 #include \<time.h\>
-3 #include "errors.h"
-4
-5 /*
-6 * The "alarm" structure now contains the time\_t (time since the
-7 * Epoch, in seconds) for each alarm, so that they can be
-8 * sorted. Storing the requested number of seconds would not be
-9 * enough, since the "alarm thread" cannot tell how long it has
-10 * been on the list.
-U */
-12 typedef struct alarm\_tag {
-13 struct alarm\_tag *link;
-14 int seconds;
-15 time\_t time; /* seconds from EPOCH */
-16 char message[64];
-17 } alarm\_t;
-18
-19 pthread\_mutex\_t alarmjnutex = PTHREAD\_MUTEX\_INITIALIZER;
-20 pthread\_cond\_t alarm\_cond = PTHREAD\_COND\_INITIALIZER;
-21 alarm\_t *alarm\_list = NULL;
-22 time\_t current\_alarm = 0;
-| alarm\_cond.c part 1 declarations
-Part 2 shows the new function alarm\_insert. This function is nearly the same
-as the list insertion code from alarm\_mutex.c, except that it signals the condition
-variable alarm\_cond when necessary. I made alarm\_insert a separate function
-because now it needs to be called from two places-once by main to insert a new
-alarm, and now also by alarm\_thread to reinsert an alarm that has been "pre-
-empted" by a new earlier alarm.
-84
-CHAPTER 3 Synchronization
-9-14 I have recommended that mutex locking protocols be documented, and here is
-an example: The alarm\_insert function points out explicitly that it must be
-called with the alarm\_mutex locked.
-48-53 If current\_alarm (the time of the next alarm expiration) is 0, then the alarm\_
-thread is not aware of any outstanding alarm requests, and is waiting for new
-work. If current\_alarm has a time greater than the expiration time of the new
-alarm, then alarm\_thread is not planning to look for new work soon enough to
-handle the new alarm. In either case, signal the alarm\_cond condition variable so
-that alarm\_thread will wake up and process the new alarm.
-alarm cond.c
-part 2 alarm\_insert
-1 /*
-2 * Insert alarm entry on list, in order.
-3 */
-4 void alarm\_insert (alarm\_t *alarm)
-5 {
-6 int status;
-7 alarm t **last, *next;
-9
-10
-11
-12
-13
-14
-15
-16
-17
-18
-19
-20
-21
-22
-23
-24
-25
-26
-27
-28
-29
-30
-31
-32
-33
-34
-35
-36
-/*
-*
-*
-LOCKING PROTOCOL:
-* This routine requires that the caller have locked the
-* alarm\_mutex!
-*/
-last = &alarm\_list;
-next = *last;
-while (next != NULL) {
-if (next-\>time \>= alarm-\>time) {
-alarm-\>link = next;
-*last = alarm;
-break;
-}
-last = &next-\>link;
-next = next-\>link;
-/*
-* If we reached the end of the list, insert the new alarm
-* there. ("next" is NULL, and "last" points to the link
-* field of the last item, or to the list header.)
-*/
-if (next == NULL) {
-*last = alarm;
-alarm-\>link = NULL;
-#ifdef DEBUG
-printf ("[list:
-");
-Condition variables 85
-37 for (next = alarm\_list; next != NULL; next = next-\>link)
-38 printf ("%d(%d)[\"%s\"] ", next-\>time,
-39 next-\>time - time (NULL), next-\>message);
-40 printf ("]\n");
-41 #endif
-42 /*
-43 * Wake the alarm thread if it is not busy (that is, if
-44 * current\_alarm is 0, signifying that it's waiting for
-45 * work), or if the new alarm comes before the one on
-46 * which the alarm thread is waiting.
-47 */
-48 if (current\_alarm == 0 || alarm-\>time \< current\_alarm) {
-49 current\_alarm = alarm-\>time;
-50 status = pthread\_cond\_signal (&alarm\_cond);
-51 if (status != 0)
-52 err\_abort (status, "Signal cond");
-53 }
-54 }
-| alarm\_cond.c part 2 alarm\_insert
-Part 3 shows the alarm\_thread function, the start function for the "alarm
-server" thread. The general structure of alarm\_thread is very much like the
-alarm\_thread in alarmjnutex.c. The differences are due to the addition of the
-condition variable.
-26-31 If the alarm\_list is empty, alarm\_mutex.c could do nothing but sleep any-
-way, so that main would be able to process a new command. The result was that
-it could not see a new alarm request for at least a full second. Now, alarm\_thread
-instead waits on the alarm\_cond condition variable, with no timeout. It will
-"sleep" until you enter a new alarm command, and then main will be able to
-awaken it immediately. Setting current\_alarm to 0 tells main that alarin\_thread
-is idle. Remember that pthread\_cond\_wait unlocks the mutex before waiting,
-and relocks the mutex before returning to the caller.
-35 The new variable expired is initialized to 0; it will be set to 1 later if the timed
-condition wait expires. This makes it a little easier to decide whether to print the
-current alarm's message at the bottom of the loop.
-36-42 If the alarm we've just removed from the list hasn't already expired, then we
-need to wait for it. Because we're using a timed condition wait, which requires a
-POSIX. lb struct timespec, rather than the simple integer time required by
-sleep, we convert the expiration time. This is easy, because a struct timespec
-has two members-tv\_sec is the number of seconds since the Epoch, which is
-exactly what we already have from the time function, and tv\_nsec is an addi-
-tional count of nanoseconds. We will just set tv\_nsec to 0, since we have no need
-of the greater resolution.
-43 Record the expiration time in the current\_alarm variable so that main can
-determine whether to signal alarm\_cond when a new alarm is added.
-86 CHAPTER 3 Synchronization
-44-53 Wait until either the current alarm has expired, or main requests that alarm\_
-thread look for a new, earlier alarm. Notice that the predicate test is split here,
-for convenience. The expression in the while statement is only half the predicate,
-detecting that main has changed current\_alarm by inserting an earlier timer.
-When the timed wait returns etimedout, indicating that the current alarm has
-expired, we exit the while loop with a break statement at line 49.
-54-55 If the while loop exited when the current alarm had not expired, main must
-have asked alarm\_thread to process an earlier alarm. Make sure the current
-alarm isn't lost by reinserting it onto the list.
-57 If we remove from alarm\_list an alarm that has already expired, just set the
-expired variable to 1 to ensure that the message is printed.
-| alarm\_cond.c part 3 alarm\_routine
-1 /*
-2 * The alarm thread's start routine.
-3 */
-4 void *alarm\_thread (void *arg)
-5 {
-6 alarm\_t *alarm;
-7 struct timespec cond\_time;
-8 time\_t now;
-9 int status, expired;
-10
-n /*
-12 * Loop forever, processing commands. The alarm thread will
-13 * be disintegrated when the process exits. Lock the mutex
-14 * at the start -- it will be unlocked during condition
-15 * waits, so the main thread can insert alarms.
-16 */
-17 status = pthread\_mutex\_lock (&alarm\_mutex);
-18 if (status != 0)
-19 err\_abort (status, "Lock mutex");
-20 while A) {
-21 /*
-22 * If the alarm list is empty, wait until an alarm is
-23 * added. Setting current\_alarm to 0 informs the insert
-24 * routine that the thread is not busy.
-25 */
-26 current\_alarm = 0;
-27 while (alarm\_list == NULL) {
-28 status = pthread\_cond\_wait (&alarm\_cond, &alarm\_mutex);
-29 if (status != 0)
-30 err\_abort (status, "Wait on cond");
-31 }
-32 alarm = alarm\_list;
-33 alarm\_list = alarm-\>link;
-34 now = time (NULL);
-Condition variables
-87
-35
-36
-37
-38
-39
-40
-|U
-42
-43
-44
-45
-46
-47
-48
-49
-50
-51
-52
-53
-54
-55
-56
-57
-58
-59
-60
-61
-62
-63
-expired = 0;
-if (alarm-\>time \> now) {
-#ifdef DEBUG
-printf ("[waiting: %d(%d)\"%s\"]\n", alarm-\>time,
-alarm-\>time - time (NULL), alarm-\>message);
-#endif
-cond\_time.tv\_sec = alarm-\>time;
-cond\_time.tv\_nsec =0;
-current\_alarm = alarm-\>time;
-while (current\_alarm == alarm-\>time) {
-status = pthread\_cond\_timedwait (
-&alarm\_cond, &alarm\_mutex, &cond\_time);
-if (status == ETIMEDOUT) {
-expired = 1;
-}
-if
-break;
-(status != 0)
-err abort (status, "Cond timedwait");
-}
-if
-(!expired)
-alarm\_insert (alarm);
-} else
-expired = 1;
-if (expired) {
-printf ("(%d) %s\n"
-free (alarm);
-alarm-\>seconds, alarm-\>message);
-alarm cond.c
-part 3 alarm\_routine
-Part 4 shows the final section of alarm\_cond.c, the main program. It is nearly
-identical to the main function from alarm\_mutex.c.
-38 Because the condition variable signal operation is built into the new alarm\_
-insert function, we call alarm\_insert rather than inserting a new alarm
-directly.
-alarm cond.c
-part 4 main
-int main (int argc, char *argv[])
-{
-int status;
-char line[128];
-alarm\_t *alarm;
-pthread\_t thread;
-status = pthread\_create (
-{.thread, NULL, alarm thread, NULL);
-88 CHAPTER 3 Synchronization
-10 if (status != 0)
-11 err\_abort (status, "Create alarm thread");
-12 while A) {
-13 printf ("Alarm\> ");
-14 if (fgets (line, sizeof (line), stdin) == NULL) exit @);
-15 if (strlen (line) \<= 1) continue;
-16 alarm = (alarm\_t*)malloc (sizeof (alarm\_t));
-17 if (alarm == NULL)
-18 errno\_abort ("Allocate alarm");
-19
-20 /*
-21 * Parse input line into seconds (%d) and a message
-22 * (%64[A\n]), consisting of up to 64 characters
-23 * separated from the seconds by whitespace.
-24 */
-25 if (sscanf (line, "%d %64["\n]",
-26 &alarm-\>seconds, alarm-\>message) \< 2) {
-27 fprintf (stderr, "Bad commandSn");
-28 free (alarm);
-29 } else {
-30 status = pthread\_mutex\_lock (&alarm\_mutex);
-31 if (status != 0)
-32 err\_abort (status, "Lock mutex");
-33 alarm-\>time = time (NULL) + alarm-\>seconds;
-34 /*
-35 * Insert the new alarm into the list of alarms,
-36 * sorted by expiration time.
-37 */
-38 alarm\_insert (alarm);
-39 status = pthread\_mutex\_unlock (&alarm\_mutex);
-40 if (status != 0)
-41 err\_abort (status, "Unlock mutex");
-42 }
-43 }
-44 }
-| alarm\_cond. c part 4 main
-3.4 Memory visibility between threads
-The moment Alice appeared, she was appealed to by all three to settle the
-question, and they repeated their arguments to her, though, as they all
-spoke at once, she found it very hard to make out exactly what they
-said.
--Lewis Carroll, Alice's Adventures in Wonderland
-Memory visibility between threads 89
-In this chapter we have seen how you should use mutexes and condition vari-
-ables to synchronize (or "coordinate") thread activities. Now we'll journey off on a
-tangent, for just a few pages, and see what is really meant by "synchronization" in
-the world of threads. It is more than making sure two threads don't write to the
-same location at the same time, although that's part of it. As the title of this sec-
-tion implies, it is about how threads see the computer's memory.
-Pthreads provides a few basic rules about memory visibility. You can count on
-all implementations of the standard to follow these rules:
-1. Whatever memory values a thread can see when it calls pthread\_create
-can also be seen by the new thread when it starts. Any data written to
-memory after the call to pthread\_create may not necessarily be seen by
-the new thread, even if the write occurs before the thread starts.
-2. Whatever memory values a thread can see when it unlocks a mutex, either
-directly or by waiting on a condition variable, can also be seen by any
-thread that later locks the same mutex. Again, data written after the mutex
-is unlocked may not necessarily be seen by the thread that locks the
-mutex, even if the write occurs before the lock.
-3. Whatever memory values a thread can see when it terminates, either by
-cancellation, returning from its start function, or by calling pthread\_exit,
-can also be seen by the thread that joins with the terminated thread by
-calling pthread\_join. And, of course, data written after the thread termi-
-nates may not necessarily be seen by the thread that joins, even if the write
-occurs before the join.
-4. Whatever memory values a thread can see when it signals or broadcasts a
-condition variable can also be seen by any thread that is awakened by that
-signal or broadcast. And, one more time, data written after the signal or
-broadcast may not necessarily be seen by the thread that wakes up, even if
-the write occurs before it awakens.
-Figures 3.5 and 3.6 demonstrate some of the consequences. So what should
-you, as a programmer, do?
-First, where possible make sure that only one thread will ever access a piece of
-data. A thread's registers can't be modified by another thread. A thread's stack
-and heap memory a thread allocates is private unless the thread communicates
-pointers to that memory to other threads. Any data you put in register or auto
-variables can therefore be read at a later time with no more complication than in
-a completely synchronous program. Each thread is synchronous with itself. The
-less data you share between threads, the less work you have to do.
-Second, any time two threads need to access the same data, you have to apply
-one of the Pthreads memory visibility rules, which, in most cases, means using a
-mutex. This is not only to protect against multiple writes-even when a thread
-only reads data it must use a mutex to ensure that it sees the most recent value
-of the data written while the mutex was locked.
-90
-CHAPTER 3 Synchronization
-This example does everything correctly. The left-hand code (running in thread A)
-sets the value of several variables while it has a mutex locked. The right-hand
-code (running in thread B) reads those values, also while holding the mutex.
-Thread A Thread B
-pthread mutex
-variableA = 1
-variableB = 2
-pthread mutex
-lock (Smutexl);
-r
-t
-unlock (Smutexl);
-pthread
-localA =
-mutex lock (Smutexl);
-= variableA;
-localB = variableB;
-pthread\_mutex unlock (smutexl);
-Rule 2: visibility from pthread\_mutex\_unlock to pthread\_mutex\_lock. When
-thread B returns from pthread\_mutex\_lock, it will see the same values for
-variableA and variableB that thread A had seen at the time it called pthread\_
-mutex\_unlock. That is, 1 and 2, respectively.
-FIGURE 3.5 Correct memory visibility
-This example shows an error. The left-hand code (running in thread A) sets the
-value of variables after unlocking the mutex. The right-hand code (running in
-thread B) reads those values while holding the mutex.
-Thread A Thread B
-pthread\_mutex\_lock (Smutexl);
-variableA = 1;
-pthread\_mutex\_unlock (Smutexl);
-variableB = 2;
-pthread\_mutex\_lock (Smutexl);
-localA = variableA;
-localB = variableB;
-pthread mutex unlock (Smutexl);
-Rule 2: visibility from pthread\_mutex\_unlock to pthread\_mutex\_lock. When
-thread B returns from pthread\_mutex\_lock, it will see the same values for
-variableA and variableB that thread A had seen at the time it called pthread\_
-mutex\_unlock. That is, it will see the value 1 for variableA, but may not see
-the value 2 for variableB since that was written after the mutex was unlocked.
-FIGURE 3.6 Incorrect memory visibility
-As the rules state, there are specific cases where you do not need to use a
-mutex to ensure visibility. If one thread sets a global variable, and then creates a
-new thread that reads the same variable, you know that the new thread will not
-see an old value. But if you create a thread and then set some variable that the
-new thread reads, the thread may not see the new value, even if the creating
-thread succeeds in writing the new value before the new thread reads it.
-Memory visibility between threads 91
-I Warning! We are now descending below the Pthreads API into details
-of hardware memory architecture that you may prefer not to know. You
-may want to skip this explanation for now and come back later.
-If you are willing to just trust me on all that (or if you've had enough for now),
-you may now skip past the end of this section. This book is not about multipro-
-cessor memory architecture, so I will just skim the surface-but even so, the
-details are a little deep, and if you don't care right now, you do not need to worry
-about them yet. You will probably want to come back later and read the rest,
-though, when you have some time.
-In a single-threaded, fully synchronous program, it is "safe" to read or write
-any memory at any time. That is, if the program writes a value to some memory
-address, and later reads from that memory address, it will always receive the last
-value that it wrote to that address.
-When you add asynchronous behavior (which includes multiprocessors) to the
-program, the assumptions about memory visibility become more complicated.
-For example, an asynchronous signal could occur at any point in the program's
-execution. If the program writes a value to memory, a signal handler runs and
-writes a different value to the same memory address, when the main program
-resumes and reads the value, it may not receive the value it wrote.
-That's not usually a major problem, because you go to a lot of trouble to
-declare and use signal handlers. They run "specialized" code in a distinctly differ-
-ent environment from the main program. Experienced programmers know that
-they should write global data only with extreme care, and it is possible to keep
-track of what they do. If that becomes awkward, you block the signal around
-areas of code that use the global data.
-When you add multiple threads to the program the asynchronous code is no
-longer special. Each thread runs normal program code, and all in the same unre-
-stricted environment. You can hardly ever be sure you always know what each
-thread may be doing. It is likely that they will all read and write some of the same
-data. Your threads may run at unpredictable times or even simultaneously on
-different processors. And that's when things get interesting.
-By the way, although we are talking about programming with multiple
-threads, none of the problems outlined in this section is specific to threads.
-Rather, they are artifacts of memory architecture design, and they apply to any
-situation where two "things" independently access the same memory. The two
-things may be threads running on separate processors, but they could instead be
-processes running on separate processors and using shared memory. Or one
-"thing" might be code running on a uniprocessor, while an independent I/O con-
-troller reads or writes the same memory.
-I A memory address can hold only one value at a time; don't let threads
-"race" to get there first.
-When two threads write different values to the same memory address, one
-after the other, the final state of memory is the same as if a single thread had
-92 CHAPTER 3 Synchronization
-written those two values in the same sequence. Either way only one value
-remains in memory. The problem is that it becomes difficult to know which write
-occurred last. Measuring some absolute external time base, it may be obvious
-that "processor B" wrote the value " several microseconds after "processor A"
-wrote the value ." That doesn't mean the final state of memory will have a ."
-Why? Because we haven't said anything about how the machine's cache and
-memory bus work. The processors probably have cache memory, which is just
-fast, local memory used to keep quickly accessible copies of data that were
-recently read from main memory. In a write-back cache system, data is initially
-written only to cache, and copied ("flushed") to main memory at some later time.
-In a machine that doesn't guarantee read/write ordering, each cache block may
-be written whenever the processor finds it convenient. If two processors write dif-
-ferent values to the same memory address, each processor's value will go into its
-own cache. Eventually both values will be written to main memory, but at essen-
-tially random times, not directly related to the order in which the values were
-written to the respective processor caches.
-Even two writes from within a single thread (processor) need not appear in
-memory in the same order. The memory controller may find it faster, or just more
-convenient, to write the values in "reverse" order, as shown in Figure 3.7. They
-may have been cached in different cache blocks, for example, or interleaved to
-different memory banks. In general, there's no way to make a program aware of
-these effects. If there was, a program that relied on them might not run correctly
-on a different model of the same processor family, much less on a different type of
-computer.
-The problems aren't restricted to two threads writing memory. Imagine that
-one thread writes a value to a memory address on one processor, and then
-another thread reads from that memory address on another processor. It may
-seem obvious that the thread will see the last value written to that address, and on
-some hardware that will be true. This is sometimes called "memory coherence" or
-"read/write ordering." But it is complicated to ensure that sort of synchronization
-between processors. It slows the memory system and the overhead provides no
-benefit to most code. Many modern computers (usually among the fastest) don't
-guarantee any ordering of memory accesses between different processors, unless
-the program uses special instructions commonly known as memory barriers.
-Time
-t
-t+1
-t+2
-t+3
-t+4
-Thread 1
-write " to address 1
-write " to address 2
-cache system flushes
-cache system flushes
-(cache)
-(cache)
-address
-address
-2
-1
-Thread :
-read
-read
-"
-"
-2
-from
-from
-address
-address
-1
-2
-FIGURE 3.7 Memory ordering without synchronization
-Memory visibility between threads
-93
-Memory accesses in these computers are, at least in principle, queued to the
-memory controller, and may be processed in whatever order becomes most effi-
-cient. A read from an address that is not in the processor's cache may be held
-waiting for the cache fill, while later reads complete. A write to a "dirty" cache
-line, which requires that old data be flushed, may be held while later writes com-
-plete. A memory barrier ensures that all memory accesses that were initiated by
-the processor prior to the memory barrier have completed before any memory
-accesses initiated after the memory barrier can complete.
-I A "memory barrier" is a moving wall, not a "cache flush" command.
-A common misconception about memory barriers is that they "flush" values to
-main memory, thus ensuring that the values are visible to other processors. That
-is not the case, however. What memory barriers do is ensure an order between
-sets of operations. If each memory access is an item in a queue, you can think of
-a memory barrier as a special queue token. Unlike other memory accesses, how-
-ever, the memory controller cannot remove the barrier, or look past it, until it has
-completed all previous accesses.
-A mutex lock, for example, begins by locking the mutex, and completes by
-issuing a memory barrier. The result is that any memory accesses issued while
-the mutex is locked cannot complete before other threads can see that the mutex
-was locked. Similarly, a mutex unlock begins by issuing a memory barrier and
-completes by unlocking the mutex, ensuring that memory accesses issued while
-the mutex is locked cannot complete after other threads can see that the mutex is
-unlocked.
-This memory barrier model is the logic behind my description of the Pthreads
-memory rules. For each of the rules, we have a "source" event, such as a thread
-calling pthread\_mutex\_unlock, and a "destination" event, such as another thread
-returning from pthread\_mutex\_lock. The passage of "memory view" from the first
-to the second occurs because of the memory barriers carefully placed in each.
-Even without read/write ordering and memory barriers, it may seem that
-writes to a single memory address must be atomic, meaning that another thread
-will always see either the intact original value or the intact new value. But that's
-not always true, either. Most computers have a natural memory granularity,
-which depends on the organization of memory and the bus architecture. Even if
-the processor naturally reads and writes 8-bit units, memory transfers may occur
-in 32- or 64-bit "memory units."
-That may mean that 8-bit writes aren't atomic with respect to other memory
-operations that overlap the same 32- or 64-bit unit. Most computers write the full
-memory unit (say, 32 bits) that contains the data you're modifying. If two threads
-write different 8-bit values within the same 32-bit memory unit, the result may
-be that the last thread to write the memory unit specifies the value of both bytes,
-overwriting the value supplied by the first writer. Figure 3.8 shows this effect.
-94
-CHAPTER 3 Synchronization
-thread 1
-memory
-00 I 01 I 02l~0lf
-each reads the value
-each modifies a byte
-each writes a new value
-00 | 14 | 02~j~03 ! ?
-thread 1 wins: liliis lime)
-thread 2
-00 |
-00 i
-01
-01
-| 02
-| 25
-i 25
-03
-03
-FIGURE 3.8 Memory conflict
-If a variable crosses the boundary between memory units, which can happen
-if the machine supports unaligned memory access, the computer may have to
-send the data in two bus transactions. An unaligned 32-bit value, for example,
-may be sent by writing the two adjacent 32-bit memory units. If either memory
-unit involved in the transaction is simultaneously written from another proces-
-sor, half of the value may be lost. This is called "word tearing," and is shown in
-Figure 3.9.
-We have finally returned to the advice at the beginning of this section: If you
-want to write portable Pthreads code, you will always guarantee correct memory
-visibility by using the Pthreads memory visibility rules instead of relying on any
-assumptions regarding the hardware or compiler behavior. But now, at the bot-
-tom of the section, you have some understanding of why this is true. For a
-substantially more in-depth treatment of multiprocessor memory architecture,
-refer to UNIX Systems for Modern Architectures [Schimmel, 1994].
-Figure 3.10 shows the same sequence as Figure 3.7, but it uses a mutex to
-ensure the desired read/write ordering. Figure 3.10 does not show the cache
-flush steps that are shown in Figure 3.7, because those steps are no longer rele-
-vant. Memory visibility is guaranteed by passing mutex ownership in steps t+3
-and t+4, through the associated memory barriers. That is, when thread 2 has
-Memory visibility between threads
-95
-00
-00
-thread 1
-01
-14
-14
-/
-/
-02
-02
-\
-\
-|xx
-03
-03
-XX
-memory (unaligned value)
-xx | 00 | 01 02 | 03 | xx
-each reads the value
-each modifies a byte
-each writes a new value
-[ xx 00 14 | 25 j 03 xx
-Each thread has written 16 bits of the 32
-XX
-| 00
-00
-XX
-thread 2
-\
-\
-01
-01 |
-/
-/
-bit value
-02
-T"
-25
-03 ;
-03
-FIGURE 3.9 Word tearing
-successfully locked the mutex previously unlocked by thread 1, thread 2 is guar-
-anteed to see memory values "at least as recent" as the values visible to thread 1
-at the time it unlocked the mutex.
-Time
-t
-t+1
-t+2
-t+3
-t+4
-t+5
-t+6
-t+7
-Thread 1
-lock mutex
-(memory barrier)
-write " to address 1
-write " to address 2
-(memory barrier)
-unlock mutex
-(cache)
-(cache)
-Thread 2
-lock mutex
-(memory barrier)
-read " from address 1
-read " from address 2
-(memory barrier)
-unlock mutex
-FIGURE 3.10 Memory ordering with synchronization
-4 A few ways to use threads
+# 4 A few ways to use threads
 "They were obliged to have him with them," the Mock Turtle said.
 "No wise fish would go anywhere without a porpoise."
 "Wouldn't it, really?" said Alice, in a tone of great surprise.
@@ -2098,7 +30,7 @@ might initiate several threads, each trying a different search algorithm.
 97
 98
 CHAPTER 4 A few ways to use threads
-4.1 Pipeline
+## 4.1 Pipeline
 "/ want a clean cup," interrupted the Hatter: "let's all move one place on."
 He moved on as he spoke, and the Dormouse followed him: the March Hare
 moved into the Dormouse's place, and Alice rather unwillingly took the
@@ -2135,38 +67,10 @@ stage, and next is a pointer to the following stage.
 last stage of a pipeline. The first stage, head, represents the first thread in the
 pipeline. The last stage, tail, is a special stage\_t that has no thread-it is a
 place to store the final result of the pipeline.
-| pipe.c part 1 definitions
-1
-2
-3
-4
-5
-6
-7
-8
-9
-10
-11
-12
-13
-14
-15
-16
-17
-18
-19
-20
-21
-22
-23
-24
-25
-26
-27
-28
-29
-|include \<pthread.h\>
-|include "errors.h"
+```c
+/** pipe.c part 1 definitions */
+#include \<pthread.h\>
+#include "errors.h"
 /*
 * Internal structure
 * pipeline. One for
@@ -2512,7 +416,7 @@ integer value, which it feeds into the pipeline.
 | pipe.c part 6 main
 106
 CHAPTER 4 A few ways to use threads
-4.2 Work crew
+## 4.2 Work crew
 The twelve jurors were all writing very busily on slates.
 "What are they doing?" Alice whispered to the Gryphon.
 "They ca'n't have anything to put down yet, before the trial's begun."
@@ -3255,7 +1159,7 @@ CHAPTER 4 A few ways to use threads
 33 }
 | crew.c
 part 5 main
-4.3 Client/Server
+## 4.3 Client/Server
 But the Judge said he never had summed up before;
 So the Snark undertook it instead,
 And summed it so well that it came to far more
@@ -3761,7 +1665,7 @@ Client/Server 129
 40 return 0;
 41 }
 | server.c part 5 main
-5 Advanced threaded programming
+# 5 Advanced threaded programming
 "Take some more tea," the March Hare said to Alice, very earnestly.
 "I've had nothing yet," Alice replied in an offended tone:
 "so I ca'n't take more."
@@ -3783,7 +1687,7 @@ allows a library to associate data with individual threads that it encounters an
 to retrieve that data later.
 Section 5.5 describes the Pthreads facilities for realtime scheduling, to help
 your program interact with the cold, cruel world in a predictable way.
-5.1 One-time initialization
+## 5.1 One-time initialization
 '"Tis the voice of the Jubjub!" he suddenly cried.
 (This man, that they used to call "Dunce.")
 "As the Bellman would tell you," he added with pride,
@@ -3917,7 +1821,7 @@ pthread\_once ensures proper synchronization.
 63 err\_abort (status, "Join thread");
 64 return 0;
 65 }
-5.2 Attributes objects
+## 5.2 Attributes objects
 The fifth is ambition. It next will be right
 To describe each particular batch:
 Distinguishing those that have feathers, and bite,
@@ -3948,7 +1852,8 @@ tions as real functions that perform validity checking.
 Threads, mutexes, and condition variables each have their own special
 attributes object type. Respectively, the types are pthread\_attr\_t, pthread\_
 mutexattr\_t, and pthread\_condattr\_t.
-5.2.1 Mutex attributes
+### 5.2.1 Mutex attributes
+```c
 pthread\_mutexattr\_t attr;
 int pthread\_mutexattr\_init (pthread\_mutexattr\_t *attr);
 int pthread\_mutexattr\_destroy (
@@ -3959,6 +1864,7 @@ pthread\_mutexattr\_t *attr, int *pshared);
 int pthread\_mutexattr\_setpshared (
 pthread\_mutexattr\_t *attr, int pshared);
 iendif
+```
 Pthreads defines the following attributes for mutex creation: pshared, protocol,
 and prioceiltng. No system is required to implement any of these attributes, how-
 ever, so check the system documentation before using them.
@@ -4006,7 +1912,8 @@ ing, will be discussed later in Section 5.5.5.
 24 }
 | mutex attr.c
 Attributes objects 137
-5.2.2 Condition variable attributes
+### 5.2.2 Condition variable attributes
+```c
 pthread\_condattr\_t attr;
 int pthread\_condattr\_init (pthread\_condattr\_t *attr);
 int pthread\_condattr\_destroy (
@@ -4017,6 +1924,7 @@ pthread\_condattr\_t *attr, int *pshared);
 int pthread\_condattr\_setpshared (
 pthread\_condattr\_t *attr, int pshared);
 #endif
+```
 Pthreads defines only one attribute for condition variable creation, pshared.
 No system is required to implement this attribute, so check the system documen-
 tation before using it. You initialize a condition variable attributes object using
@@ -4069,7 +1977,8 @@ nize using a condition variable must also use the same mutex. Waiting for a
 condition variable automatically unlocks, and then locks, the associated mutex.
 So if the mutex isn't also created with pthread\_process\_SHARED, the synchroni-
 zation won't work.
-5.2.3 Thread attributes
+### 5.2.3 Thread attributes
+```c
 pthread\_attr\_t attr;
 int pthread\_attr\_init (pthread\_attr\_t *attr);
 int pthread\_attr\_destroy (pthread\_attr\_t *attr);
@@ -4089,6 +1998,7 @@ pthread\_attr\_t *attr, void *stackaddr);
 int pthread\_attr\_setstackaddr (
 pthread\_attr\_t *attr, void **stackaddr);
 #endif
+```
 Attributes objects 139
 POSIX defines the following attributes for thread creation: detachstate, stack-
 size, stackaddr, scope, inheritsched, schedpolicy, and schedparam. Some systems
@@ -4226,13 +2136,14 @@ Attributes objects 141
 | thread attr.c
 142
 CHAPTER 5 Advanced threaded programming
-5.3 Cancellation
+## 5.3 Cancellation
 "Now, I give you fair warning,"
 shouted fhe Queen, stamping on the ground as she spoke;
 "either you or your head must be off,
 and that in about half no time! Take your choice!"
 The Duchess took her choice, and was gone in a moment.
 -Lewis Carroll, Alice's Adventures in Wonderland
+```c
 int pthread\_cancel (pthread\_t thread);
 int pthread\_setcancelstate (int state, int *oldstate);
 int pthread\_setcanceltype (int type, int *oldtype);
@@ -4240,6 +2151,7 @@ void pthread\_testcancel (void);
 void pthread\_cleanup\_push (
 void (*routine)(void *), void *arg);
 void pthread\_cleanup\_pop (int execute);
+```
 Most of the time each thread runs independently, finishes a specific job, and
 exits on its own. But sometimes a thread is created to do something that doesn't
 necessarily need to be finished. The user might press a CANCEL button to stop a
@@ -4473,7 +2385,7 @@ killer" that will arbitrarily terminate threads in the process. You can only can
 threads that you created, or threads for which the creator (or the thread itself)
 gave you an identifier. That generally means that cancellation is restricted to
 operating within a subsystem.
-5.3.1 Deferred cancelability
+### 5.3.1 Deferred cancelability
 "Deferred cancelability" means that the thread's cancelability type has been set
 to pthread\_cancel\_deferred and the thread's cancelability enable has been set to
 pthread\_cancel\_enable. The thread will only respond to cancellation requests
@@ -4663,7 +2575,7 @@ pthread\_setcancelstate again.
 61 return 0;
 62 }
 | cancel disable.c
-5.3.2 Asynchronous cancelability
+### 5.3.2 Asynchronous cancelability
 Asynchronous cancellation is useful because the "target thread" doesn't need
 to poll for cancellation requests by using cancellation points. That can be valu-
 able for a thread that runs a tight compute-bound loop (for example, searching
@@ -4853,7 +2765,7 @@ never try this on any Pthreads system! If your system conforms to POSIX
 1003. lc-1995 (or POSIX 1003.1, 1996 edition, or later), it supports deferred can-
 cellation of, at minimum, kernel functions such as read and write. You do not
 need asynchronous cancellation, and using it can be extremely dangerous.
-5.3.3 Cleaning up
+### 5.3.3 Cleaning up
 I When you write any library code, design it to handle deferred
 cancellation gracefully. Disable cancellation where it is not
 appropriate, and always use cleanup handlers at cancellation points.
@@ -5196,7 +3108,7 @@ Thread-specific data 161
 103 err\_abort (status, "Join team");
 104 }
 | cancel subcontract.c
-5.4 Thread-specific data
+## 5.4 Thread-specific data
 No, I've made up my mind about it: if I'm Mabel, I'll stay down here. It'll be
 no use their putting their heads down and saying "Come up again,
 dear!" I shall only look up and say "Who am I, then? Tell me that first, and
@@ -5273,11 +3185,13 @@ have for the key.
 Thread-specific data
 163
 FIGURE 5.2 Thread-specific data analogy
-5.4.1 Creating thread-specific data
+### 5.4.1 Creating thread-specific data
+```c
 pthread\_key\_t key;
 int pthread\_key\_create (
 pthread\_key\_t *key, void (*destructor)(void *));
 int pthread\_key\_delete (pthread\_key\_t key);
+```
 A thread-specific data key is represented in your program by a variable of type
 pthread\_key\_t. Like most Pthreads types, pthread\_key\_t is opaque and you
 should never make any assumptions about the structure or content. The easiest
@@ -5416,10 +3330,12 @@ Rarely will you use more than a few. In general, each component that uses
 thread-specific data will have a small number of keys each maintaining pointers
 to data structures that contain related data. It would take a lot of components to
 exhaust the available keys!
-5.4.2 Using thread-specific data
+### 5.4.2 Using thread-specific data
+```c
 int pthread\_setspecific (
 pthread\_key\_t key, const void *value);
 void *pthread\_getspecific (pthread\_key\_t key);
+```
 You can use the pthread\_getspecif ic function to determine the thread's cur-
 rent value for a key, or pthread\_setspecif ic to change the current value. Take a
 look at Section 7.3.1 for ideas on using thread-specific data to adapt old libraries
@@ -5449,7 +3365,7 @@ assign a pointer to that new structure to the same thread-specific data key, in 
 same thread, you are responsible for freeing the old structure. Pthreads will not
 free the old structure, nor will it call your destructor function with a pointer to
 the old structure.
-5.4.3 Using destructor functions
+### 5.4.3 Using destructor functions
 When a thread exits while it has a value defined for some thread-specific data
 key, you usually need to do something about it. If your key's value is a pointer to
 heap memory, you will need to free the memory to avoid a memory leak each
@@ -5661,7 +3577,7 @@ Thread-specific data 171
 113 pthread\_exit (NULL);
 114 }
 | tsd destructor.c
-5.5 Realtime scheduling
+## 5.5 Realtime scheduling
 "Well, it's no use your talking about waking him," said Tweedledum,
 "when you're only one of the things in his dream. You know
 very well you're not real."
@@ -5710,7 +3626,7 @@ while another thread uses the processor. Most systems, by default, will try to d
 tribute resources more or less fairly between threads. That's nice for a lot of
 things-but realtime isn't fair. Realtime means carefully giving precedence to the
 parts of the program that limit external response time.
-5.5.1 POSIX realtime options
+### 5.5.1 POSIX realtime options
 The POSIX standards are flexible, because they're designed to be useful in a
 wide range of environments. In particular, since traditional UNIX systems don't
 support any form of realtime scheduling control, all of the tools for controlling
@@ -5726,7 +3642,8 @@ other. Whenever more than one thread is ready to execute, the system will choose
 the thread with the highest priority.
 174
 CHAPTER 5 Advanced threaded programming
-5.5.2 Scheduling policies and priorities
+### 5.5.2 Scheduling policies and priorities
+```c
 int sched\_get\_priority\_max (int policy);
 int sched\_get\_priority\_min (int policy);
 int pthread\_attr\_getinheritsched (
@@ -5748,6 +3665,7 @@ int *policy, struct sched\_j?aram *param);
 int pthread\_setschedparam (
 pthread\_t thread, int\>policy,
 const struct sched\_param *param);
+```
 A Pthreads system that supports \_posix\_thread\_priority\_scheduling must
 provide a definition of the struct sched\_param structure that includes at least
 the member sched\_priority. The sched\_priority member is the only schedul-
@@ -6075,11 +3993,13 @@ Realtime scheduling 181
 79 return 0;
 80 }
 | sched thread.c
-5.5.3 Contention scope and allocation domain
+### 5.5.3 Contention scope and allocation domain
+```c
 int pthread\_attr\_getscope (
 const pthread\_attr\_t *attr, int *contentionscope);
 int pthread\_attr\_setscope (
 pthread attr t *attr, int contentionscope);
+```
 Besides scheduling policy and parameters, two other controls are important in
 realtime scheduling. Unless you are writing a realtime application, they probably
 don't matter. If you are writing a realtime application, you will need to find out
@@ -6165,7 +4085,7 @@ does not require any Pthreads system to implement this type of "cross processor
 preemption," you are more likely to find it when you use system contention scope
 threads. If predictability is critical, of course, you should be using system conten-
 tion scope anyway.
-5.5.4 Problems with realtime scheduling
+### 5.5.4 Problems with realtime scheduling
 One of the problems of relying on realtime scheduling is that it is not modu-
 lar. In real applications you will generally be working with libraries from a variety
 of sources, and those libraries may rely on threads for important functions like
@@ -6233,7 +4153,8 @@ higher priorities, because you are less likely to interfere with something
 else that's important.
 Unless your code really needs priority scheduling, avoid it. In most cases,
 introducing priority scheduling will cause more problems than it will solve.
-5.5.5 Priority-aware mutexes
+### 5.5.5 Priority-aware mutexes
+```c
 #if defined (\_POSIX\_THREAD\_PRIO\_PROTECT) \
 || defined (\_POSIX\_THREAD\_PRIO\_INHERIT)
 int pthread\_mutexattr\_getprotocol (
@@ -6252,6 +4173,7 @@ int pthread\_mutex\_setprioceiling (
 pthread\_mutex\_t *mutex,
 int prioceiling, int *old\_ceiling);
 #endif
+```
 Pthreads provides several special mutex attributes that can help to avoid pri-
 ority inversion deadlocks. Locking, or waiting for, a mutex with one of these
 attributes may change the priority of the thread-or the priority of other threads-
@@ -6297,7 +4219,7 @@ thread\_prio\_inherit then the protocol attribute may not be defined. The defaul
 value of the protocol attribute (or the effective value if the attribute isn't defined) is
 posix\_prio\_none, which means that thread priorities are not modified by the act
 of locking (or waiting for) a mutex.
-5.5.5.1 Priority ceiling mutexes
+#### 5.5.5.1 Priority ceiling mutexes
 The simplest of the two types of "priority aware" mutexes is the priority ceiling
 (or "priority protection") protocol (Figure 5.3). When you create a mutex using a
 priority ceiling, you specify the highest priority at which a thread will ever be
@@ -6339,7 +4261,7 @@ ceiling mutexes or that no thread in which the callback might be invoked will ru
 at a priority above the ceiling priority of the mutex.
 188
 CHAPTER 5 Advanced threaded programming
-5.5.5.2 Priority inheritance mutexes
+#### 5.5.5.2 Priority inheritance mutexes
 The other Pthreads mutex protocol is priority inheritance. In the priority inher-
 itance protocol, when a thread locks a mutex the thread's priority is controlled
 through the mutex (Figure 5.4). When another thread needs to block on thai
@@ -6379,7 +4301,7 @@ thread 1 priority |
 thread 2 priority |
 FIGURE 5.4 Priority inheritance mutex operation
 Threads and kernel entities 189
-5.6 Threads and kernel entities
+## 5.6 Threads and kernel entities
 "Two lines!" cried the Mock Turtle. "Seals, turtles, salmon, and so on:
 then, when you've cleared all the jelly-fish out of the way-"
 'That generally takes some time," interrupted the Gryphon.
@@ -6420,7 +4342,7 @@ application is one that does not rely on any options or extensions to the standa
 only the specified minimum value for all implementation limits (but will work correctly with any
 allowed value).
 190 CHAPTER 5 Advanced threaded programming
-5.6.1 Many-to-one (user level)
+### 5.6.1 Many-to-one (user level)
 The many-to-one method is also sometimes called a "library implementation."
 In general, "many-to-one" implementations are designed for operating systems
 with no support for threads. Pthreads implementations that run on generic UNIX
@@ -6479,7 +4401,7 @@ multiprocessor hardware.
 days, involving primarily new assembly language for the register context switching routines. We use
 the motto "Some Assembly Required."
 TABLE 5.2 Many-to-one thread scheduling
-5.6.2 One-to-one (kernel level)
+### 5.6.2 One-to-one (kernel level)
 One-to-one thread mapping is also sometimes called a "kernel thread" imple-
 mentation. The Pthreads library assigns each thread to a kernel entity. It
 generally must use blocking kernel functions to wait on mutexes and condition
@@ -6552,7 +4474,7 @@ Poor scaling when many threads are used, because
 each Pthreads thread takes kernel resources from
 the system.
 TABLE 5.3 One-to-one thread scheduling
-5.6.3 Many-to-few (two level)
+### 5.6.3 Many-to-few (two level)
 The many-to-few model tries to merge the advantages of both the many-to-
 one and one-to-one models, while avoiding their disadvantages. This model
 requires cooperation between the user-level Pthreads library and the kernel.
@@ -6618,7 +4540,7 @@ kernel entities, since the thread's pri-
 ority may be meaningful only in user
 mode.
 TABLE 5.4 Many-to-jew thread scheduling
-6 POSIX adjusts to threads
+# 6 POSIX adjusts to threads
 "Who are you ?" said the Caterpillar.
 This was not an encouraging opening for a conversation.
 Alice replied, rather shyly, "I-/ hardly know, Sir,
@@ -6634,7 +4556,7 @@ But there's another class of POSIX functions that doesn't extend into the
 threaded world quite so unambiguously. For example, when you fork a threaded
 process, what happens to the threads? What does exec do in a threaded process?
 What happens when one of the threads in a threaded process calls exit?
-6.1 fork
+## 6.1 fork
 I Avoid using fork in a threaded program (if you can)
 unless you intend to exec a new program immediately.
 When a threaded process calls fork to create a child process, Pthreads speci-
@@ -6692,9 +4614,11 @@ This is an inconsistency in the POSIX standard that will need to be fixed.
 Nobody yet knows what the eventual solution will be. My advice is to avoid using
 fork in a signal-catching function.
 fork 199
-6.1.1 Fork handlers
+### 6.1.1 Fork handlers
+```c
 int pthread\_atfork (void (*prepare)(void), I
 void (*parent)(void), void (*child)(void)); I
+```
 Pthreads added the pthread\_atf ork "fork handler" mechanism to allow your
 code to protect data invariants across fork. This is somewhat analogous to
 atexit, which allows a program to perform cleanup when a process terminates.
@@ -6920,7 +4844,7 @@ before releasing the mutexes. If you want the child to begin with no open connec
 tions, then you would locate the existing parent connection data structures and
 free them, closing the associated files that were propagated by fork.
 204 CHAPTER 6 POSIX adjusts to threads
-6.2 exec
+## 6.2 exec
 The exec function isn't affected much by the presence of threads. The func-
 tion of exec is to wipe out the current program context and replace it with a new
 program. A call to exec immediately terminates all threads in the process except
@@ -6931,7 +4855,7 @@ created using the pthread\_process\_shared attribute value) and pshared condi-
 tion variables, which remain usable as long as the shared memory is mapped by
 some process. You should, however, unlock any pshared mutexes that the cur-
 rent process may have locked-the system will not unlock them for you.
-6.3 Process exit
+## 6.3 Process exit
 In a nonthreaded program, an explicit call to the exit function has the same
 effect as returning from the program's main function. The process exits. Pthreads
 adds the pthread\_exit function, which can be used to cause a single thread to
@@ -6955,16 +4879,18 @@ error, it may be dangerous to allow the program to continue to operate on the
 data. When the program is somehow broken, it might be dangerous to attempt to
 shut down the application threads cleanly. In that case, you might call exit to stop
 all processing immediately.
-6.4 Stdio
+## 6.4 Stdio
 Pthreads specifies that the ANSI C standard I/O [stdio) functions are thread-
 safe. Because the stdio package requires static storage for output buffers and file
 Stdio 205
 state, stdio implementations will use synchronization, such as mutexes or
 semaphores.
-6.4.1 f lockf ile and f unlockf ile
+### 6.4.1 f lockf ile and f unlockf ile
+```c
 void flockfile (FILE *file);
 int ftrylockfile (FILE *file);
 void funlockfile (FILE *file);
+```
 In some cases, it is important that a sequence of stdio operations occur in
 uninterrupted sequence; for example, a prompt followed by a read from the ter-
 minal, or two writes that need to appear together in the output file even if another
@@ -7068,11 +4994,13 @@ series of writes is not interrupted by a file access from some other thread. The
 f trylockf ile function works like pthread\_mutex\_trylock in that it attempts to
 lock the file and, if the file is already locked, returns an error status instead of
 blocking.
-6.4.2 getchar\_unlocked and putchar\_unlocked
+### 6.4.2 getchar\_unlocked and putchar\_unlocked
+```c
 int getc\_unlocked (FILE *stream);
 int getchar\_unlocked (void);
 int putc\_unlocked (int c, FILE *stream);
 int putchar\_unlocked (int c);
+```
 ANSI C provides functions to get and put single characters efficiently into
 stdio buffers. The functions getchar and putchar operate on stdin and stdout,
 respectively, and getc and putc can be used on any stdio file stream. These are
@@ -7177,7 +5105,7 @@ Thread-safe functions 209
 64 pthread\_exit (NULL);
 65 }
 | putchar.c
-6.5 Thread-safe functions
+## 6.5 Thread-safe functions
 Although ANSI C and POSIX 1003.1-1990 were not developed with threads in
 mind, most of the functions they define can be made thread-safe without chang-
 ing the external interface. For example, although malloc and free must be
@@ -7208,11 +5136,13 @@ dirent passed to readdir\_r.
 A few existing functions, such as ctermid, are already thread-safe as long as
 certain restrictions are placed on parameters. These restrictions are noted in the
 following sections.
-6.5.1 User and terminal identification
+### 6.5.1 User and terminal identification
+```c
 int getlogin\_r (char *name, size\_t namesize);
 char *ctermid (char *s);
 int ttyname\_r (int fildes,
 char *name, size t namesize);
+```
 These functions return data to a caller-specified buffer. For getlogin\_r,
 namesize must be at least LOGIN\_NAME\_MAX characters. For ttyname\_r, namesize
 must be at least tty\_name\_max characters. Either function returns a value of 0 on
@@ -7266,9 +5196,11 @@ provided on systems that don't support threads.
 36 }
 | getlogin.c
 212 CHAPTER 6 POSIX adjusts to threads
-6.5.2 Directory searching
+### 6.5.2 Directory searching
+```c
 int readdir\_r (DIR *dirp, struct dirent *entry, I
 struct dirent **result); I
+```
 This function performs essentially the same action as readdir. That is, it
 returns the next directory entry in the directory stream specified by dirp. The dif-
 ference is that instead of returning a pointer to that entry, it copies the entry into
@@ -7278,9 +5210,11 @@ returns 0 and sets result to null. On failure, it returns an error number such a
 EBADF.
 Refer to program pipe. c, in Section 4.1, for a demonstration of using readdir\_r
 to allow your threads to search multiple directories concurrently.
-6.5.3 String token
+### 6.5.3 String token
+```c
 char *strtok\_r ( I
 char *s, const char *sep, char **lasts); I
+```
 This function returns the next token in the string s. Unlike strtok, the con-
 text (the current pointer within the original string) is maintained in lasts, which
 is specified by the caller, rather than in a static pointer internal to the function.
@@ -7290,21 +5224,25 @@ NULL. The value lasts is set by strtok\_r to maintain the function's position
 within the string, and on each subsequent call you must return that same value
 of lasts. The strtok\_r function returns a pointer to the next token, or NULL
 when there are no more tokens to be found in the original string.
-6.5.4 Time representation
+### 6.5.4 Time representation
+```c
 char *asctime\_r (const struct tm *tm, char *buf);
 char *ctime\_r (const time\_t *clock, char *buf);
 struct tm *gmtime\_r (
 const time\_t *clock, struct tm *result);
 struct tm *localtime\_r (
 const time t *clock, struct tm *result);
+```
 Thread-safe functions 213
 The output buffers (buf and result) are supplied by the caller, instead of
 returning a pointer to static storage internal to the functions. Otherwise, they are
 identical to the traditional variants. The asctime\_r and ctime\_r routines, which
 return ASCII character representations of a system time, both require that their
 buf argument point to a character string of at least 26 bytes.
-6.5.5 Random number generation
+### 6.5.5 Random number generation
+```c
 int rand\_r (unsigned int *seed); I
+```
 The seed is maintained in caller-supplied storage (seed) rather than using
 static storage internal to the function. The main problem with this interface is
 that it is not usually practical to have a single seed shared by all application and
@@ -7313,8 +5251,9 @@ generally have a separate "stream" of random numbers. Thus, a program con-
 verted to use rand\_r instead of rand is likely to generate different results, even if
 no threads are created. (Creating threads would probably change the order of
 calls to rand, and therefore change results anyway.)
-6.5.6 Group and user database
+### 6.5.6 Group and user database
 Group database:
+```c
 int getgrgid\_r (
 gid\_t gid, struct group *grp, char *buffer,
 size\_t bufsize, struct group **result);
@@ -7330,6 +5269,7 @@ int getpwnam\_r (
 const char *name, struct passwd *pwd,
 char *buffer, size\_t bufsize,
 struct passwd **result);
+```
 These functions store a copy of the group or user record (grp or pwd, respec-
 tively) for the specified group or user (gid, uid, or name) in a buffer designated by
 214 CHAPTER 6 POSIX adjusts to threads
@@ -7342,7 +5282,7 @@ becomes a pointer to the struct group or struct passwd record within buffer.
 The maximum required size for buffer can be determined by calling sysconf
 with the argument \_SC\_GETGR\_R\_SIZE\_MAX (for group data) or with the argument
 SC GETPW R SIZE max (for user data).
-6.6 Signals
+## 6.6 Signals
 Beware the Jabberwock, my son!
 The jaws that bite, the claws that catch!
 Beware the Jubjub bird, and shun
@@ -7383,7 +5323,7 @@ in the main thread, and sigwait to handle signals synchronously within a single
 thread dedicated to that purpose. If you must use sigaction (or equivalent) to
 handle synchronous signals (such as sigsegv) within threads, be especially cau-
 tious. Do as little work as possible within the signal-catching function.
-6.6.1 Signal actions
+### 6.6.1 Signal actions
 All signal actions are process-wide. A program must coordinate any use of
 sigaction between threads. This is nonmodular, but also relatively simple, and
 signals have never been modular. A function that dynamically modifies signal
@@ -7444,9 +5384,11 @@ province of the main program. This philosophy becomes even more wise when
 you are programming with threads. Signal actions must always be under the con-
 trol of a single component, at least, and to assign that responsibility to the main
 program makes the most sense in nearly all situations.
-6.6.2 Signal masks
+### 6.6.2 Signal masks
+```c
 int pthread\_sigmask (int how, I
 const sigset\_t *set, sigset\_t *oset); I
+```
 Each thread has its own private signal mask, which is modified by calling
 pthread\_sigmask. Pthreads does not specify what sigprocmask does within a
 threaded process-it may do nothing. Portable threaded code does not call sig-
@@ -7458,8 +5400,10 @@ had blocked sigfpe. When a thread is created, it inherits the signal mask of the
 thread that created it-if you want a signal to be masked everywhere, mask it first
 thing in main.
 Signals 217
-6.6.3 pthreadjdll
+### 6.6.3 pthreadjdll
+```c
 int pthread\_kill (pthread\_t thread, int sig); I
+```
 Within a process, one thread can send a signal to a specific thread (including
 itself) by calling pthread\_kill. When calling pthread\_kill, you specify not only
 the signal number to be delivered, but also the pthread\_t identifier for the thread
@@ -7937,7 +5881,8 @@ Signals 227
 87 pthread\_exit (NULL); /* Let threads finish */
 88 }
 | susp.c part 5 sampleprogram
-6.6.4 sigwait and sigwaitinfo
+### 6.6.4 sigwait and sigwaitinfo
+```c
 int sigwait (const sigset
 t *set, int *sig);
 fifdef \_POSIX\_REALTIME\_SIGNALS
@@ -7953,6 +5898,7 @@ siginfo\_t
 *info);
 *info,
 r
+```
 I Always use sigwait to work with asynchronous signals within threaded
 code.
 Pthreads adds a function to allow threaded programs to deal with "asynchro-
@@ -8092,7 +6038,7 @@ Signals 229
 91 return 0;
 92 }
 | sigwait.c
-6.6.5 SIGEVJHREAD
+### 6.6.5 SIGEVJHREAD
 Some of the functions in the POSIX. lb realtime standard, which provide for
 asynchronous notification, allow the programmer to give specific instructions
 about how that notification is to be accomplished. For example, when initiating
@@ -8249,7 +6195,7 @@ Signals 233
 93 return 0;
 94 }
 | sigev thread.c
-6.6.6 Semaphores: synchronizing with a signal-catching function
+### 6.6.6 Semaphores: synchronizing with a signal-catching function
 #ifdef
 int
 int
@@ -8598,7 +6544,7 @@ Signals 239
 105 #endif
 106 }
 | semaphore signal.c
-7 "Real code"
+# 7 "Real code"
 "When we were still little," the Mock Turtle went on at last, more calmly,
 though still sobbing a little now and then, "we went to school in the sea.
 The master was an old Turtle-we used to call him Tortoise-"
@@ -8620,7 +6566,7 @@ threads). The library packages may be useful to you as is or as templates. Pnrr.
 ily, though, they are here to give me something to talk about in this section, ar. z
 have omitted some complication that may be valuable in real code. The err::
 detection and recovery code, for example, is fairly primitive.
-7.1 Extended synchronization
+## 7.1 Extended synchronization
 Mutexes and condition variables are flexible and efficient synchronization
 tools. You can build just about any form of synchronization you need using those
 two things. But you shouldn't build them from scratch every time you need them.
@@ -8637,7 +6583,7 @@ CHAPTER 7 "Real code"
 Then we'll build something called a read/write lock. A read/write lock allows
 multiple threads to read data simultaneously, but prevents any thread from mod-
 ifying data that is being read or modified by another thread.
-7.1.1 Barriers
+### 7.1.1 Barriers
 A barrier is a way to keep the members of a group together. If our intrepid
 "bailing programmers" washed up on a deserted island, for example, and they
 ventured into the jungle to explore, they would want to remain together, for the
@@ -9169,7 +7115,7 @@ Extended synchronization 253
 110 return 0;
 111 }
 | barrier main.c
-7.1.2 Read/write locks
+### 7.1.2 Read/write locks
 A read/write lock is a lot like a mutex. It is another way to prevent more than
 one thread from modifying shared data at the same time. But unlike a mutex it
 distinguishes between reading data and writing data. A mutex excludes all other
@@ -9426,7 +7372,7 @@ Part 2 shows the rwl\_destroy function, which destroys a read/write lock.
 8-9 We first try to verify that the read/write lock was properly initialized by check-
 ing the valid member. This is not a complete protection against incorrect usage,
 but it is cheap, and it will catch some of the most common errors. See the anno-
-tation for barrier .c, part 2, for more about how the valid member is used.
+tation for barrier.c, part 2, for more about how the valid member is used.
 10-30 Check whether the read/write lock is in use. We look for threads that are
 using or waiting for either read or write access. Using two separate if statements
 makes the test slightly more readable, though there's no other benefit.
@@ -9933,7 +7879,7 @@ Extended synchronization 269
 158 }
 | rwlock main.c
 270 CHAPTER 7 "Real code"
-7.2 Work queue manager
+## 7.2 Work queue manager
 I've already briefly outlined the various models of thread cooperation. These
 include pipelines, work crews, client/servers, and so forth. In this section, I
 present the development of a "work queue," a set of threads that accepts work
@@ -10640,7 +8586,7 @@ But what about existing libraries? 283
 138 return 0;
 139 }
 | workq\_main.c
-7.3 But what about existing libraries?
+## 7.3 But what about existing libraries?
 "The great art of riding, as I was saying is-
 to keep your balance properly. Like this, you know-"
 He let go the bridle, and stretched out both his arms to
@@ -10657,7 +8603,7 @@ faces to the functions to support that state in the most efficient manner. But w
 you're modifying an existing library to work with threads, you usually don't have
 that luxury. And when you are using someone else's library, you may need simply
 to "make do."
-7.3.1 Modifying libraries to be thread-safe
+### 7.3.1 Modifying libraries to be thread-safe
 Many functions rely on static storage across a sequence of calls, for example,
 strtok or getpwd. Others depend on returning a pointer to static storage, for
 example, asctime. This section points out some techniques that can help when
@@ -10719,7 +8665,7 @@ that's convenient. It can be on the thread's stack, in heap, or can even be shar
 between threads. Although in a way this is "giving up" on the existing function
 and defining a new function, it is often the best way (and sometimes the only
 practical way) to make a function thread-safe.
-7.3.2 Living with legacy libraries
+### 7.3.2 Living with legacy libraries
 Sometimes you have to work with code you didn't write, and can't change. A
 lot of code is now being made thread-safe, and most operating systems that sup-
 port threads can be expected to supply thread-safe implementations of the
@@ -10810,7 +8756,7 @@ safe setup function and stored where they can be retrieved one by one without
 calling strtok again. Thus, while the setup function would lock a common mutex
 and serialize access across all threads, the information retrieval function could
 run without any serialization.
-8 Hints to avoid debugging
+# 8 Hints to avoid debugging
 "Other maps are such shapes, with their islands and capes!
 But we've got our brave Captain to thank"
 (So the crew would protest) "that he's bought us the best-
@@ -10844,7 +8790,7 @@ even feel comfortable with them. But you have to start by being constantly aware
 that something's changed.
 289
 290 CHAPTER 8 Hints to avoid debugging
-8.1 Avoiding incorrect code
+## 8.1 Avoiding incorrect code
 "For instance, now," she went on, sticking a large piece of plaster on her fin-
 ger as she spoke, "there's the King's Messenger. He's in prison now,
 being punished: and the trial doesn't even begin till next Wednesday:
@@ -10890,7 +8836,7 @@ The following sections describe some of the most common classes of threaded
 programming errors, with the intention of helping you to avoid these problems
 while designing, as well as possibly making it easier to recognize them while
 debugging.
-8.1.1 Avoid relying on "thread inertia"
+### 8.1.1 Avoid relying on "thread inertia"
 Always, always, remember that threads are asynchronous. That's especially
 important to keep in mind when you develop code on uniprocessor systems
 where threads may be "slightly synchronous." Nothing happens simultaneously
@@ -11000,7 +8946,7 @@ and continuously throughout development. Do this despite the fact that, espe-
 cially without a perfect threaded debugger, testing on a multiprocessor will be
 more difficult than debugging on a uniprocessor. And, of course, you should care-
 fully read the following section.
-8.1.2 Never bet your mortgage on a thread race
+### 8.1.2 Never bet your mortgage on a thread race
 A race occurs when two or more threads try to get someplace or do something
 at the same time. Only one can win. Which thread wins is determined by a lot of
 factors, not all of which are under your control. The outcome may be affected by
@@ -11180,7 +9126,7 @@ are more efficient because the greatest power of threaded programming is that
 things can happen concurrently, and synchronization prevents concurrency.
 Running an application on a multiprocessor system doesn't help much if most
 processors spend their time waiting for one to finish something.
-8.1.3 Cooperate to avoid deadlocks
+### 8.1.3 Cooperate to avoid deadlocks
 Like races, deadlocks are the result of synchronization problems in a pro-
 gram. While races are resource conflicts caused by insufficient synchronization,
 deadlocks are usually conflicts in the use of synchronization. A deadlock can
@@ -11248,7 +9194,7 @@ mutex. In this case, you may need a more sophisticated tool to trace the synchro
 nization behavior of the program. Such a tool would allow you to examine the
 data and determine, for example, that function bad\_lock locked a mutex and
 failed to unlock that mutex.
-8.1.4 Beware of priority inversion
+### 8.1.4 Beware of priority inversion
 "Priority inversion" is a problem unique to applications (or libraries) that rely
 on realtime priority scheduling. Priority inversion involves at least three threads
 of differing priority. The differing priorities are important-priority inversion is a
@@ -11286,7 +9232,7 @@ available everywhere. Also, you cannot set the mutex priority protocol for
 mutexes you do not create, including those used by ANSI C functions.
 Avoid calling functions that may lock mutexes you didn't create in any
 thread with elevated priority.
-8.1.5 Never share condition variables between predicates
+### 8.1.5 Never share condition variables between predicates
 Your code will usually be cleaner and more efficient if you avoid using a single
 condition variable to manage more than one predicate condition. You should not,
 for example, define a single "queue" condition variable that is used to awaken
@@ -11318,7 +9264,7 @@ OK to write, but only the one writer can proceed-the other 100 threads must
 wait again. The result of this imprecision is a lot of wasted context switches, and
 there are more useful ways to keep your computer busy.
 Avoiding incorrect code 301
-8.1.6 Sharing stacks and related memory corrupters
+### 8.1.6 Sharing stacks and related memory corrupters
 There's nothing wrong with sharing stack memory between threads. That is, it
 is legal and sometimes reasonable for a thread to allocate some variable on its
 own stack and communicate that address to one or more other threads. A cor-
@@ -11362,7 +9308,7 @@ fully. If you routinely use an analysis tool that reports use of uninitialized
 variables (such as Third Degree on Digital UNIX), you may not need to worry
 about this class of problem-or many others.
 302 CHAPTER 8 Hints to avoid debugging
-8.2 Avoiding performance problems
+## 8.2 Avoiding performance problems
 "Well, in our country," said Alice, still panting a little, "you'd generally
 get to somewhere else-if you ran very fast for a long time as we've
 been doing."
@@ -11390,7 +9336,7 @@ need to be split into several mutexes controlling more specialized data (finer-
 grain concurrency), which can improve performance by increasing concurrency.
 If finer grain mutexes have low contention, combining them may improve perfor-
 mance by reducing locking overhead.
-8.2.1 Beware of concurrent serialization
+### 8.2.1 Beware of concurrent serialization
 The ideal parallel code is a set of tasks that is completely compute-bound.
 They never synchronize, they never block-they just "think." If you start with a
 program that calls three compute-bound functions in series, and change it to
@@ -11430,7 +9376,7 @@ cally grant parallelism or even concurrency to your application. When you're
 analyzing performance, be aware that your program can be affected by factors
 that aren't within your control. You may not even be able to see what's happening
 in the file system, but what you can't see can hurt you.
-8.2.2 Use the right number of mutexes
+### 8.2.2 Use the right number of mutexes
 The first step in making a library thread-safe may be to create a "big mutex"
 that protects all entries into the library. If only one thread can execute within the
 library at a time, then most functions will be thread-safe. At least, no static data
@@ -11462,7 +9408,7 @@ special tools. Some thread development systems provide detailed visual tracing
 information that shows synchronization costs. Others provide "metering" infor-
 mation on individual mutexes to tell how many times the mutex was locked, and
 how often threads found the mutex already locked.
-8.2.2.1 Too many mutexes will not help
+#### 8.2.2.1 Too many mutexes will not help
 Beware, too, of exchanging a "big" mutex for lots of "tiny" mutexes. You may
 make matters worse. Remember, it takes time to lock a mutex, and more time to
 unlock that mutex. Even if you increase parallelism by designing a locking hier-
@@ -11478,7 +9424,7 @@ tion I suggested creating a separate mutex for each data structure. Yet, if two
 data structures are usually used together, or if one thread will hardly ever need to
 use one data structure while another thread is using the second data structure,
 the extra mutex may decrease your overall performance.
-8.2.3 Never fight over cache lines
+### 8.2.3 Never fight over cache lines
 No modern computer reads data directly from main memory. Memory that is
 fast enough to keep up with the computer is too expensive for that to be practi-
 cal. Instead, data is fetched by the memory management unit into a fast local
@@ -11514,9 +9460,9 @@ particular system would be to ensure that each thread has a private, page-
 aligned, segment of data. It is highly unlikely that any system would use a cache
 block as large as a page, because a page includes far too much varied data to pro-
 vide any performance advantage in the memory management unit.
-9 POSIX threads mini-reference
+# 9 POSIX threads mini-reference
 This chapter is a compact reference to the POSIX. lc standard.
-9.1 POSIX 1003.1 c-1995 options
+# 9.1 POSIX 1003.1 c-1995 options
 Pthreads is intended to address a wide variety of audiences. High-performance
 computational programs can use it to support parallel decomposition of loops.
 Realtime programs can use it to support concurrent realtime I/O. Database and
@@ -11583,7 +9529,7 @@ You can use the special "\_r" library
 functions that provide thread-safe
 behavior.
 TABLE 9.1 POSIX 1003.lc-1995 options
-9.2 POSIX 1003.lc-1995 limits
+## 9.2 POSIX 1003.lc-1995 limits
 The Pthreads standard allows you to determine the run-time limits of the sys-
 tem that may affect your application, for example, how many threads you can
 create, by defining a set of macros, which are shown in Table 9.2. Any implemen-
@@ -11628,7 +9574,7 @@ TABLE 9.2 POSIX 1003.1 c-1995 limits
 you wish to support do not support additional threads. Or you might prefer to
 write conditional code that relies on the value of the pthread\_threads\_max sym-
 bolic constant (if defined) or call sysconf to determine the limit at run time.
-9.3 POSIX 1003.1 c-1995 interfaces
+## 9.3 POSIX 1003.1 c-1995 interfaces
 The interfaces are sorted by functional categories: threads, mutexes, and so
 forth. Within each category, the interfaces are listed in alphabetical order.
 Figure 9.1 describes the format of the entries.
@@ -11683,7 +9629,7 @@ interface, or some fundamental restriction of the interface. In pthread\_mutexat
 getpshared, for example, the hint points out that a mutex created to be "process
 shared" must be allocated in shared memory that's accessible by all participating
 processes.
-9.3.1 Error detection and reporting
+### 9.3.1 Error detection and reporting
 The POSIX standard distinguishes carefully between two categories of error:
 1. Mandatory ("if occurs") errors involve circumstances beyond the control of
 the programmer. These errors must always be detected and reported by the
@@ -11711,7 +9657,7 @@ and a "metered" execution mode, where the ownership of mutexes is always
 tracked and optional errors in locking and unlocking mutexes are reported. The
 UNIX98 specification includes "error check" mutexes (Section 10.1.2), so they will
 soon be available on most UNIX systems.
-9.3.2 Use of void* type
+### 9.3.2 Use of void* type
 ANSI C requires that you be allowed to convert any pointer type to void* and
 back, with the result being identical to the original value. However, ANSI C does
 not require that all pointer types have the same binary representation. Thus, a
@@ -11730,7 +9676,7 @@ ever, and relying on the programmer to provide proper type casting, the sigev\_
 value member is a union sigval, containing overlayed int and void* members.
 This mechanism avoids the problem of converting between integer and pointer
 types, eliminating one of the conflicts with ANSI C guarantees.
-9.3.3 Threads
+### 9.3.3 Threads
 Threads provide concurrency, the ability to have more than one "stream of
 execution" within a process at the same time. Each thread has its own hardware
 registers and stack. All threads in a process share the full virtual address space,
@@ -11910,7 +9856,7 @@ Headers: \<sched.h\>
 Errors: [ENOSYS] sched\_yield not supported.
 Hint: Use before locking mutex to reduce chances of a timeslice while mu-
 tex is locked.
-9.3.4 Mutexes
+### 9.3.4 Mutexes
 Mutexes provide synchronization, the ability to control how threads share
 resources. You use mutexes to prevent multiple threads from modifying shared
 data at the same time, and to ensure that a thread can read consistent values for
@@ -12023,7 +9969,7 @@ Headers: \<pthread.h\>
 Errors: [EINVAL] mutex is invalid.
 [EPERM] calling thread does not own mutex.
 Hint: Always unlock within the same thread.
-9.3.5 Condition variables
+### 9.3.5 Condition variables
 Condition variables provide communication, the ability to wait for some shared
 resource to reach some desired state, or to signal that it has reached some state
 in which another thread may be interested. Each condition variable is closely
@@ -12166,7 +10112,7 @@ Errors: [EINVAL] cond or mutex is invalid.
 Hint: Mutex is always unlocked (before wait) and relocked (after wait) in-
 side pthread\_cond\_wait, even if the wait fails or is canceled.
 POSIX 1003.1 c-1995 interfaces 323
-9.3.6 Cancellation
+### 9.3.6 Cancellation
 Cancellation provides a way to request that a thread terminate "gracefully"
 when you no longer need it to complete its normal execution. Each thread can
 control how and whether cancellation affects it, and can repair the shared state
@@ -12249,7 +10195,7 @@ References: 5.3
 Headers: \<pthread.h\>
 Hint: Cancellation is asynchronous. Use pthread\_join to wait for termi-
 nation of thread if necessary.
-9.3.7 Thread-specific data
+### 9.3.7 Thread-specific data
 Thread-specific data provides a way to declare variables that have a common
 "name" in all threads, but a unique value in each thread. You should consider
 using thread-specific data in a threaded program in many cases where a non-
@@ -12304,7 +10250,7 @@ Errors: [enomem] insufficient memory.
 [EINVAL] key is invalid.
 Hint: If you set a value of null, the key's destructor will not be called at
 thread termination.
-9.3.8 Realtime scheduling
+### 9.3.8 Realtime scheduling
 Realtime scheduling provides a predictable response time to important events
 within the process. Note that "predictable" does not always mean "fast," and in
 many cases realtime scheduling may impose overhead that results in slower exe-
@@ -12667,7 +10613,7 @@ Errors: [ENOSYS] priority scheduling is not supported.
 Hint: Priority min and max are integer values-you can compute relative
 values, for example, half and quarter points in range.
 336 CHAPTER 9 POSIX threads mini-reference
-9.3.9 Fork handlers
+### 9.3.9 Fork handlers
 Pthreads provides some new functions to help the new threaded environment
 to coexist with the traditional process-based UNIX environment. Creation of a
 child process by copying the full address space, for example, causes problems for
@@ -12685,7 +10631,7 @@ References: 6.1.1
 Headers: \<unistd.h\>
 Errors: [ENOMEM] insufficient space to record the handlers.
 Hint: All resources needed by child must be protected.
-9.3.10 Stdio
+### 9.3.10 Stdio
 Pthreads provides some new functions, and new versions of old functions, to
 access ANSI C stdio features safely from a threaded process. For safety reasons,
 the old forms of single-character access to stdio buffers have been altered to lock
@@ -12771,7 +10717,7 @@ EOF if an error occurred.
 References: 6.4.2
 Headers: \<stdio.h\>
 Hint: Replace old calls to putchar to retain fastest access.
-9.3.11 Thread-safe functions
+### 9.3.11 Thread-safe functions
 Thread-safe functions provide improved access to traditional features of
 ANSI C and POSIX that cannot be effectively made thread-safe without interface
 changes. These routines are designated by the "\_r" suffix added to the traditional
@@ -12920,7 +10866,7 @@ with the \_SC\_GETPW\_r\_size\_MAX parameter.
 References: 6.5.6
 Headers: \<sys/types.h\>, \<pwd.h\>
 Errors: [ERANGE ] the specified buffer is too small.
-9.3.12 Signals
+### 9.3.12 Signals
 Pthreads provides functions that extend the POSIX signal model to support
 multithreaded processes. All threads in a process share the same signal actions.
 Each thread has its own pending and blocked signal masks. The process also
@@ -13019,7 +10965,7 @@ Errors: [einval] set contains an invalid signal number.
 Hint: Use only for asynchronous signal delivery. All signals in set must
 be masked in the calling thread, and should usually be masked in
 all threads.
-9.3.13 Semaphores
+### 9.3.13 Semaphores
 Semaphores come from POSIX. lb (POSIX 1003.1b-1993) rather than from
 Pthreads. They follow the older UNIX convention for reporting errors. That is, on
 failure they return a value of -1 and store the appropriate error number into
@@ -13090,7 +11036,7 @@ Errors: [EINVALJ sem is not a valid semaphore.
 [ edeadlk ] a deadlock condition was detected.
 Hint: When the semaphore's initial value was 1, this is a lock operation;
 when the initial value was 0, this is a wait operation.
-10 Future standardization
+# 10 Future standardization
 Three primary standardization efforts affect Pthreads programmers. X/Open's
 XSH5 is a new interface specification that includes POSIX. lb, Pthreads, and a set
 of additional thread functions (part of the Aspen fast-track submission). The
@@ -13098,7 +11044,7 @@ POSIX. lj draft standard proposes to add barriers, read/write locks, spinlocks,
 and improved support for "relative time" waits on condition variables. The
 POSIX. 14 draft standard (a "POSIX Standard Profile") gives direction for manag-
 ing the various options of Pthreads in a multiprocessor environment.
-10.1 X/Open XSH5 (UNIX98)
+## 10.1 X/Open XSH5 (UNIX98)
 Mutex type attribute:
 int pthread\_mutexattr\_gettype (
 const pthread\_mutexattr\_t *attr, int *type);
@@ -13156,7 +11102,7 @@ system. A number of complicated issues arise when developing an implementa-
 tion of Pthreads, and some subtle aspects of the standard are ambiguous. Such
 an industry-wide testing system will require all vendors implementing UNIX98
 branded systems to agree on interpretations of Pthreads.
-10.1.1 POSIX options for XSH5
+### 10.1.1 POSIX options for XSH5
 Some of the features that are options in the Pthreads standard are required
 by XSH5. If your code relies on these Pthreads options, it will work on any sys-
 tem conforming to XSH5:
@@ -13176,7 +11122,7 @@ realtime\_threads option, then these Pthreads options are also supported:
 supported.
 ? \_posix\_thread\_prio\_protect: Priority ceiling mutexes are supported.
 ? \_posix\_thread\_prio\_inherit: Priority inheritance mutexes are supported.
-10.1.2 Mutextype
+### 10.1.2 Mutextype
 The DCE threads package provided an extension that allowed the program-
 mer to specify the "kind" of mutex to be created. DCE threads supplied fast,
 recursive, and nonrecursive mutex kinds. The XSH5 specification changes the
@@ -13303,7 +11249,7 @@ Errors: [EINVAL] type invalid.
 Hint: Normal mutexes will usually be fastest; errorcheck mutexes are use-
 ful for debugging; recursive mutexes can be useful for making old
 interfaces thread-safe.
-10.1.3 Set concurrency level
+### 10.1.3 Set concurrency level
 When you use Pthreads implementations that schedule user threads onto
 some smaller set of kernel entities (see Section 5.6.3), it may be possible to have
 ready user threads while all kernel entities allocated to the process are busy.
@@ -13353,7 +11299,7 @@ Errors: [einvalj new\_level is negative.
 Hint: Concurrency level is a hint. It may be ignored by any implementa-
 tion, and will be ignored by an implementation that does not need
 it to ensure concurrency.
-10.1.4 Stack guard size
+### 10.1.4 Stack guard size
 Guard size comes from DCE threads. Most thread implementations add to the
 thread's stack a "guard" region, a page or more of protected memory. This pro-
 tected page is a safety zone, to prevent a stack overflow in one thread from
@@ -13394,7 +11340,7 @@ References: 2, 5.2.3
 Errors: [EINVAL] guardsize or attr invalid.
 Hint: Specify 0 to fit lots of stacks in an address space, or increase default
 guardsize for threads that allocate large buffers on the stack.
-10.1.5 Parallel I/O
+### 10.1.5 Parallel I/O
 Many high-performance systems, such as database engines, use threads, at
 least in part, to gain performance through parallel I/O. Unfortunately, Pthreads
 doesn't directly support parallel I/O. That is, two threads can independently
@@ -13443,7 +11389,7 @@ References: none
 Errors: [EIKVAL] offset is negative.
 [ESPIPE] file is pipe.
 Hint: Allows high-performance parallel I/O.
-10.1.6 Cancellation points
+### 10.1.6 Cancellation points
 Most UNIX systems support a substantial number of interfaces that do not
 come from POSIX. The select and poll interfaces, for example, should be
 deferred cancellation points. Pthreads did not require these functions to be can-
@@ -13531,7 +11477,7 @@ vprintf
 vwprintf
 wprintf
 wscanf
-10.2 POSIX1003.1J
+## 10.2 POSIX1003.1J
 Condition variable wait clock:
 int pthread\_condattr\_getclock (
 const pthread\_condattr\_t *attr,
@@ -13597,7 +11543,7 @@ useful for fine-grained parallelism, for example, in systems that automatically
 generate parallel code from program loops. Read/write locks are useful in shared
 data algorithms where many threads are allowed to read simultaneously, but only
 one thread can be allowed to update data.
-10.2.1 Barriers
+### 10.2.1 Barriers
 "Barriers" are a form of synchronization most commonly used in parallel
 decomposition of loops. They're almost never used except in code designed to run
 only on multiprocessor systems. A barrier is a "meeting place" for a group of
@@ -13607,7 +11553,7 @@ See Section 7.1.1 for details of barrier behavior and for an example showing
 how to implement a barrier using standard Pthreads synchronization. (Note that
 the behavior of this example is not precisely the same as that proposed by
 POSIX.lj.)
-10.2.2 Read/write locks
+### 10.2.2 Read/write locks
 A read/write lock (also sometimes known as "reader/writer lock") allows one
 thread to exclusively lock some shared data to write or modify that data, but also
 allows multiple threads to simultaneously lock the data for read access. UNIX98
@@ -13629,7 +11575,7 @@ proposed by POSIX. lj.)
 lock definition and abandoning the original POSIX. lj names, but the decision hasn't yet been
 made.
 POSIX 1003. lj 359
-10.2.3 Spinlocks
+### 10.2.3 Spinlocks
 Spinlocks are much like mutexes. There's been a lot of discussion about
 whether it even makes sense to standardize on a spinlock interface-since POSIX
 specifies only a source level API, there's very little POSIX. lj says about them that
@@ -13651,9 +11597,9 @@ the system resources cordially with other processes. To be effective, a spinlock
 must never be locked for as long as it takes to "context switch" from one thread to
 another. If it does take as long or longer, you'll get better overall performance by
 blocking and allowing some other thread to do useful work.
-POSIX. lj contains two sets of spinlock functions: one set with a spin\_ prefix,
+POSIX. lj contains two sets of spinlock functions: one set with a spin\_prefix,
 which allows spinlock synchronization between processes; and the other set with
-a pthread\_ prefix, allowing spinlock synchronization between threads within a
+a pthread\_prefix, allowing spinlock synchronization between threads within a
 process. This, you will notice, is very different from the model used for mutexes,
 condition variables, and read/write locks, where the same functions were used
 and the pshared attribute specifies whether the resulting synchronization object
@@ -13663,7 +11609,7 @@ not be subject to any possible overhead as a result of needing to decide, at run
 time, how to behave. It is, in fact, unlikely that the implementation of spin\_lock
 and pthread\_spin\_lock will differ on most systems, but the standard allows
 them to be different.
-10.2.4 Condition variable wait clock
+### 10.2.4 Condition variable wait clock
 Pthreads condition variables support only "absolute time" timeouts. That is,
 the thread specifies that it is willing to wait until "Jan 1 00:00:00 GMT 2001,"
 rather than being able to specify that it wants to wait for  hour, 10 minutes."
@@ -13719,7 +11665,7 @@ POSIX 1003.14 361
 option, so it isn't a cure-all. In the absence of these options, there is no clock
 attribute, and no way to be sure of relative timeout behavior-or even completely
 portable behavior.
-10.2.5 Thread abort
+### 10.2.5 Thread abort
 The pthread\_abort function is essentially fail-safe cancellation. It is used only
 when you want to be sure the thread will terminate immediately. The dangerous
 aspect of pthread\_abort is that the thread does not run cleanup handlers or have
@@ -13745,7 +11691,7 @@ to respond to the cancel in a reasonable time, the application must continue any
 way. The error manager would then abort the sensor thread, analyze and correct
 any data structures it might have corrupted, create and advertise new mutexes if
 necessary, and create a new sensor thread.
-10.3 POSIX 1003.14
+## 10.3 POSIX 1003.14
 POSIX.14 is a different sort of standard, a "POSIX Standard profile." Unlike
 Pthreads and POSIX. lj, POSIX. 14 does not add any new capabilities to the POSIX
 family. Instead, it attempts to provide some order to the maze of options that
@@ -13791,1307 +11737,3 @@ Eventually, some standards organization (possibly POSIX) will need to address
 these issues and develop portable interfaces. The folks who attempt this feat may
 find that they need to limit the scope of the standard to a field narrower than
 "systems on which people may wish to use threads."
-Bibliography
-[Anderson, 1991] Thomas E. Anderson, Brian N. Bershad, Edward D. Lazowska,
-and Henry M. Levy, "Scheduler Activations: Effective Kernel Support for the
-User-Level Management of Parallelism," Proceedings of the Thirteenth ACM
-Symposium on Operating Systems Principles, October 1991.
-Research paper describing the addition of an efficient "two-level scheduler"
-mechanism for operating systems. This is where all modern two-level sched-
-uler systems started-everyone's read it, everyone references it, and every-
-one's been inspired by it.
-[Birrell, 1989] Andrew D. Birrell, An Introduction to Programming with Threads,
-SRC Research Report 35, Digital Systems Research Center, 130 Lytton Ave.,
-Palo Alto, CA 94301, January 1989. Available on Internet from http://
-www.research.digital.com/SRC/publications/src-rr.html
-An introduction to the concepts of threaded programming. Although specifi-
-cally oriented toward Modula-2+ and SRC's Taos multithreaded operating
-system, many essential concepts remain easily recognizable in Pthreads.
-[Boykin, 1993] Joseph Boykin, David Kirschen, Alan Langerman, and Susan
-LoVerso, Programming under Mach, Addison-Wesley, Reading, MA, ISBN
-0-201-52739-1, 1993.
-[Custer, 1993] Helen Custer, Inside Windows NT, Microsoft Press, ISBN 1-55615-
-481-X, 1993.
-[Digital, 1996] Digital Equipment Corporation, Guide to DECthreads, Digital
-Equipment Corporation, part number AA-Q2DPC-TK, 1996.
-Reference manual for Digital's DECthreads implementation of the Pthreads
-standard. An appendix (which will be removed after the Digital UNIX 4.0 and
-OpenVMS 7.0 versions) provides reference information on the obsolete cma
-and DCE threads (POSIX 1003.4a draft 4) interfaces.
-[Dijkstra, 1965] E. W. Dijkstra, "Solution of a Problem in Concurrent Program-
-ming Control," Communications of the ACM, Vol. 8 (9), September 1965, pp.
-569-570.
-[Dijkstra, 1968a] E. W. Dijkstra, "Cooperating Sequential Processes," Program-
-ming Languages, edited by F. Genuys, Academic Press, New York, 1968, pp.
-43-112.
-[Dijkstra, 1968b] E. W. Dijkstra, 'The Structure of the THE'-Multiprogramming
-System," Communications of the ACM, Vol. 11 E), 1968, pp. 341-346.
-363
-364 Bibliography
-[Gallmeister, 1995] Bill O. Gallmeister, POSIX.4: Programming for the Real World,
-O'Reilly, Sebastopol, CA, ISBN 1-56592-074-0, 1995.
-POSIX 1003. lb-1993 realtime programming (based on a near-final draft of the
-standard).
-[Hoare, 1974] C.A.R. Hoare, "Monitors: An Operating System Structuring Con-
-cept," Communications of the ACM, Vol. 17 A0), 1974, pp. 549-557.
-[IEEE, 1996] 9945-1:1996 (ISO/IEC) [IEEE/ANSI Std 1003.1 1996 Edition] Infor-
-mation Technology-Portable Operating System Interface (POSIX)-Part 1:
-System Application: Program Interface (API) [C Language] (ANSI), IEEE Stan-
-dards Press, ISBN 1-55937-573-6, 1996.
-The POSIX C Language interfaces, including realtime and threads.
-[Jones, 1991] Michael B. Jones, "Bringing the C Libraries With Us into a Multi-
-Threaded Future," Winter 1991 Usenix Conference Proceedings, Dallas, TX,
-January 1991, pp. 81-91.
-[Kleiman, 1996] Steve Kleiman, Devang Shah, and Bart Smaalders, Program-
-ming with Threads, Prentice Hall, Englewood Cliffs, NJ, ISBN 0-13-172389-8,
-1996.
-This book shares some characteristics with the book you are holding. Both,
-for example, involve authors who were directly involved in the POSIX standard
-working group, and were also principal architects of their respective compa-
-nies' thread implementations.
-[Lea, 1997] Doug Lea, Concurrent Programming in Java?, Addison-Wesley, Read-
-ing, MA, ISBN 0-201-69581-2, 1997.
-A different view of threads, from the perspective of the Java? language, which
-provides unique constructs for thread synchronization within the language.
-[Lewis, 1995] Bil Lewis and Daniel J. Berg, Threads Primer, SunSoft Press, ISBN
-0-13-443698-9, 1995.
-A good introduction to threaded programming for the novice. The first edition
-primarily deals with Solaris "UI threads," with some information on POSIX
-threads.
-[Lockhart, 1994] Harold W. Lockhart, Jr., OSFDCE, Guide to Developing Distrib-
-uted Applications, McGraw-Hill, New York, ISBN 0-07-911481-4, 1994.
-A chapter on DCE threads describes how to use threads in building DCE
-applications.
-[McJones, 1989] Paul F. McJones and Garret F. Swart, "Evolving the UNIX Sys-
-tem Interface to Support Multithreaded Programs," SRC Research Report 21,
-Digital Systems Research Center, 130 Lytton Ave., Palo Alto, CA 94301, Sep-
-tember 1989. Available on Internet from http://www.research.digital.com/
-SRC/publications/src-rr.html
-Report on adaptation of UNIX system for multithreaded programming.
-Bibliography 365
-[Schimmel, 1994] Curt Schimmel, UNIX Systems for Modern Architectures, Addi-
-son-Wesley, Reading, MA, ISBN 0-201-63338-8, 1994.
-Substantial detail on the implementation of multiprocessors and shared
-memory systems. If Section 3.4 in the book you're holding doesn't satisfy your
-thirst for knowledge, this is where you should go.
-Thread resources on the Internet
-In the midst of the word he was trying to say,
-In the midst of his laughter and glee,
-He had softly and suddenly vanished away-
-For the Snark was a Boojum, you see.
-THE END
--Lewis Carroll, The Hunting of the Snark
-This list provides a few starting points for information. Of course, the web
-changes all the time, so no list committed to paper will ever be completely correct.
-That's life in the information age.
-Newsgroups
-comp.programming.threads
-General, unmoderated discussion of anything related to threads. This group is
-frequented by a number of people highly knowledgeable about threads in general,
-and about various specific implementations of Pthreads. It's a nice, friendly place
-to ask about problems you're having, or things you would like to do. Please, don't
-ask about screensavers! And, if you want to ask about a problem, always remem-
-ber to tell us what type of hardware and operating system you're using and
-include the version.
-comp.unix.os?.os?1
-The primary discussion group for the Digital UNIX operating system. There
-are, of course, historical reasons for the nonintuitive name. This is a reasonable
-place to ask questions about using threads on Digital UNIX. If the question (or
-problem) doesn't seem to be specific to Digital UNIX, comp. programming. threads
-may be more appropriate, because it presents your question to a larger audience
-of thread experts, and makes the answer available to a larger audience of thread
-users.
-comp.unix.Solaris
-The primary discussion group for the Solaris operating system. This is a rea-
-sonable place to ask questions about using threads on Solaris. If the question (or
-problem) doesn't seem to be specific to Solaris, comp.programming.threads may
-367
-368 Thread resources on the Internet
-be more appropriate, because it presents your question to a larger audience of
-thread experts, and makes the answer available to a larger audience of thread
-users.
-Web sites
-http://altavista.digital.com/
-AltaVista is a multithreaded web search engine developed by Digital Equip-
-ment Corporation. It is also an excellent search engine that you can use to find
-out about nearly anything. Always a good place to start.
-http://www.aw.com/cp/butenhof/posix.html
-The Addison-Wesley web page containing information about this book, includ-
-ing the source for all the example programs.
-http://www.best.com/-bos/threads-faq/
-This page is a list of frequently asked questions (FAQ) from the comp. program-
-ming, threads newsgroup. Please read this before you read comp. programming.
-threads, in order to avoid asking a wide range of questions that have been asked
-a million times before. The information in this page is also posted to the news-
-group at regular intervals.
-http://liinwww.ira.uka.de/bibliography/Os/threads.html
-A searchable bibliography of terms related to threading, maintained by the
-University of Oslo in Norway.
-http://www.digital.com/
-Digital Equipment Corporation web site. This site includes a lot of information
-on the Digital UNIX and OpenVMS operating systems, including information on
-threads and multiprocessor systems.
-http://www.sun.com/
-Sun Microsystems, Inc., web site. This site includes, as you might guess, a lot
-of information on the Solaris operating system. You can also find information
-about the Java language, which provides an interesting variant of thread support
-by making thread synchronization an explicit attribute of a class method.
-http://www.sgi.com/
-Silicon Graphics, Inc., web site. Information on SGI systems and the IRIX
-operating system.
-http: / /www. netcom. com/-brownel 1 /pthreads++. html
-Information on an attempt to "define a standardized approach to the use of
-threading in the C++ language."
-Index
-Abort thread, 361
-alo\_read, 230
-aio\_write, 230
-Allocation domain, 181-183
-Amdahl's Law, 21-22, 297
-ANSIC
-and cancellation, 151
-and deadlocks, 298
-and destructor functions, 168
-and fork handlers, 199-200
-and kernel entities, 189-190
-library, runtime, 284
-and priority inversions, 300
-prototype for Pthread interfaces,
-310-346
-and sequence races, 296
-and signals, 217
-and threading, 24-25
-void*, use of, 311
-See also Stdio (function)
-Apple Macintosh toolbox, 23
-asctime\_r (function), 213, 339-340
-Assembly language and threading,
-24-25
-Assembly line. See Pipeline program-
-ming model
-Asynchronous
-cancelability, 150-154, 249
-communication between processes, 8
-definition of, 2, 4
-I/O operations, 22-23
-programming, 8-12, 15-21
-sigwait, 227-230
-and UNIX, 9-11
-See also Memory, visibility
-Async-signal safe functions, 198, 234
-Atomicity, 61, 72-73, 93
-Attribute objects
-condition variable attributes, 137-138
-definition of, 134-135
-and detaching, 37, 43, 231
-mutex attributes, 135-136, 185
-thread attributes, 138-141, 174, 181,
-231
-Bailing programmers
-barriers analogy, 242
-cancellation analogy, 143
-condition variable analogy, 71
-mutex analogy, 47-48
-overview of, 3-4
-thread-specific data analogy, 162-163
-Barriers
-definition of, 241
-memory, 92-95
-POSIX 1003.lj, 358
-and synchronization, extended,
-242-253
-See also Condition variables; Mutexes
-Blocking threads, 42
-Broadcast
-and condition variables, 72-76, 80-82
-and memory visibility, 89
-and work crews, 109
-C language. See ANSI C
-Cache lines, 304-305
-Cancellation
-asynchronous, 150-154, 249
-cleanup handlers, 147, 154-161
-deferred, 147-150, 249
-definition of, 142-147
-fail-safe in POSIX 1003. lj, 361
-interfaces, 323-325
-points, list of, 147-148
-points in XSH5, 355-356
-state, 143-144
-type, 143-144
-Cleanup handlers, 147, 154-161
-Client server programming model,
-120-129
-369
-370
-Index
-clock\_gettime (function), 13
-CLOCK\_MONOTONIC (value), 360
-Code. See Programs, examples of
-Communication. See Condition variables
-Computing overhead and threads, 26
-Concurrency
-benefit of threading, 22-24
-control functions, definition of,
-7-8
-definition of, 4-5
-level in XSH5, 351-353
-and parallelism, 5-6
-serialization, avoidance of, 302-303
-and thread implementation, 190
-See also Asynchronous; Threads
-Condition variables
-attributes, 137-138
-and blocked threads, 42
-and client-server programming model,
-121
-broadcasting, 81-82
-creating and destroying, 74-76
-definition of, 8
-interfaces, 319-322
-and pipeline programming model, 101
-and semaphores, 237
-sharing, avoidance of, 300
-signaling, 81-82
-as a synchronization mechanism, 4, 8,
-30, 70-73
-and thread-safety, 6-7
-wait clock (POSIX 1003.1J), 359-361
-waiting on, 77-81
-waking waiters, 81-82
-and work crew programming model,
-107
-See also Barriers; Mutexes; Predicates;
-Signals
-Contention scope, 181-183
-Context structure, 6-7
-Critical sections, 46
-ctime\_r (function), 213, 340
-DCE threads, 154, 290, 353
-Deadlocks
-avoidance of, 26-27, 297-299
-and lock hierarchy, 63-69
-and signals, 215
-and thread-safe libraries, 284-285
-See also Priority inversions
-Debugging, threads
-cache lines, 304-305
-concurrent serialization, avoidance of,
-302-303
-condition variable sharing, avoidance
-of, 300
-and costs of threading, 13, 27-28
-deadlocks, avoidance of, 297-299
-introduction to, 13
-memory corrupters, avoidance of, 301
-mutexes, right number of, 303-304
-priority inversions, avoidance of,
-299-300
-thread inertia, avoidance of, 291-293
-thread race, avoidance of, 293-297
-tools for, 290, 302
-See also Errors
-Default mutexes, 349-351
-Deferred cancelability, 147-150, 249
-Destructor functions, 167-172
-Detach
-creating and using threads, 37-39
-and multiple threads, 17-19
-termination, 43
-and thread attributes, 138-141
-Digital UNIX
-mutex error detection and reporting,
-311
-thread debugging library, 290
-programming examples, introduction
-to, 12-13
-detecting memory corrupters, 301
-SIGEV-THREAD implementation, 231
-Dijkstra, EdsgerW., 47
-Directory searching function, 212
-E
-EAGAIN (error), 314, 318, 326, 344, 353
-EBUSY (error), 49, 58, 65, 318-321, 345
-EDEADLK (error), 32, 318-319, 346
-EINTR (error), 346
-EINVAL (error), 312-326, 343-346,
-351-355
-Encapsulation, 24, 75
-ENOMEM (error), 313, 317-321, 326, 336
-ENOSPC (error), 345
-ENOSYS (error), 312-316, 344-346
-Index
-371
-ENXIO (error), 355
-EOVERFLOW (error), 355
-EPERM (error), 318, 345
-ERANGE (error), 210, 341-342
-err\_abort, 33-34
-errno, 31-34, 117, 228
-errno\_abort, 33-34
-errno.h (header file), 32-33
-Error detection and reporting, 310-311
-Errorcheck mutexes, 349-351
-Errors
-EAGAIN, 314, 318, 326, 344, 353
-EBUSY, 49, 58, 65, 318-321, 345
-EDEADLK, 32, 318-319, 346
-EINTR, 346
-EINVAL, 312-326, 343-346, 351-355
-ENOMEM, 313, 317-321, 326, 336
-ENOSPC, 345
-ENOSYS, 312-316, 344-346
-ENXIO, 355
-EOVERFLOW, 355
-EPERM, 318, 345
-ERANGE, 210, 341-342
-ESPIPE, 355
-ESRCH, 32, 314, 323, 343
-ETIMEDOUT, 78, 80, 86, 322
-errors.h (header file), 13
-ESPIPE (error), 355
-ESRCH (error), 32, 314, 323, 343
-ETIMEDOUT (error), 78, 80, 86, 322
-Events
-and concurrency, 23-24
-as a synchronization mechanism, 8
-Exec, 204
-Execution context
-architectural overview, 30
-definition of, 7-8
-fgets (function), 14
-flockfile (function), 121, 205-207,
-336-337
-Fork
-in asynchronous program, 15, 19
-definition of, 197-198
-handlers, 199-203, 336
-ftrylockfile (function), 207, 337
-funlockfile (function), 121, 205-207, 337
-G
-Gallmeister, Bill, 294
-getc (function), 207
-getchar (function), 207
-getchar\_unlocked (function), 207-209,
-338
-getc\_unlocked (function), 207-208, 337
-getgrgid\_r (function), 341
-getgrnam\_r (function), 341
-getlogin\_r (function), 210, 339
-getpwnam\_r (function), 342
-getpwuid\_r (function), 342
-gmtime\_r (function), 340
-Group and user database function,
-213-214
-H
-Hard realtime, 172-173
-inheritsched (attribute), 138-141, 176
-Initial (main) thread
-and creation, 40-42
-initialization, onetime, 131-134
-overview of, 36-37
-signal mask, 216
-Initialization, 131-134
-Invariants
-and condition variables, 71, 75
-definition of, 45-46
-and mutexes, 61-64
-See also Predicates
-I/O operations
-and blocked threads, 42
-and cancellation points, 148-149
-candidate for threads, 29
-and concurrency, 22-23
-parallel in XSH5, 354-355
-Join, 37-39, 139, 145
-Kernel entities
-and contention scope thread, 182
-implementation of, 189
-many to few (two level), 193-195
-many to one (user level), 190-191
-372
-Index
-Kernel entities (continued)
-one to one (kernel level), 191-193
-setting in XSH5, 351-353
-L
-Libraries
-for debugging, 290
-implementation, 190
-legacy, 285-287
-thread-safe, 283-285
-Light weight processes, 1
-limits.h (file header), 308
-localtime\_r (function), 340
-LWP. See Kernel entities
-M
-Main (initial) thread
-and creation, 40-42
-initialization, one time, 131-134
-overview of, 36-37
-signal mask, 216
-Many to few (two level) implementation,
-193-195
-Many to one (user level) implementation,
-190-191
-Memory
-barriers, 92-95
-coherence, 47, 92
-conflict, 94
-corrupters, avoidance of, 301
-leaks, 198
-ordering, 48, 90, 92-93
-stack guard size in XSH5, 353-354
-visibility, 26, 88-95, 294
-Message queues, 30
-Microsoft Windows, 23
-MIMD (multiple instruction, multiple
-data), 107
-MPP (massively parallel processor), 5
-Multiprocessors
-and allocation domain, 182
-candidate for threads, 29
-and concurrency, 1, 4-5
-and deadlock, 65
-definition of, 5
-memory architecture, 91-95
-and parallelism, 5-6, 20-22
-and thread implementation, 191-193
-and thread inertia, 291-293
-and thread race, 293-297
-Multithreaded programming model. See
-Threads
-Mutexes
-and atomicity, 61, 72-73
-attributes, 135-136
-and blocked threads, 42, 51
-and client-server programming model,
-121
-creating and destroying, 49-51
-and deadlocks, 26-27, 63, 66-69,
-297-299
-definition of, 8, 47-49
-interfaces, 316-319
-and invariants, 61-64
-lock chaining, 70
-lock hierarchy, 63-70
-locking and unlocking, 52-58
-multiple, use of, 63-64
-non-blocking locks, 58-61
-number of, 303-304
-and pipeline programming model,
-100-101
-priority ceiling, 186-187, 300
-priority inheritance, 186-188, 300,
-307
-priority inversions, 26-27, 63,
-184-186, 299-300
-priority-aware, 185-186
-and semaphores, 236
-sizing of, 62-63
-as a synchronization mechanism, 8,
-30
-and thread-safety, 6-7, 62
-types inXSH5, 349-351
-and work crew programming model,
-108-110
-See also Barriers; Condition variables;
-Memory, visibility; Read/write locks
-Mutually exclusive. See Mutexes
-N
-Network servers and clients,
-99 9*3
-Normal mutexes, 349-351
-NULL (value), 167
-Index
-373
-Object oriented programming and
-threading, 25
-One to one (kernel level) implementation,
-191-193
-Opaque, 31, 36, 163
-Open Software Foundation's Distributed
-Computing Environment, 154
-Paradigms, 25
-Parallel decomposition. See Work crews
-Parallelism
-and asynchronous programming,
-11-12
-benefit of threading, 20-25
-candidate for threads, 29
-definition of, 5-6
-and thread-safety, 6-7
-See also Concurrency
-Performance
-as a benefit of threading, 20-22
-as a cost of threading, 26
-and mutexes, 62-63
-problems, avoidance of, 302-305
-Pipeline programming model, 97-105
-Pipes, 30
-Polymorphism, 24
-POSIX
-architectural overview, 30
-conformance document, 307, 308
-error checking, 31-34
-realtime scheduling options, 173
-signal mechanisms, 40-41, 81-82
-types and interfaces, 30-31
-POSIX 1003.1 (ISO/IEC 9945-1:1996),
-29-30
-POSIX 1003.1-1990, 31, 209
-POSIX 1003.1b-1993 (realtime)
-and condition variables, 3.94, 80
-and semaphores, 236-237, 345
-and signals, 230-232
-thread concepts, 29-30
-void *, use of, 311
-POSIX 1003.1c-1995 (threads)
-and cancellation, 154
-cancellation, interfaces, 323-325
-condition variables, interfaces,
-319-322
-error detection and reporting, 310-311
-fork handlers, interfaces, 336
-interfaces, overview, 309-310
-limits, 308-309
-mutexes, interfaces, 316-319
-options, 307-308
-and realtime scheduling, 173
-realtime scheduling, interfaces,
-326-335
-semaphores, interfaces, 345-346
-signals, interfaces, 342-345
-stdio, interfaces, 336-338
-thread concepts, 29-30
-threads, interfaces, 311-316
-thread-safe, interfaces, 338-342
-thread-specific data, interfaces,
-325-326
-void *, use of, 311
-POSIX 1003. li-1995 (corrections to
-1003.1b-1993), 29-30
-POSIX 1003.1J (additional realtime
-extension)
-barriers, 249, 356-358
-read/write locks, 358
-spinlocks, 359
-thread abort, 361
-wait clock, condition variable,
-359-361
-POSIX 1003.14 (multiprocessor profile),
-30, 182, 361-362
-POSIX\_PRIOJNHERIT, 186
-POSIX\_PRIO\_NONE (value), 186
-POSIX\_PRIO\_PROTECT, 186
-\_POSIX\_REALTIME\_SIGNALS (option),
-228
-\_POSIX\_SEMAPHORES (option), 235
-\_POSIX\_THREAD\_ATTR\_STACKADDR
-(option), 139, 308, 348
-JPOSIX\_THREAD\_ATTR\_STACKSIZE
-(option), 139, 308, 348
-\_POSrX\_THREAD\_PRIO\_INHERIT
-(option), 185-186, 308, 349
-\_POSIX\_THREAD\_PRIO\_PROTECT
-(option), 185-186, 308, 349
-\_POSIX\_THREAD\_PRIORTTY\_SCHEDUL-
-ING (option), 173-176, 179, 308,
-349
-\_POSIX\_THREAD\_PROCESS\_SHARED
-(option), 136-137, 308, 348
-374
-Index
-\_POSIX\_THREADS (option), 308, 348
-\_POSIX\_THREAD\_SAFE\_FUNCTIONS
-(option), 308, 349
-\_POSIX\_TIMERS (option), 360
-pread (function), 354-355
-Predicates
-definition of, 46
-loose, 80
-wakeup, 80-81
-waking waiters, 81
-See also Condition variables
-printf (function), 15
-prioceiling (attribute), 135-138
-Priority ceiling, 186-187, 300
-Priority inheritance
-definition of, 186
-mutexes, 188
-and POSIX 1003.1c options, 307
-priority inversion, avoidance of, 300
-Priority inversions
-avoidance of, 299-300
-as a cost of threading, 26-27
-mutexes and priority scheduling, 63
-as a realtime scheduling problem, 184
-See also Deadlocks
-Process contention, 181-185
-Process exit, 204
-Processes
-asynchronous, 8
-lightweight, 1
-threads, compared to, 10, 20
-variable weight, 1
-Processors
-and blocked threads, 42
-and thread implementation, 190-195
-See also Multiprocessors;
-Uniprocessors
-Programs, examples of
-barriers, 245-248, 250-253
-cancellation, 145-161
-client server, 121-129
-condition variables, creating and
-destroying, 74-76
-condition variables, timed condition
-wait, 83-88
-condition variables, waiting on, 78-80
-creating and using threads, 38-39
-errors, 32-34
-flockfile, 205-207
-fork handlers, 201-203
-initialization, 133-134
-multiple processes, 15-16
-multiple threads, 17-19
-mutex attributes object, 136
-mutexes, deadlock avoidance, 66-69
-mutexes, dynamic, 50-68
-mutexes, locking and unlocking,
-52-57
-mutexes, non-blocking locks, 58-61
-mutexes, static mutex, 50
-pipeline, 99-105
-putchar, 208-209
-read/write locks, 255-269
-realtime scheduling, 175-181
-sample information, 13
-semaphore, 238-240
-SIGEV\_THREAD, 232-234
-sigwait, 228-230
-suspend and resume, 218-227
-synchronous programming, 13-15, 27
-thread attributes, 140-141
-thread inertia, 292
-thread-specific, 164-165, 169-172
-user and terminal identification, 211
-work crews, 108-120
-work queue manager, 271-283
-protocol (attribute), 135-138, 186
-pshared (attribute), 135-138, 204
-pthread\_abort (function), 361
-pthread\_atfork (function), 199, 336
-pthread\_attr\_destroy (function), 312
-pthread\_attr\_getdetachstate (function),
-312
-pthread\_attr\_getguardsize (function),
-353
-pthread\_attr\_getinheritsched (function),
-327
-pthread\_attr\_getschedparam (function),
-327
-pthread\_attr\_getschedpolicy (function),
-327-328
-pthread\_attr\_getscope (function), 328
-pthread\_attr\_getstackaddr (function),
-312-313
-pthread\_attr\_getstacksize (function),
-135, 139,313
-pthread\_attr\_init (function), 139, 313
-Index
-375
-pthread\_attr\_setdetachstate (function),
-313
-pthread\_attr\_setguardsize (function),
-354
-pthread\_attr\_setinheritsched (function),
-176, 329
-pthread\_attr\_setschedparam (function),
-175, 329
-pthread\_attr\_setschedpolicy (function),
-175, 329-330
-pthread\_attr\_setscope (function), 182,
-330
-pthread\_attr\_setstackaddr (function),
-314
-pthread\_attr\_setstacksize (function),
-135,314
-pthread\_attr\_t (datatype), 135, 139, 231
-pthread\_cancel (function)
-asynchronous cancelability, 151
-deferred cancelability, 148
-definition of, 323
-and pthreadjdll, 217
-termination, 43, 143-145
-PTHREAD\_CANCEL\_ASYNCHRONOUS
-(value), 152, 324
-PTHREAD\_CANCEL\_DEFERRED
-(value), 145, 147, 324
-PTHREAD\_CANCEL\_DISABLE (value),
-145,149,324
-PTHREAD\_CANCELED (value), 43, 145
-PTHREAD\_CANCEL\_ENABLE (value),
-147, 324
-pthread\_cleanup\_pop (function), 43,
-147, 155, 323
-pthread\_cleanup\_push (function), 43,
-147, 155, 323
-pthread\_condattr\_destroy (function),
-319
-pthread\_condattr\_getclock (function),
-360
-pthread\_condattr\_getpshared (function),
-320
-pthread\_condattr\_init (function), 137,
-320
-pthread\_condattr\_setclock (function),
-360
-pthread\_condattr\_setpshared (function),
-137, 320
-pthread\_condattr\_t (datatype), 135
-pthread\_cond\_broadcast (function) ,81,
-256, 300, 321
-pthread\_cond\_destroy (function), 76,
-321
-pthread\_cond\_init (function), 75, 137,
-321
-pthread\_cond\_signal (function), 81, 300,
-322
-pthread\_cond\_t (datatype), 74, 137
-pthread\_cond\_timedwait (function), 78,
-80,322
-pthread\_cond\_wait (function), 77, 85,
-322
-pthread\_create (function)
-and attributes objects, 139
-creating and using threads, 36-42,
-189
-definition of, 314
-execution context, 30
-and memory visibility, 89
-and multiple threads, 17
-and thread identifier, 144-145, 266
-PTHREAD\_CREATE\_DETACHED
-(value), 44, 125, 139, 231, 312-313
-PTHREAD\_CREATE\_JOINABLE (value),
-139, 231,312-313
-PTHREAD\_DESTRUCTORJTERATIONS
-(limit), 168, 309
-pthread\_detach (function)
-cleaning up, 158
-creating and using threads, 37
-definition of, 315
-and multiple threads, 17
-termination, 43-44
-pthread\_equal (function), 36, 315
-pthread\_exit (function)
-and attributes objects, 140
-cleaning up, 155
-creating and using threads, 37-38
-definition of, 204, 315
-and fork, 197
-and memory visibility, 89
-and multiple threads, 17
-termination, 30, 40-44, 53
-PTHREADJEXPLICITJSCHED (value),
-176, 327-329
-pthread\_getconcurrency (function), 352
-376
-Index
-pthread\_getschedparam (function), 331
-pthread\_getspeciflc (function), 34, 164,
-166, 325
-pthread.h (header file), 13
-PTHREADJNHERIT\_SCHED (value),
-176, 327-329
-pthreadjoin (function)
-and attributes objects, 139
-cleaning up, 158
-creating and using threads, 37-38
-definition of, 315
-and error checking, 32
-and memory visibility, 89
-and pthread\_kill, 225
-termination, 43-44, 128, 145
-pthread\_key\_create (function), 163-166,
-325-326
-pthread\_key\_delete (function), 166, 326
-PTHREAD\_KEYS\_MAX (limit), 166, 309
-pthread\_key\_t (datatype), 163-166
-pthread\_kill (function), 217-227, 343
-pthread\_mutexattr\_destroy (function),
-316
-pthread\_mutexattr\_getprioceiling (func-
-tion), 332
-pthread\_mutexattr\_getprotocol (func-
-tion), 332-333
-pthread\_mutexattr\_getpshared (func-
-tion), 317
-pthread\_mutexattr\_gettype (function),
-350-351
-pthread\_mutexattr\_init (function), 135,
-317
-pthread\_mutexattr\_setprioceiling (func-
-tion), 333
-pthread\_mutexattr\_setprotocol (func-
-tion), 186, 333-334
-pthread\_mutexattr\_setpshared (func-
-tion), 136,317
-pthread\_mutexattr\_settype (function),
-351
-pthread\_mutexattr\_t (datatype), 135
-FTHREAD\_MUTEX\_DEFAULT (value),
-349-351
-pthread\_mutex\_destroy (function), 51,
-318,350
-PTHREAD\_MUTEX\_ERRORCHECK
-(value), 349
-pthread\_mutex\_getprioceiling (func-
-tion), 331
-pthread\_mutex\_init (function)
-and attributes objects, 135
-creating and destroying mutexes,
-50-51
-definition of, 318
-initialization of, 132, 186
-standardization, future, 350
-PTHREAD\_MUTEX\_INITIALIZER
-(macro), 50-52, 74-76
-pthread\_mutex\_lock (function)
-asynchronous cancelability, 151
-definition of, 318
-lock hierarchy, 64-65
-locking and unlocking, 52, 58
-and memory visibility, 90, 93
-mutexes, number of, 303-304
-standardization, future, 350
-XSHS mutex types, 350
-PTHREAD\_MUTEX\_NORMAL (value),
-349
-PTHREAD\_MUTEX\_RECURSIVE (value),
-349
-pthread\_mutex\_setprioceiling (func-
-tion), 332
-pthread\_mutex\_t (datatype), 49, 62, 136
-pthread\_mutex\_trylock (function)
-creating and destroying mutexes, 49
-definition of, 319
-and flockfile and funlockfile, 207
-lock hierarchy, 64-65
-locking and unlocking, 52, 58
-mutexes, number of, 303-304
-read/write locks, 257
-standardization, future, 350
-XSHS mutex types, 350
-pthread\_mutex\_unlock (function)
-creating and destroying mutexes, 49
-definition of, 319
-and flockfile and funlockfile, 207
-lock hierarchy, 64-65
-locking and unlocking, 52, 58
-and memory visibility, 90
-Index
-377
-mutexes, number of, 303-304
-standardization, future, 350
-XSHS mutex types, 350
-pthread\_once (function)
-initialization, condition variables, 75
-initialization, mutexes, 50
-or statically initialized mutex, 132
-in suspend/resume, 220-221
-and thread races, 295-296
-thread-specific data, 163-164
-PTHREAD\_ONCE\_INIT (macro), 132
-pthread\_once\_t (datatype), 132
-PTHREAD\_PRIOJNHERIT (value), 186,
-333-334
-PTHREAD\_PRIO\_NONE (value), 333-334
-PTHREAD\_PRIO\_PROTECT (value), 186,
-333-334
-PTHREAD\_PROCESS\_PRTVATE (value),
-136-137, 317-320
-PTHREAD\_PROCESS\_SHARED (value),
-136-138, 204, 317-320
-PTHREAD\_SCOPE\_PROCESS (value),
-182,328-330
-PTHREAD\_SCOPE\_SYSTEM (value),
-182, 328-330
-pthread\_self (function), 17, 36-37,
-144-145, 316
-pthread\_setcancelstate (function), 147,
-149, 151, 324
-pthread\_setcanceltype (function), 151,
-324
-pthread\_setconcurrency (function),
-352-353
-pthread\_setschedparam (function), 334
-pthread\_setspecific (function), 166, 326
-pthread\_sigmask (function), 215-216,
-343
-pthread\_spin\_lock (function), 359
-PTHREAD\_STACK\_MIN (limit), 139, 309
-pthread\_t (datatype)
-creating and using threads, 36-37,
-189, 266
-and pthread\_kill, 217
-termination, 43, 144-145
-thread-specific data, 161-162
-pthread\_testcancel (function), 144-145,
-150, 158, 325
-PTHREAD\_THREAD\_MAX (limit), 309
-putc (function), 207
-putchar (function), 6, 207
-putchar\_unlocked (function), 207-209,
-338
-putc\_unlocked (function), 207-208, 338
-pwrite (function), 355
-R
-Races
-avoidance of, 26-27
-and condition variables, 73
-and memory visibility, 91
-overview, 293-295
-sequence race, 284-285, 295-297
-synchronization race, 294-296
-thread inertia, 291-293
-raise (function), 217
-Random number generation function,
-213
-rand\_r (function), 213, 341
-readdir\_r (function)
-definition of, 339
-directory searching, 212
-reentrancy, 7, 297
-thread-safe function, 210
-and work crews, 107-109
-Read/write locks, 242, 253-269, 358
-Read/write ordering, 92-95
-Ready threads, 39-42, 53
-Realtime scheduling
-allocation domain, 181-183
-architectural overview, 30
-contention scope, 181-183
-definition of, 7-8, 172-173
-hard realtime, 172-173
-interfaces, 326-335
-mutexes, priority ceiling, 186-187,
-300
-mutexes, priority inheritance,
-186-188, 300, 307
-mutexes, priority-aware, 185-186
-policies and priorities, 174-181
-POSIX options, 173
-and priority inversion, 299-300, 326
-problems with, 183-185
-soft realtime, 172-173
-and synchronization, 295
-Recursive mutexes, 349-351
-378
-Index
-Recycling threads, 43-44
-Reentrant, 6-7, 297
-See also Readdir\_r (function)
-Resume. See Pthread\_kill (function)
-Running threads, 42
-Scaling, 20-22
-SC\_GETGR\_R\_SIZE\_MAX (value), 214
-SC\_GETPW\_R\_SIZE\_MAX (value), 214
-SCHED\_BG\_NP (value), 175
-SCHED\_FG\_NP (value), 175
-SCHED\_FIFO (value)
-problems with, 183-185
-as a scheduling interface value,
-328-331, 334-335
-scheduling policies and priorities,
-174-175
-and thread race, 295
-sched\_get\_priority\_max (function), 174,
-335
-sched\_get\_priority\_min (function), 174,
-335
-SCHED\_OTHER (value), 175,328-331,
-334-335
-schedparam (attribute), 138-141, 175
-schedpolicy (attribute), 138-141, 175
-SCHED\_RR (value), 174, 185, 328-331,
-334-335
-Scheduler Activations model, 194
-Scheduling. See Realtime scheduling
-schedjrield (function), 53-54, 65, 221,
-316
-Schimmel, Curt, 94
-scope (attribute), 138-141, 182
-\_SC\_THREAD\_ATTR\_STACKADDR
-(option), 308
-\_SC\_THREAD\_ATTR\_STACKSIZE
-(option), 308
-\_SC\_THREAD\_DESTRUCTOR\_ITERA-
-TIONS (limit), 309
-\_SC\_THREAD\_KEYS\_MAX (limit), 309
-\_SC\_THREAD\_PRIO\_INHERIT (option),
-185, 308
-\_SC\_THREAD\_PRIO\_PROTECT (option),
-185-186, 308
-\_SC\_THREAD\_PRIORITY\_SCHEDULING
-(option), 308
-\_SC\_THREAD\_PROCESS\_SHARED
-(option), 308
-\_SC\_THREADS (limit), 308
-\_SC\_THREAD\_SAFE\_FUNCTIONS
-(option), 308
-\_SC\_THREAD\_STACK\_MIN (limit), 309
-\_SC\_THREAD\_THREADS\_MAX (limit),
-309
-Semaphores
-functions, definition of, 345-346
-as a synchronization mechanism, 8,
-30
-synchronization with signal catching,
-234-240
-sem\_destroy (function), 237, 345
-sem\_getvalue (function), 237
-sem\_init (function), 237, 345
-sem\_post (function), 235-237, 346
-sem\_t (value), 237
-semjxywait (function), 237, 346
-sem\_wait (function), 236-237, 346
-Sequence races, 284-285, 295-297
-Serial programming, 25
-Serial regions. See Predicates
-Serialization, 21
-Shared data, 3
-sigaction (function), 215
-SIG\_BLOCK (value), 343
-SIGCONT (action), 217
-sigevent, 311
-sigev\_notify\_attributes, 231
-sigev\_notify\_function, 231
-SIGEV\_THREAD (function), 40, 231-234
-sigevjvalue (function), 311
-SIGFPE (function), 215-216
-SIGKILL (function), 216-217
-Signals
-actions, 215-216
-background, 214-215
-and condition variables, 72-76,
-80-81
-handlers, 91-92
-interfaces, 342-345
-masks, 216
-and memory visibility, 89
-pthread\_kill, 217-227
-running and blocking threads, 42
-semaphores, 234-240
-Index
-379
-SIGEV^THREAD, 231-234
-sigwait, 227-230
-See also Condition variables
-SIGPIPE (action), 215
-sigprocmask (function), 216
-sigqueue (function), 230
-SIGSEGV (action), 216
-SIG\_SETMASK (value), 343
-SIGSTOP (action), 216-217
-sigtimedwait (function), 228, 343-344
-SIGTRAP signal, 216, 290
-SIGJJNBLOCK (value), 343
-sigwait (function)
-definition of, 227-230, 344
-running and blocking, 42
-and semaphores, 234
-sigwaitinfo (function), 228, 234, 344-345
-SIMD (single instruction, multiple data),
-106
-sleep (function), 15
-SMP. See Multiprocessors
-Soft realtime, 172-173
-Solaris 2.5
-concurrency level, setting of, 58, 119,
-128, 145, 152, 266
-thread debugging library, 290
-programming examples, introduction
-to, 12-13
-realtime scheduling, 176, 179
-SIGEVJTHREAD implementation, 231
-Spinlocks. 359
-Spurious wakeups, 80-81
-stackaddr (attribute), 138-141
-stacksize (attribute), 138-141
-Startup threads, 41-42
-stderr, 33
-stdin (function)
-in asynchronous program example,
-14, 18
-and client servers, 121
-in pipeline program example, 98, 105
-and stdio, 205-207
-stdio (function)
-and concurrency, 23
-and fork handlers, 199
-interfaces, 336-338
-and realtime scheduling. 190
-thread-safety. 6. 205-207
-stdout (function)
-and client servers, 121
-in pipeline program example, 98
-and stdio, 205
-in suspend program example, 224
-strerror (function), 33
-String token function, 212
-strtok\_r (function), 212, 339
-struct aiocb, 230
-struct dirent, 109, 210
-struct sigevent, 230
-Suspend. See Pthread\_kill (function)
-Synchronization
-architectural overview, 30
-and computing overhead, 26
-critical sections, 46
-definition of, 7-8
-objects, 3
-and programming model, 24-25
-protocols, 26
-races, 284-285
-and reentrant code, 6-7
-and scheduling, 295
-and semaphores, 234-240
-and sequence race, 294-297
-and UNIX, 9-11
-See also Barriers; Condition variables;
-Invariants; Memory, visibility;
-Mutexes; Parallelism; Read/write
-locks
-Synchronous
-I/O operations, 22-23
-programming, 13-15, 27
-sysconf (function), 185, 214, 307-308
-System contention, 181-185
-Termination of threads, 43-44
-thd\_continue (interface), 217, 223-224
-thd\_suspend (interface), 217-221, 224
-Threads
-abort (POSIX 1003.1J), 361
-architectural overview, 30
-and asynchronous programming,
-8-12
-attributes, 138-141
-benefits of, 10-11, 20-25
-blocking, 42
-380
-Index
-Threads (continued)
-candidates for, 28-29
-client server programming model,
-120-129
-costs of, 25-28
-creating and using, 25-41
-definition of, 8
-error checking, 31-34
-identifier, 36
-implementation of, 189
-initial (main), 36-42, 119, 131-134
-interfaces, 311-316
-introduction to, 1-3
-many to few (two level), 193-195
-many to one (user level), 190-191
-one to one (kernel level), 191-193
-as part of a process, 10
-pipeline programming model, 97-105
-processes, compared to, 10, 20
-programmers, compared to, 3
-programming model, 24-25
-ready, 39-42, 53
-recycling, 43-44
-running, 42
-startup, 41-42
-states of, 39-41
-termination, 43-44
-and traditional programming, 4, 27
-types and interfaces, 30-31
-work crew programming model,
-105-120
-See also Concurrency; Debugging,
-threads
-Thread-safe
-definition of, 6-7
-interfaces, 286-287, 338-342
-libraries, 283-285
-library, 303-304
-and mutexes, 62
-and programming discipline, 26-27
-Thread-safe functions
-directory searching, 212
-group and user database, 213-214
-random number generation, 213
-string token, 212
-time representation, 212-213
-user and terminal identification,
-209-211
-Thread-specific data
-creating, 163-166
-destructor functions, 167-172
-interfaces, 325-326
-overview, 161-163
-and termination, 43
-and thread-safety, 6-7
-use of, 166-167
-thr\_setconcurrency (function), 13, 58,
-119, 128, 145, 152
-Time representation function, 212-213
-Timer signals, 23
-timer\_create (function), 230
-Timeslice, 8, 42, 174
-Tokens, 3, 47
-tty\_name\_r (function), 210
-U
-Uniprocessors
-and allocation domain, 182
-and concurrency, 4-5
-and deadlock, 65
-definition of, 5
-and thread inertia, 291-293
-and thread race, 293-297
-unistd.h (header file), 307
-University of Washington, 194
-UNIX
-and asynchronous, 9-11, 22
-and error checking, 31-34
-kernel, 154
-programming examples, introduction
-to, 12-13
-UNIX Systems for Modern Architectures,
-94
-UNIX98. SeeXSH5
-User and terminal identification func-
-tion, 210-211
-Variable weight processes, 1
-void*
-creating and using threads, 36
-definition of, 311
-thread startup, 42
-thread termination, 43
-Index
-381
-W
-waitpid (function), 15, 19
-WNOHANG (flag), 15
-Word tearing, 95
-Work crews. 105-120, 270-283
-Work queue. See Work crews
-X Windows. 28
-X/Open. Sct'XSH5
-X/Open CAE Specification, System Inter-
-faces and Headers, Issue 5. See
-XSH5
-XSH5
-cancellation points, 148, 355-356
-concurrency level, 351-353
-mutex error detection and reporting,
-311
-mutex types, 349-351
-parallel I/O, 354-355
-POSIX options for, 348-349
-stack guard size, 353-354
