@@ -1,4 +1,3 @@
-
 # 7 "Real code"
 Lewis Carroll, Through the Looking-Glass:
 > "When we were still little," the Mock Turtle went on at last, more calmly,  
@@ -42,7 +41,7 @@ The best solution is to add a separate variable for the predicate. We will use a
 
 The header file barrier.h and the C source file barrier.c demonstrate an implementation of barriers using standard Pthreads mutexes and condition variables. This is a portable implementation that is relatively easy to understand. One could, of course, create a much more efficient implementation for any specific system based on knowledge of nonportable hardware and operating system characteristics.
 
-Part 1 shows the structure of a barrier, represented by the type barrier\_t. You can see the mutex (mutex) and the condition variable (cv). The threshhold member is the number of threads in the group, whereas counter is the number of threads that have yet to join the group at the barrier. And cycle is the flag discussed in the previous paragraph. It is used to ensure that a thread awakened from a barrier wait will immediately return to the caller, but will block in the barrier if it calls the wait operation again before all threads have resumed execution.
+Part 1 shows the structure of a barrier, represented by the type **barrier\_t**. You can see the mutex (mutex) and the condition variable (cv). The threshhold member is the number of threads in the group, whereas counter is the number of threads that have yet to join the group at the barrier. And cycle is the flag discussed in the previous paragraph. It is used to ensure that a thread awakened from a barrier wait will immediately return to the caller, but will block in the barrier if it calls the wait operation again before all threads have resumed execution.
 
 ```c
 /* barrier.h part 1 barrier_t */
@@ -59,19 +58,19 @@ typedef struct barrier tag {
     int                 cycle;         /* alternate cycles (0 or 1) */
 } barrier_t;
 
-#define BARRIER VALID Oxdbcafe
+#define BARRIER_VALID Oxdbcafe
 ```
 
-The barrier\_valid macro defines a "magic number," which we store into the valid member and then check to determine whether an address passed to other barrier interfaces is "reasonably likely to be" a barrier. This is an easy, quick check that will catch the most common errors(see **Hint** below).
+The **barrier\_valid** macro defines a "magic number," which we store into the valid member and then check to determine whether an address passed to other barrier interfaces is "reasonably likely to be" a barrier. This is an easy, quick check that will catch the most common errors(see **Hint** below).
 
 > **Hint:**  
 > I always like to define magic numbers using hexadecimal constants that can be pronounced as English words. For barriers, I invented my own restaurant called the "DB cafe," or, in C syntax, Oxdbcaf e. Many interesting (or at least mildly amusing) English words can be spelled using only the letters a through/ There are even more possibilities if you allow the digit 1 to stand in for the letter 1. and the digit 0 to stand in for the letter o. (Whether you like the results will depend a lot on the typeface in which you commonly read your code.)
 
-Part 2 shows definitions and prototypes that allow you to do something with the barrier\_t structure. First, you will want to initialize a new barrier.
+Part 2 shows definitions and prototypes that allow you to do something with the **barrier\_t** structure. First, you will want to initialize a new barrier.
 
-You can initialize a static barrier at compile time by using the macro barrier\_ INITIALIZER. You can instead dynamically initialize a barrier by calling the function barrier\_init.
+You can initialize a static barrier at compile time by using the macro **BARRIER\_INITIALIZER**. You can instead dynamically initialize a barrier by calling the function **barrier\_init**.
 
-Once you have initialized a barrier, you will want to be able to use it. and the main thing to be done with a barrier is to wait on it. When we're done with a barrier, it would be nice to be able to destroy the barrier and reclaim the resources it used. We'll call these operations barrier\_init, barrier\_wait, and barrier\_ destroy. All the operations need to specify upon which barrier they will operate. Because barriers are synchronization objects, and contain both a mutex and a condition variable (neither of which can be copied), we always pass a pointer to a barrier. Only the initialization operation requires a second parameter, the number of waiters required before the barrier opens.
+Once you have initialized a barrier, you will want to be able to use it. and the main thing to be done with a barrier is to wait on it. When we're done with a barrier, it would be nice to be able to destroy the barrier and reclaim the resources it used. We'll call these operations **barrier\_init**, **barrier\_wait**, and **barrier\_destroy**. All the operations need to specify upon which barrier they will operate. Because barriers are synchronization objects, and contain both a mutex and a condition variable (neither of which can be copied), we always pass a pointer to a barrier. Only the initialization operation requires a second parameter, the number of waiters required before the barrier opens.
 
 To be consistent with Pthreads conventions, the functions all return an integer value, representing an error number defined in \<errno.h\>. The value 0 represents success.
 
@@ -93,13 +92,13 @@ extern int barrier_wait (barrier_t *barrier);
 
 Now that you know the interface definition, you could write a program using barriers. But then, the point of this section is not to tell you how to use barriers, but to help improve your understanding of threaded programming by showing how to build a barrier. The following examples show the functions provided by barrier. c, to implement the interfaces we've just seen in barrier. h.
 
-Part 1 shows barrier\_init, which you would call to dynamically initialize a barrier, for example, if you allocate a barrier with malloc.
+Part 1 shows **barrier\_init**, which you would call to dynamically initialize a barrier, for example, if you allocate a barrier with malloc.
 
 Both the counter and threshold are set to the same value. The counter is the "working counter" and will be reset to threshold for each barrier cycle.
 
-If mutex initialization fails, barrier\_init returns the failing status to the caller.
+If mutex initialization fails, **barrier\_init** returns the failing status to the caller.
 
-If condition variable (cv) initialization fails, barrier\_init destroys the mutex it had already created and returns the failure status-the status of pthread\_ mutex\_destroy is ignored because the failure to create the condition variable is more important than the failure to destroy the mutex.
+If condition variable (cv) initialization fails, **barrier\_init** destroys the mutex it had already created and returns the failure status-the status of **pthread\_mutex\_destroy** is ignored because the failure to create the condition variable is more important than the failure to destroy the mutex.
 
 The barrier is marked valid only after all initialization is complete. This does not completely guarantee that another thread erroneously trying to wait on that barrier will detect the invalid barrier rather than failing in some less easily diagnosable manner, but at least it is a token attempt.
 
@@ -131,13 +130,13 @@ int barrier_init (barrier_t *barrier, int count)
 }
 ```
 
-Part 2 shows the barrier\_destroy function, which destroys the mutex and condition variable (cv) in the barrier\_t structure. If we had allocated any additional resources for the barrier, we would need to release those resources also.
+Part 2 shows the **barrier\_destroy** function, which destroys the mutex and condition variable (cv) in the **barrier\_t** structure. If we had allocated any additional resources for the barrier, we would need to release those resources also.
 
 First check that the barrier appears to be valid, and initialized, by looking at the valid member. We don't lock the mutex first, because that will fail, possibly with something nasty like a segmentation fault, if the mutex has been destroyed or hasn't been initialized. Because we do not lock the mutex first, the validation check is not entirely reliable, but it is better than nothing, and will only fail to detect some race conditions where one thread attempts to destroy a barrier while another is initializing it, or where two threads attempt to destroy a barrier at nearly the same time.
 
 If any thread is currently waiting on the barrier, return ebusy.
 
-At this point, the barrier is "destroyed"-all that's left is cleanup. To minimize the chances of confusing errors should another thread try to wait on the barrier before we're done, mark the barrier "not valid" by clearing valid, before changing any other state. Then, unlock the mutex, since we cannot destroy it while it :=? locked.
+At this point, the barrier is "destroyed"-all that's left is cleanup. To minimize the chances of confusing errors should another thread try to wait on the barrier before we're done, mark the barrier "not valid" by clearing valid, before changing any other state. Then, unlock the mutex, since we cannot destroy it while it is locked.
 
 Destroy the mutex and condition variable. If the mutex destruction fads return the status; otherwise, return the status of the condition variable destruction. Or, to put it another way, return an error status if either destruction failed otherwise, return success.
 
@@ -181,25 +180,25 @@ int barrier_destroy (barrier_t *barrier)
 }
 ```
 
-Finally, part 3 shows the implementation of barrier\_wait.
+Finally, part 3 shows the implementation of **barrier\_wait**.
 
-First we verify that the argument barrier appears to be a valid barrier\_t. We perform this check before locking the mutex, so that barrier\_destroy can safely destroy the mutex once it has cleared the valid member. This is a simple attempt to minimize the damage if one thread attempts to wait on a barrier while another thread is simultaneously either initializing or destroying that barrier.
+First we verify that the argument barrier appears to be a valid **barrier\_t**. We perform this check before locking the mutex, so that **barrier\_destroy** can safely destroy the mutex once it has cleared the valid member. This is a simple attempt to minimize the damage if one thread attempts to wait on a barrier while another thread is simultaneously either initializing or destroying that barrier.
 
-We cannot entirely avoid problems, since without the mutex, barrier\_wait has no guarantee that it will see the correct (up-to-date) value of valid. The valid check may succeed when the barrier is being made invalid, or fail when the barrier is being made valid. Locking the mutex first would do no good, because the mutex may not exist if the barrier is not fully initialized, or if it is being destroyed. This isn't a problem as long as you use the barrier correctly-that is, you initialize the barrier before any thread can possibly try to use it, and do not destroy the barrier until you are sure no thread will try to use it again.
+We cannot entirely avoid problems, since without the mutex, **barrier\_wait** has no guarantee that it will see the correct (up-to-date) value of valid. The valid check may succeed when the barrier is being made invalid, or fail when the barrier is being made valid. Locking the mutex first would do no good, because the mutex may not exist if the barrier is not fully initialized, or if it is being destroyed. This isn't a problem as long as you use the barrier correctly-that is, you initialize the barrier before any thread can possibly try to use it, and do not destroy the barrier until you are sure no thread will try to use it again.
 
-Copy the current value of the barrier's cycle into a local variable. The comparison of our local cycle against the barrier\_t structure's cycle member becomes our condition wait predicate. The predicate ensures that all currently waiting threads will return from barrier\_wait when the last waiter broadcasts the condition variable, but that any thread that calls barrier\_wait again will wait for the next broadcast. (This is the "tricky part" of correctly implementing a barrier.)
+Copy the current value of the barrier's cycle into a local variable. The comparison of our local cycle against the **barrier\_t** structure's cycle member becomes our condition wait predicate. The predicate ensures that all currently waiting threads will return from **barrier\_wait** when the last waiter broadcasts the condition variable, but that any thread that calls **barrier\_wait** again will wait for the next broadcast. (This is the "tricky part" of correctly implementing a barrier.)
 
 Now we decrease counter, which is the number of threads that are required but haven't yet waited on the barrier. When counter reaches 0, no more threads are needed-they're all here and waiting anxiously to continue to the next attraction. Now all we need to do is tell them to wake up. We advance to the next cycle, reset the counter, and broadcast the barrier's condition variable.
 
 Earlier, I mentioned that a program often needs one thread to perform some cleanup or setup between parallel regions. Each thread could lock a mutex and check a flag so that only one thread would perform the setup. However, the setup may not need additional synchronization, for example, because the other threads will wait at a barrier for the next parallel region, and, in that case, it would be nice to avoid locking an extra mutex.
 
-The barrier\_wait function has this capability built into it. One and only one thread will return with the special value of -1 while the others return 0. In this particular implementation, the one that waits last and wakes the others will take the honor, but in principle it is "unspecified" which thread returns -1. The thread that receives -1 can perform the setup, while others race ahead. If you do not need the special return status, treat -1 as another form of success. The proposed POSIX. lj standard has a similar capability-one (unspecified) thread completing a barrier will return the status barrier\_serial\_thread.
+The **barrier\_wait** function has this capability built into it. One and only one thread will return with the special value of -1 while the others return 0. In this particular implementation, the one that waits last and wakes the others will take the honor, but in principle it is "unspecified" which thread returns -1. The thread that receives -1 can perform the setup, while others race ahead. If you do not need the special return status, treat -1 as another form of success. The proposed POSIX. lj standard has a similar capability-one (unspecified) thread completing a barrier will return the status **barrier\_serial\_thread**.
 
 Any threaded code that uses condition variables should always either support deferred cancellation or disable cancellation. Remember that there are two distinct types of cancellation: deferred and asynchronous. Code that deals with asynchronous cancellation is rare. In general it is difficult or impossible to support asynchronous cancellation in any code that acquires resources (including locking a mutex). Programmers can't assume any function supports asynchronous cancellation unless its documentation specifically says so. Therefore we do not need to worry about asynchronous cancellation.
 
-We could code barrier\_wait to deal with deferred cancellation, but that raises difficult questions. How, for example, will the barrier wait ever be satisfied if one of the threads has been canceled? And if it won't be satisfied, what happens to all the other threads that have already waited (or are about to wait) on that barrier? There are various ways to answer these questions. One would be for barrier\_wait to record the thread identifiers of all threads waiting on the barrier, and for any thread that's canceled within the wait to cancel all other waiters.
+We could code **barrier\_wait** to deal with deferred cancellation, but that raises difficult questions. How, for example, will the barrier wait ever be satisfied if one of the threads has been canceled? And if it won't be satisfied, what happens to all the other threads that have already waited (or are about to wait) on that barrier? There are various ways to answer these questions. One would be for **barrier\_wait** to record the thread identifiers of all threads waiting on the barrier, and for any thread that's canceled within the wait to cancel all other waiters.
 
-Or we might handle cancellation by setting some special error flag and broadcasting the condition variable, and modifying barrier\_wait to return a special error when awakened in that way. However, it makes little sense to cancel one thread that's using a barrier. We're going to disallow it, by disabling cancellation prior to the wait, and restoring the previous state of cancellation afterward. This is the same approach taken by the proposed POSIX. lj standard, by the way-barrier waits are not cancellation points.
+Or we might handle cancellation by setting some special error flag and broadcasting the condition variable, and modifying **barrier\_wait** to return a special error when awakened in that way. However, it makes little sense to cancel one thread that's using a barrier. We're going to disallow it, by disabling cancellation prior to the wait, and restoring the previous state of cancellation afterward. This is the same approach taken by the proposed POSIX. lj standard, by the way-barrier waits are not cancellation points.
 
 If there are more threads that haven't reached the barrier, we need to wait for them. We do that by waiting on the condition variable until the barrier has advanced to the next cycle-that is, the barrier's cycle no longer matches the local copy.
 
@@ -267,11 +266,11 @@ int barrier_wait (barrier_t *barrier)
 }
 ```
 
-Finally, barrier\_main.c is a simple program that uses barriers. Each thread loops on calculations within a private array.
+Finally, **barrier\_main.c** is a simple program that uses barriers. Each thread loops on calculations within a private array.
 
-At the beginning and end of each iteration, the threads, running function thread\_routine, all wait on a barrier to synchronize the operation.
+At the beginning and end of each iteration, the threads, running function **thread\_routine**, all wait on a barrier to synchronize the operation.
 
-At the end of each iteration, the "lead thread" (the one receiving a -1 result from barrier\_wait) will modify the data of all threads, preparing them for the next iteration. The others go directly to the top of the loop and wait on the barrier at line 35.
+At the end of each iteration, the "lead thread" (the one receiving a -1 result from **barrier\_wait**) will modify the data of all threads, preparing them for the next iteration. The others go directly to the top of the loop and wait on the barrier at line 35.
 
 ```c
 /*  barrier_main.c  */
@@ -404,15 +403,15 @@ In this example, thread 1 locks the read/write lock for exclusive write. Thread 
 
 The header file rwlock. h and the C source file rwlock. c demonstrate an implementation of read/write locks using standard Pthreads mutexes and condition variables. This is a portable implementation that is relatively easy to understand. One could, of course, create a much more efficient implementation for any specific system based on knowledge of nonportable hardware and operating system characteristics.
 
-The rest of this section shows the details of a read/write lock package. First, rwlock. h describes the interfaces, and then rwlock. c provides the implementation. Part 1 shows the structure of a read/write lock, represented by the type rwlock\_t.
+The rest of this section shows the details of a read/write lock package. First, rwlock. h describes the interfaces, and then rwlock. c provides the implementation. Part 1 shows the structure of a read/write lock, represented by the type **rwlock\_t**.
 
 Of course, there's a mutex to serialize access to the structure. We'll use two separate condition variables, one to wait for read access (called read) and one to wait for write access (called, surprisingly, write).
 
-The rwlock\_t structure has a valid member to easily detect common usage errors, such as trying to lock a read/write lock that hasn't been initialized. The member is set to a magic number when the read/write lock is initialized, just as in barrier\_init.
+The **rwlock\_t** structure has a valid member to easily detect common usage errors, such as trying to lock a read/write lock that hasn't been initialized. The member is set to a magic number when the read/write lock is initialized, just as in **barrier\_init**.
 
-To enable us to determine whether either condition variable has waiters, we'll keep a count of active readers (r\_active) and a flag to indicate an active writer (w\_active).
+To enable us to determine whether either condition variable has waiters, we'll keep a count of active readers (**r\_active**) and a flag to indicate an active writer (**w\_active**).
 
-We also keep a count of the number of threads waiting for read access (r\_wait) and for write access (wwait).
+We also keep a count of the number of threads waiting for read access (**r\_wait**) and for write access (wwait).
 
 Finally, we need a "magic number" for our valid member. (See the footnote in Section 7.1.1 if you missed this part of the barrier example.)
 
@@ -437,7 +436,7 @@ typedef struct rwlock_tag {
 #define RWLOCK_VALID    0xfacade
 ```
 
-We could have saved some space and simplified the code by using a single condition variable, with readers and writers waiting using separate predicate expressions. We will use one condition variable for each predicate, because it is more efficient. This is a common trade-off. The main consideration is that when two predicates share a condition variable, you must always wake them using pthread\_cond\_broadcast, which would mean waking all waiters each time the read/write lock is unlocked.
+We could have saved some space and simplified the code by using a single condition variable, with readers and writers waiting using separate predicate expressions. We will use one condition variable for each predicate, because it is more efficient. This is a common trade-off. The main consideration is that when two predicates share a condition variable, you must always wake them using **pthread\_cond\_broadcast**, which would mean waking all waiters each time the read/write lock is unlocked.
 
 We keep track of a boolean variable for "writer active," since there can only be one. There are also counters for "readers active," "readers waiting," and "writers waiting." We could get by without counters for readers and writers waiting. All readers are awakened simultaneously using a broadcast, so it doesn't matter how many there are. Writers are awakened only if there are no readers, so we could dispense with keeping track of whether there are any threads waiting to write (at the cost of an occasional wasted condition variable signal when there are no waiters).
 
@@ -447,9 +446,9 @@ which we can decrease when a waiter is canceled, solves the problem. The consequ
 
 Part 2 shows the rest of the definitions and the function prototypes.
 
-The rwlock\_initializer macro allows you to statically initialize a read/write lock.
+The **RWLOCK\_INITIALIZER** macro allows you to statically initialize a read/write lock.
 
-Of course, you must also be able to initialize a read/write lock that you cannot allocate statically, so we provide rwl\_init to initialize dynamically, and rwl\_ destroy to destroy a read/write lock once you're done with it. In addition, there are functions to lock and unlock the read/write lock for either read or write access. You can "try to lock" a read/write lock, either for read or write access, by calling rwl\_readtrylock or rwl\_writetrylock., just as you can try to lock a mutex by calling pthread\_mutex\_trylock.
+Of course, you must also be able to initialize a read/write lock that you cannot allocate statically, so we provide **rwl\_init** to initialize dynamically, and **rwl\_destroy** to destroy a read/write lock once you're done with it. In addition, there are functions to lock and unlock the read/write lock for either read or write access. You can "try to lock" a read/write lock, either for read or write access, by calling **rwl\_readtrylock** or **rwl\_writetrylock**., just as you can try to lock a mutex by calling **pthread\_mutex\_trylock**.
 
 ```c
 /*  rwlock.h part 2 interfaces  */
@@ -474,7 +473,7 @@ extern int rwl_writeunlock (rwlock_t *rwlock);
 ```
 The file rwlock. c contains the implementation of read/write locks. The following examples break down each of the functions used to implement the rwlock.h interfaces.
 
-Part 1 shows rwl\_init, which initializes a read/write lock. It initializes the Pthreads synchronization objects, initializes the counters and flags, and finally sets the valid sentinel to make the read/write lock recognizable to the other interfaces. If we are unable to initialize the read condition variable, we destroy the mutex that we'd already created. Similarly, if we are unable to initialize the write condition variable, we destroy both the mutex and the read condition variable.
+Part 1 shows **rwl\_init**, which initializes a read/write lock. It initializes the Pthreads synchronization objects, initializes the counters and flags, and finally sets the valid sentinel to make the read/write lock recognizable to the other interfaces. If we are unable to initialize the read condition variable, we destroy the mutex that we'd already created. Similarly, if we are unable to initialize the write condition variable, we destroy both the mutex and the read condition variable.
 
 ```c
 /*  rwlock.c part 1 rwl_init  */
@@ -513,13 +512,13 @@ int rwl_init (rwlock_t *rwl)
 }
 ```
 
-Part 2 shows the rwl\_destroy function, which destroys a read/write lock.
+Part 2 shows the **rwl\_destroy** function, which destroys a read/write lock.
 
 We first try to verify that the read/write lock was properly initialized by checking the valid member. This is not a complete protection against incorrect usage, but it is cheap, and it will catch some of the most common errors. See the annotation for barrier.c, part 2, for more about how the valid member is used.
 
 Check whether the read/write lock is in use. We look for threads that are using or waiting for either read or write access. Using two separate if statements makes the test slightly more readable, though there's no other benefit.
 
-As in barrier\_destroy, we destroy all Pthreads synchronization objects, and store each status return. If any of the destruction calls fails, returning a nonzero value, rwl\_destroy will return that status, and if they all succeed it will return 0 for success.
+As in **barrier\_destroy**, we destroy all Pthreads synchronization objects, and store each status return. If any of the destruction calls fails, returning a nonzero value, **rwl\_destroy** will return that status, and if they all succeed it will return 0 for success.
 
 ```c
 /*  rwlock.c part 2 rwl_destroy  */
@@ -566,7 +565,7 @@ int rwl_destroy (rwlock_t *rwl)
 }
 ```
 
-Part 3 shows the code for rwl\_readcleanup and rwl\_writecleanup, two cancellation cleanup handlers used in locking the read/write lock for read and write access, respectively. As you may infer from this, read/write locks, unlike barriers, are cancellation points. When a wait is canceled, the waiter needs to decrease the count of threads waiting for either a read or write lock, as appropriate, and unlock the mutex.
+Part 3 shows the code for **rwl\_readcleanup** and **rwl\_writecleanup**, two cancellation cleanup handlers used in locking the read/write lock for read and write access, respectively. As you may infer from this, read/write locks, unlike barriers, are cancellation points. When a wait is canceled, the waiter needs to decrease the count of threads waiting for either a read or write lock, as appropriate, and unlock the mutex.
 
 ```c
 /*  rwlock.c part 3 cleanuphandlers  */
@@ -601,11 +600,11 @@ static void rwl_writecleanup (void *arg)
 }
 ```
 
-Part 4 shows rwl\_readlock, which locks a read/write lock for read access. If a writer is currently active (w\_active is nonzero), we wait for it to broadcast the read condition variable. The r\_wait member counts the number of threads waiting to read. This could be a simple boolean variable, except for one problem-when a waiter is canceled, we need to know whether there are any remaining waiters. Maintaining a count makes this easy, since the cleanup handler only needs to decrease the count.
+Part 4 shows **rwl\_readlock**, which locks a read/write lock for read access. If a writer is currently active (**w\_active** is nonzero), we wait for it to broadcast the read condition variable. The **r\_wait** member counts the number of threads waiting to read. This could be a simple boolean variable, except for one problem-when a waiter is canceled, we need to know whether there are any remaining waiters. Maintaining a count makes this easy, since the cleanup handler only needs to decrease the count.
 
-This is one of the places where the code must be changed to convert our read/ write lock from "reader preference" to "writer preference," should you choose to do that. To implement writer preference, a reader must block while there are waiting writers (w\_wait \> 0), not merely while there are active writers, as we do here.
+This is one of the places where the code must be changed to convert our read/ write lock from "reader preference" to "writer preference," should you choose to do that. To implement writer preference, a reader must block while there are waiting writers (**w\_wait** \> 0), not merely while there are active writers, as we do here.
 
-Notice the use of the cleanup handler around the condition wait. Also, notice that we pass the argument 0 to pthread\_cleanup\_pop so that the cleanup code is called only if the wait is canceled. We need to perform slightly different actions when the wait is not canceled. If the wait is not canceled, we need to increase the count of active readers before unlocking the mutex.
+Notice the use of the cleanup handler around the condition wait. Also, notice that we pass the argument 0 to **pthread\_cleanup\_pop** so that the cleanup code is called only if the wait is canceled. We need to perform slightly different actions when the wait is not canceled. If the wait is not canceled, we need to increase the count of active readers before unlocking the mutex.
 
 ```c
 /*  rwlock.c part 4 rwl_readlock  */
@@ -639,7 +638,7 @@ int rwl_readlock (rwlock_t *rwl)
 }
 ```
 
-Part 5 shows rwl\_readtrylock. This function is nearly identical to rwl\_read- lock, except that, instead of waiting for access if a writer is active, it returns ebusy. It doesn't need a cleanup handler, and has no need to increase the count of waiting readers.
+Part 5 shows **rwl\_readtrylock**. This function is nearly identical to **rwl\_readlock**, except that, instead of waiting for access if a writer is active, it returns ebusy. It doesn't need a cleanup handler, and has no need to increase the count of waiting readers.
 
 This function must also be modified to implement "writer preference" read/ write locks, by returning EBUSY when a writer is waiting, not just when a writer is active.
 
@@ -666,11 +665,11 @@ int rwl_readtrylock (rwlock_t *rwl)
     return (status2 != 0 ? status2 : status);
 }
 ```
-Part 6 shows rwlreadunlock. This function essentially reverses the effect of rwl\_readlock or rwl\_tryreadlock, by decreasing the count of active readers (r\_active).
+Part 6 shows rwlreadunlock. This function essentially reverses the effect of **rwl\_readlock** or **rwl\_tryreadlock**, by decreasing the count of active readers (**r\_active**).
 
-If there are no more active readers, and at least one thread is waiting for write access, signal the write condition variable to unblock one. Note that there is a race here, and whether you should be concerned about it depends on your notion of what should happen. If another thread that is interested in read access calls rwl\_readlock or rwl\_tryreadlock before the awakened writer can run, the reader may "win," despite the fact that we just selected a writer.
+If there are no more active readers, and at least one thread is waiting for write access, signal the write condition variable to unblock one. Note that there is a race here, and whether you should be concerned about it depends on your notion of what should happen. If another thread that is interested in read access calls **rwl\_readlock** or **rwl\_tryreadlock** before the awakened writer can run, the reader may "win," despite the fact that we just selected a writer.
 
-Because our version of read/write locks has "reader preference," this is what we usually want to happen-the writer will determine that it has failed and will resume waiting. (It received a spurious wakeup.) If the implementation changes to prefer writers, the spurious wakeup will not occur, because the potential reader would have to block. The waiter we just unblocked cannot decrease w\_wait until it actually claims the lock.
+Because our version of read/write locks has "reader preference," this is what we usually want to happen-the writer will determine that it has failed and will resume waiting. (It received a spurious wakeup.) If the implementation changes to prefer writers, the spurious wakeup will not occur, because the potential reader would have to block. The waiter we just unblocked cannot decrease **w\_wait** until it actually claims the lock.
 
 ```c
 /*  rwlock.c part 6 rwl_readunlock  */
@@ -693,7 +692,7 @@ int rwl_readunlock (rwlock_t *rwl)
 }
 ```
 
-Part 7 shows rwl\_writelock. This function is much like rwl\_readlock, except for the predicate condition on the condition variable wait. In part 1, I explained that, to convert from "preferred read" to "preferred write," a potential reader would have to wait until there were no active or waiting writers, whereas currently it waits only for active writers. The predicate in rwlwritelock is the converse of that condition. Because we support "preferred read," in theory, we must wait here if there are any active or waiting readers. In fact, it is a bit simpler, because if there are any active readers, there cannot be any waiting readers-the whole point of a read/write lock is that multiple threads can have read access at the same time. On the other hand, we do have to wait if there are any active writers, because we allow only one writer at a time.
+Part 7 shows **rwl\_writelock**. This function is much like **rwl\_readlock**, except for the predicate condition on the condition variable wait. In part 1, I explained that, to convert from "preferred read" to "preferred write," a potential reader would have to wait until there were no active or waiting writers, whereas currently it waits only for active writers. The predicate in rwlwritelock is the converse of that condition. Because we support "preferred read," in theory, we must wait here if there are any active or waiting readers. In fact, it is a bit simpler, because if there are any active readers, there cannot be any waiting readers-the whole point of a read/write lock is that multiple threads can have read access at the same time. On the other hand, we do have to wait if there are any active writers, because we allow only one writer at a time.
 
 Unlike ractive, which is a counter, wactive is treated as a boolean. Or is it a counter? There's really no semantic difference, since the value of 1 can be considered a boolean true or a count of 1-there can be only one active writer at any time.
 
@@ -729,7 +728,7 @@ int rwl_writelock (rwlock_t *rwl)
 }
 ```
 
-Part 8 shows rwl\_writetrylock. This function is much like rwl\_writelock, except that it returns ebusy if the read/write lock is currently in use (either by a reader or by a writer) rather than waiting for it to become free.
+Part 8 shows **rwl\_writetrylock**. This function is much like **rwl\_writelock**, except that it returns ebusy if the read/write lock is currently in use (either by a reader or by a writer) rather than waiting for it to become free.
 
 ```c
 /*  rwlock.c part 8 rwl_writetrylock  */
@@ -755,7 +754,7 @@ int rwl_writetrylock (rwlock_t *rwl)
 }
 ```
 
-Finally, part 9 shows rwl\_writeunlock. This function is called by a thread with a write lock, to release the lock.
+Finally, part 9 shows **rwl\_writeunlock**. This function is called by a thread with a write lock, to release the lock.
 
 When a writer releases the read/write lock, it is always free; if there are any threads waiting for access, we must wake one. Because we implement "preferred read" access, we first look for threads that are waiting for read access. If there are any, we broadcast the read condition variable to wake them all.
 
@@ -794,15 +793,15 @@ int rwl_writeunlock (rwlock_t *rwl)
 }
 ```
 
-Now that we have all the pieces, rwlock\_main.c shows a program that uses read/write locks.
+Now that we have all the pieces, **rwlock\_main.c** shows a program that uses read/write locks.
 
-Each thread is described by a structure of type thread\_t. The thread\_num member is the thread's index within the array of thread\_t structures. The thread\_id member is the pthread\_t (thread identifier) returned by pthread\_ create when the thread was created. The updates and reads members are counts of the number of read lock and write lock operations performed by the thread. The interval member is generated randomly as each thread is created, to determine how many iterations the thread will read before it performs a write.
+Each thread is described by a structure of type **thread\_t**. The **thread\_num** member is the thread's index within the array of **thread\_t** structures. The **thread\_id** member is the **pthread\_t** (thread identifier) returned by **pthread\_create** when the thread was created. The updates and reads members are counts of the number of read lock and write lock operations performed by the thread. The interval member is generated randomly as each thread is created, to determine how many iterations the thread will read before it performs a write.
 
-The threads cycle through an array of data\_t elements. Each element has a read/write lock, a data element, and a count of how many times some thread has updated the element.
+The threads cycle through an array of **data\_t** elements. Each element has a read/write lock, a data element, and a count of how many times some thread has updated the element.
 
-The program creates a set of threads running the thread\_routine function. Each thread loops iterations times, practicing use of the read/write lock. It cycles through the array of data elements in sequence, resetting the index (element) to 0 when it reaches the end. At intervals specified by each thread's interval member, the thread will modify the current data element instead of reading it. The thread locks the read/write lock for write access, stores its thread\_num as the new data value, and increases the updates counter.
+The program creates a set of threads running the **thread\_routine** function. Each thread loops iterations times, practicing use of the read/write lock. It cycles through the array of data elements in sequence, resetting the index (element) to 0 when it reaches the end. At intervals specified by each thread's interval member, the thread will modify the current data element instead of reading it. The thread locks the read/write lock for write access, stores its **thread\_num** as the new data value, and increases the updates counter.
 
-On all other iterations, thread\_routine reads the current data element, locking the read/write lock for read access. It compares the data value against its thread\_num to determine whether it was the most recent thread to update that data element, and, if so, it increments a counter.
+On all other iterations, **thread\_routine** reads the current data element, locking the read/write lock for read access. It compares the data value against its **thread\_num** to determine whether it was the most recent thread to update that data element, and, if so, it increments a counter.
 
 On Solaris systems, increase the thread concurrency level to generate more interesting activity. Without timesllcing of user threads, each thread would tend to execute sequentially otherwise.
 
@@ -975,9 +974,9 @@ The work queue manager could also be considered a work crew manager, depending o
 
 When you create the work queue, you can specify the maximum level of parallelism that you need. The work queue manager interprets that as the maximum number of "engine" threads that it may create to process your requests. Threads will be started and stopped as required by the amount of work. A thread that finds nothing to do will wait a short time and then terminate. The optimal "short time" depends on how expensive it is to create a new thread on your system, the cost in system resources to keep a thread going that's not doing anything, and how likely it is that you'll need the thread again soon. I've chosen two seconds, which is probably much too long.
 
-The header file workq. h and the C source file workq. c demonstrate an implementation of a work queue manager. Part 1 shows the two structure types used by the work queue package. The workq\_t type is the external representation of a work queue, and the workqelet is an internal representation of work items that have been queued.
+The header file workq. h and the C source file workq. c demonstrate an implementation of a work queue manager. Part 1 shows the two structure types used by the work queue package. The **workq\_t** type is the external representation of a work queue, and the workqelet is an internal representation of work items that have been queued.
 
-The workq\_ele\_t structure is used to maintain a linked list of work items. It has a link element (called next) and a data value, which is stored when the work item is queued and passed to the caller's "engine function" with no interpretation.
+The **workq\_ele\_t** structure is used to maintain a linked list of work items. It has a link element (called next) and a data value, which is stored when the work item is queued and passed to the caller's "engine function" with no interpretation.
 
 Of course, there's a mutex to serialize access to the workqt, and a condition variable (cv) on which the engine threads wait for work to be queued.
 
@@ -1017,7 +1016,7 @@ typedef struct workq_tag {
 #define WORKQ_VALID 0xdec1992
 ```
 
-Part 2 shows the interfaces we'll create for our work queue. We need to create and destroy work queue managers, so we'll define workq\_init and workq\_destroy. Both take a pointer to a workq\_t structure. In addition, the initializer needs the maximum number of threads the manager is allowed to create to service the queue, and the engine function. Finally, the program needs to be able to queue work items for processing-we'll call the interface for this workqadd. It takes a pointer to the workq\_t and the argument that should be passed to the engine function.
+Part 2 shows the interfaces we'll create for our work queue. We need to create and destroy work queue managers, so we'll define **workq\_init** and **workq\_destroy**. Both take a pointer to a **workq\_t** structure. In addition, the initializer needs the maximum number of threads the manager is allowed to create to service the queue, and the engine function. Finally, the program needs to be able to queue work items for processing-we'll call the interface for this workqadd. It takes a pointer to the **workq\_t** and the argument that should be passed to the engine function.
 
 ```c
 /*  workq.h part 2 interfaces  */
@@ -1034,11 +1033,11 @@ extern int workq_add (workq_t *wq, void *data);
 
 The file workq.c contains the implementation of our work queue. The following examples break down each of the functions used to implement the workq. h interfaces.
 
-Part 1 shows the workq\_init function, which initializes a work queue. We create the Pthreads synchronization objects that we need, and fill in the remaining members.
+Part 1 shows the **workq\_init** function, which initializes a work queue. We create the Pthreads synchronization objects that we need, and fill in the remaining members.
 
 Initialize the thread attributes object attr so that the engine threads we create will run detached. That means we do not need to keep track of their thread identifier values, or worry about joining with them.
 
-We're not ready to quit yet (we've hardly started!), so clear the quit flag. The parallelism member records the maximum number of threads we are allowed to create, which is the workq\_init parameter threads. The counter member will record the current number of active engine threads, initially 0, and idle will record the number of active threads waiting for more work. And of course, finally, we set the valid member.
+We're not ready to quit yet (we've hardly started!), so clear the quit flag. The parallelism member records the maximum number of threads we are allowed to create, which is the **workq\_init** parameter threads. The counter member will record the current number of active engine threads, initially 0, and idle will record the number of active threads waiting for more work. And of course, finally, we set the valid member.
 
 ```c
 /*  workq.c part 1 workq_init  */
@@ -1086,15 +1085,15 @@ int workq_init (workq_t *wq, int threads, void (*engine)(void *arg))
 }
 ```
 
-Part 2 shows the workq\_destroy function. The procedure for shutting down a work queue is a little different than the others we've seen. Remember that the Pthreads mutex and condition variable destroy function fail, returning ebusy, when you try to destroy an object that is in use. We used the same model for barriers and read/write locks. But we cannot do the same for work queues-the calling program cannot know whether the work queue is in use, because the caller only queues requests that are processed asynchronously.
+Part 2 shows the **workq\_destroy** function. The procedure for shutting down a work queue is a little different than the others we've seen. Remember that the Pthreads mutex and condition variable destroy function fail, returning ebusy, when you try to destroy an object that is in use. We used the same model for barriers and read/write locks. But we cannot do the same for work queues-the calling program cannot know whether the work queue is in use, because the caller only queues requests that are processed asynchronously.
 
-The work queue manager will accept a request to shut down at any time, but it will wait for all existing engine threads to complete their work and terminate. Only when the last work queue element has been processed and the last engine thread has exited will workq\_destroy return successfully.
+The work queue manager will accept a request to shut down at any time, but it will wait for all existing engine threads to complete their work and terminate. Only when the last work queue element has been processed and the last engine thread has exited will **workq\_destroy** return successfully.
 
 If the work queue has no threads, either it was never used or all threads have timed out and shut down since it was last used. That makes things easy, and we can skip all the shutdown complication.
 
-If there are engine threads, they are asked to shut down by setting the quit flag in the workq\_t structure and broadcasting the condition variable to awaken any waiting (idle) engine threads. Each engine thread will eventually run and see this flag. When they see it and find no more work, they'll shut themselves down.
+If there are engine threads, they are asked to shut down by setting the quit flag in the **workq\_t** structure and broadcasting the condition variable to awaken any waiting (idle) engine threads. Each engine thread will eventually run and see this flag. When they see it and find no more work, they'll shut themselves down.
 
-The last thread to shut down will wake up the thread that's waiting in workq\_ destroy, and the shutdown will complete. Instead of creating a condition variable that's used only to wake up workq\_destroy, the last thread will signal the same condition variable used to inform idle engine threads of new work. At this point, all waiters have already been awakened by a broadcast, and they won't wait again because the quit flag is set. Shutdown occurs only once during the life of the work queue manager, so there's little point to creating a separate condition variable for this purpose.
+The last thread to shut down will wake up the thread that's waiting in **workq\_destroy**, and the shutdown will complete. Instead of creating a condition variable that's used only to wake up **workq\_destroy**, the last thread will signal the same condition variable used to inform idle engine threads of new work. At this point, all waiters have already been awakened by a broadcast, and they won't wait again because the quit flag is set. Shutdown occurs only once during the life of the work queue manager, so there's little point to creating a separate condition variable for this purpose.
 
 ```c
 /*  workq.c part 2 workq_destroy  */
@@ -1160,13 +1159,13 @@ int workq_destroy (workq_t *wq)
 }
 ```
 
-Part 3 shows workq\_add, which accepts work for the queue manager system.
+Part 3 shows **workq\_add**, which accepts work for the queue manager system.
 
 It allocates a new work queue element and initializes It from the parameters. It queues the element, updating the first and last pointers as necessary.
 
 If there are idle engine threads, which were created but ran out of work, signal the condition variable to wake one.
 
-If there are no idle engine threads, and the value of parallelism allows for more, create a new engine thread. If there are no idle threads and it can't create a new engine thread, workq\_add returns, leaving the new element for the next thread that finishes its current assignment.
+If there are no idle engine threads, and the value of parallelism allows for more, create a new engine thread. If there are no idle threads and it can't create a new engine thread, **workq\_add** returns, leaving the new element for the next thread that finishes its current assignment.
 
 ```c
 /*  workq.c part 3 workq_add  */
@@ -1234,17 +1233,17 @@ int workq_add (workq_t *wq, void *element)
 }
 ```
 
-That takes care of all the external interfaces, but we will need one more function, the start function for the engine threads. The function, shown in part 4, is called workq\_server. Although we could start a thread running the caller's engine with the appropriate argument for each request, this is more efficient. The workq\_server function will dequeue the next request and pass it to the engine function, then look for new work. It will wait if necessary and shut down only when a certain period of time passes without any new work appearing, or when told to shut down by workq\_destroy.
+That takes care of all the external interfaces, but we will need one more function, the start function for the engine threads. The function, shown in part 4, is called **workq\_server**. Although we could start a thread running the caller's engine with the appropriate argument for each request, this is more efficient. The **workq\_server** function will dequeue the next request and pass it to the engine function, then look for new work. It will wait if necessary and shut down only when a certain period of time passes without any new work appearing, or when told to shut down by **workq\_destroy**.
 
 Notice that the server begins by locking the work queue mutex, and the "matching" unlock does not occur until the engine thread is ready to terminate. Despite this, the thread spends most of its life with the mutex unlocked, either waiting for work in the condition variable wait or within the caller's engine function.
 
-When a thread completes the condition wait loop, either there is work to be done or the work queue is shutting down (wq-\>quit is nonzero).
+When a thread completes the condition wait loop, either there is work to be done or the work queue is shutting down (**wq-\>quit** is nonzero).
 
-First, we check for work and process the work queue element if there is one. There could still be work queued when workq\_destroy is called, and it must all be processed before any engine thread terminates.
+First, we check for work and process the work queue element if there is one. There could still be work queued when **workq\_destroy** is called, and it must all be processed before any engine thread terminates.
 
 The user's engine function is called with the mutex unlocked, so that the user's engine can run a long time, or block, without affecting the execution of other engine threads. That does not necessarily mean that engine functions can run in parallel-the caller-supplied engine function is responsible for ensuring whatever synchronization is needed to allow the desired level of concurrency or parallelism. Ideal engine functions would require little or no synchronization and would run in parallel.
 
-When there is no more work and the queue is being shut down, the thread terminates, awakening workq\_destroy if this was the last engine thread to shut down.
+When there is no more work and the queue is being shut down, the thread terminates, awakening **workq\_destroy** if this was the last engine thread to shut down.
 
 Finally we check whether the engine thread timed out looking for work, which would mean the engine has waited long enough. If there's still no work to be found, the engine thread exits.
 
@@ -1371,15 +1370,15 @@ static void *workq_server (void *arg)
 }
 ```
 
-Finally, workq\_main. c is a sample program that uses our work queue manager. Two threads queue work elements to the work queue in parallel. The engine function is designed to gather some statistics about engine usage. To accomplish this, it uses thread-specific data. When the sample run completes, main collects all of the thread-specific data and reports some statistics.
+Finally, **workq\_main.c** is a sample program that uses our work queue manager. Two threads queue work elements to the work queue in parallel. The engine function is designed to gather some statistics about engine usage. To accomplish this, it uses thread-specific data. When the sample run completes, main collects all of the thread-specific data and reports some statistics.
 
-Each engine thread has an engine\_t structure associated with the thread-specific data key engine\_key. The engine function gets the calling thread's value of this key, and if the current value is NULL, creates a new engine\_t structure and assigns it to the key. The calls member of engine\_t structure records the number of calls to the engine function within each thread.
+Each engine thread has an **engine\_t** structure associated with the thread-specific data key **engine\_key**. The engine function gets the calling thread's value of this key, and if the current value is NULL, creates a new **engine\_t** structure and assigns it to the key. The calls member of **engine\_t** structure records the number of calls to the engine function within each thread.
 
-The thread-specific data key's destructor function, destructor, adds the terminating thread's engine\_t to a list (engine\_list\_head), where main can find it later to generate the final report.
+The thread-specific data key's destructor function, destructor, adds the terminating thread's **engine\_t** to a list (**engine\_list\_head**), where main can find it later to generate the final report.
 
-The engine function's work is relatively boring. The argument is a pointer to a power\_t structure, containing the members value and power. It uses a trivial loop to multiply value by itself power times. The result is discarded in this example, and the power\_t structure is freed.
+The engine function's work is relatively boring. The argument is a pointer to a **power\_t** structure, containing the members value and power. It uses a trivial loop to multiply value by itself power times. The result is discarded in this example, and the **power\_t** structure is freed.
 
-A thread is started, by main, running the thread\_routine function. In addition, main calls thread\_routine. The thread\_routine function loops for some number of iterations, determined by the macro iterations, creating and queuing work queue elements. The value and power members of the power\_t structure are determined semirandomly using rand\_r. The function sleeps for a random period of time, from zero to four seconds, to occasionally allow engine threads to time out and terminate. Typically when you run this program you would expect to see summary messages reporting some small number of engine threads, each of which processed some number of calls-which total 50 calls B5 each from the two threads).
+A thread is started, by main, running the **thread\_routine** function. In addition, main calls **thread\_routine**. The **thread\_routine** function loops for some number of iterations, determined by the macro iterations, creating and queuing work queue elements. The value and power members of the **power\_t** structure are determined semirandomly using **rand\_r**. The function sleeps for a random period of time, from zero to four seconds, to occasionally allow engine threads to time out and terminate. Typically when you run this program you would expect to see summary messages reporting some small number of engine threads, each of which processed some number of calls-which total 50 calls B5 each from the two threads).
 
 ```c
 /*  workq_main.c  */
@@ -1544,7 +1543,7 @@ One problem with using the "big mutex" approach is that you have to be careful a
 And what if realloc is implemented to call malloc, copy data, and then call free on the old pointer? The realloc function would lock the heap mutex and call malloc. The malloc function would immediately try to lock the heap mutex itself, resulting in a deadlock. There are several ways to solve this. One is to carefully separate each of the external interfaces into an internal "engine" function that does the actual work and an external entry point that locks the subsystem mutex and calls the engine. Other entry points within the subsystem that need the same engine function would call it directly rather than using the normal entry point. That's often the most efficient solution, but it is also harder to do. Another possibility is to construct a "recursive" mutex that allows the subsystem to relock its own mutex without deadlock.(see **Hint** below) Now malloc and free are allowed to relock the mutex held by realloc, but another thread trying to call any of them will be blocked until realloc completely unlocks the recursive mutex.
 
 > **Hint:**  
-> It is easy to construct a "recursive" mutex using a mutex, a condition variable, the pthread\_ t value of the current owner (if any), and a count of the owner's "recursion depth." The depth is 0 when the recursive mutex is not locked, and greater than 0 when it is locked. The mutex protects access to the depth and owner members, and the condition variable is used to wait for the depth to become 0, should a thread wish to lock the recursive mutex while another thread has it locked.  
+> It is easy to construct a "recursive" mutex using a mutex, a condition variable, the **pthread\_t** value of the current owner (if any), and a count of the owner's "recursion depth." The depth is 0 when the recursive mutex is not locked, and greater than 0 when it is locked. The mutex protects access to the depth and owner members, and the condition variable is used to wait for the depth to become 0, should a thread wish to lock the recursive mutex while another thread has it locked.  
 
 Most functions with persistent state require more substantial changes than just a "big mutex," especially to avoid altering the interface. The asctime function, for example, returns a pointer to the character string representation of a binary time. Traditionally, the string is formatted into a static buffer declared within the asctime function, and the function returns a pointer to that buffer.
 
@@ -1552,32 +1551,32 @@ Locking a mutex within asctime isn't enough to protect the data. In fact, it is 
 
 The problem can instead be fixed by recoding asctime to allocate a heap buffer using malloc, formatting the time string into that buffer, and returning its address. The function can use a thread-specific data key to keep track of the heap address so that it can be reused on the next call within that thread. When the thread terminates, a destructor function can free the storage.
 
-It would be more efficient to avoid using malloc and thread-specific data, but that requires changing the interface to asctime. Pthreads adds a new thread-safe alternative to asctime, called asctime\_r, which requires the caller to pass the address and length of a buffer. The asctime\_r function formats the time string into the caller's buffer. This allows the caller to manage the buffer in any way that's convenient. It can be on the thread's stack, in heap, or can even be shared between threads. Although in a way this is "giving up" on the existing function and defining a new function, it is often the best way (and sometimes the only practical way) to make a function thread-safe.
+It would be more efficient to avoid using malloc and thread-specific data, but that requires changing the interface to asctime. Pthreads adds a new thread-safe alternative to asctime, called **asctime\_r**, which requires the caller to pass the address and length of a buffer. The **asctime\_r** function formats the time string into the caller's buffer. This allows the caller to manage the buffer in any way that's convenient. It can be on the thread's stack, in heap, or can even be shared between threads. Although in a way this is "giving up" on the existing function and defining a new function, it is often the best way (and sometimes the only practical way) to make a function thread-safe.
 
 ### 7.3.2 Living with legacy libraries
 Sometimes you have to work with code you didn't write, and can't change. A lot of code is now being made thread-safe, and most operating systems that support threads can be expected to supply thread-safe implementations of the common bundled library packages. The "inner circle" of thread-safe libraries will gradually increase to become the rule rather than the exception as more application and library developers demand thread-safety.
 
-But inevitably you'll find that a library you need hasn't been made thread- safe, for example, an older version of the X Windows windowing system, or a database engine, or a simulation package. And you won't have source code. Of course you'll immediately complain to the supplier of the library and convince them to make the next version fully thread-safe. But what can you do until the new version arrives?
+But inevitably you'll find that a library you need hasn't been made thread-safe, for example, an older version of the X Windows windowing system, or a database engine, or a simulation package. And you won't have source code. Of course you'll immediately complain to the supplier of the library and convince them to make the next version fully thread-safe. But what can you do until the new version arrives?
 
 If you really need the library, the answer is "use it anyway." There are a number of techniques you can use, from simple to complex. The appropriate level of complexity required depends entirely on the library's interface and how (as well as how much) you use the library in your code.
 
 > Make the unsafe library into a server thread.
 
-In some cases, you may find it convenient to restrict use of the library to one thread, making that thread a "server" for the capabilities provided by the unsafe library. This technique is commonly applied, for example, when using versions of the XI1 protocol client library that are not thread-safe. The main thread or some other thread created for the purpose processes queued XI1 requests on behalf of other threads. Only the server thread makes calls into the XI1 library, so it does not matter whether XI1 is thread-safe.
+In some cases, you may find it convenient to restrict use of the library to one thread, making that thread a "server" for the capabilities provided by the unsafe library. This technique is commonly applied, for example, when using versions of the X11 protocol client library that are not thread-safe. The main thread or some other thread created for the purpose processes queued X11 requests on behalf of other threads. Only the server thread makes calls into the X11 library, so it does not matter whether X11 is thread-safe.
 
 > Write your own "big mutex" wrappers around the interfaces.
 
-If the function you need has a "thread-safe interface" but not a "thread-safe implementation," then you may be able to encapsulate each call inside a wrapper function (or a macro) that locks a mutex, calls the function, and then unlocks the mutex. This is just an external version of the "big mutex" approach. By "thread- safe interface" I mean that the function relies on the static state, but that any data returned to the caller isn't subject to alteration by later calls. For example, malloc fits that category. The allocation of memory involves static data that needs to be protected, but once a block has been allocated and returned to a caller, that address (and the memory to which it points) will not be affected by later calls to malloc. The external "big mutex" is not a good solution for libraries that may block for substantial periods of time-like XI1 or any other network protocol. While the result may be safe, it will be very inefficient unless you rarely use the library, because other threads may be locked out for long periods of time while remote operations are taking place.
+If the function you need has a "thread-safe interface" but not a "thread-safe implementation," then you may be able to encapsulate each call inside a wrapper function (or a macro) that locks a mutex, calls the function, and then unlocks the mutex. This is just an external version of the "big mutex" approach. By "thread-safe interface" I mean that the function relies on the static state, but that any data returned to the caller isn't subject to alteration by later calls. For example, malloc fits that category. The allocation of memory involves static data that needs to be protected, but once a block has been allocated and returned to a caller, that address (and the memory to which it points) will not be affected by later calls to malloc. The external "big mutex" is not a good solution for libraries that may block for substantial periods of time-like X11 or any other network protocol. While the result may be safe, it will be very inefficient unless you rarely use the library, because other threads may be locked out for long periods of time while remote operations are taking place.
 
 > Extend the implementation with external state.
 
 A big mutex won't fix a function like asctime that writes data into a static buffer and returns the address: The returned data must be protected until the caller is finished using it, and the data is used outside the wrapper. For a function like strtok the data is in use until the entire sequence of tokens has been parsed. In general, functions that have persistent static data are more difficult to encapsulate.
 
-A function like asctime can be encapsulated by creating a wrapper function that locks a mutex, calls the function, copies the return value into a thread-safe buffer, unlocks the mutex, and then returns. The thread-safe buffer can be dynamically allocated by the wrapper function using malloc, for instance. You can require the caller to free the buffer when done, which changes the interface, or you can make the wrapper keep track of a per-thread buffer using thread- specific data.
+A function like asctime can be encapsulated by creating a wrapper function that locks a mutex, calls the function, copies the return value into a thread-safe buffer, unlocks the mutex, and then returns. The thread-safe buffer can be dynamically allocated by the wrapper function using malloc, for instance. You can require the caller to free the buffer when done, which changes the interface, or you can make the wrapper keep track of a per-thread buffer using thread-specific data.
 
 Alternatively, you could invent a new interface that requires the caller to supply a buffer. The caller can use a stack buffer, or a buffer in heap, or, if properly synchronized (by the caller), it can share the buffer between threads. Remember that if the wrapper uses thread-specific data to keep track of a per-thread heap buffer, the wrapper can be made compatible with the original interface. The other variants require interface changes: The caller must supply different inputs or it must be aware of the need to free the returned buffer.
 
 A function that keeps persistent state across a sequence of calls is more difficult to encapsulate neatly. The static data must be protected throughout. The easiest way to do this is simply to change the caller to lock a mutex before the first call and keep it locked until after the final call of a sequence. But remember that no other thread can use the function until the mutex is unlocked. If the caller does a substantial amount of processing between calls, a major processing bottleneck can occur. Of course, this may also be difficult or impossible to integrate into a simple wrapper-the wrapper would have to be able to recognize the first and last of any series of calls.
 
-A better, but harder, way is to find some way to encapsulate the function (or a set of related functions) into a new thread-safe interface. There is no general model for this transformation, and in many cases it may be impossible. But often you just need to be creative, and possibly apply some constraints. While the library function may not be easy to encapsulate, you may be able to encapsulate "special cases" that you use. While strtok, for example, allows you to alter the token delimiters at each call, most code does not take advantage of this flexibility. Without the complication of varying delimiters, you could define a new token parsing model on top of strtok where all tokens in a string are found by a thread- safe setup function and stored where they can be retrieved one by one without calling strtok again. Thus, while the setup function would lock a common mutex and serialize access across all threads, the information retrieval function could run without any serialization.
+A better, but harder, way is to find some way to encapsulate the function (or a set of related functions) into a new thread-safe interface. There is no general model for this transformation, and in many cases it may be impossible. But often you just need to be creative, and possibly apply some constraints. While the library function may not be easy to encapsulate, you may be able to encapsulate "special cases" that you use. While strtok, for example, allows you to alter the token delimiters at each call, most code does not take advantage of this flexibility. Without the complication of varying delimiters, you could define a new token parsing model on top of strtok where all tokens in a string are found by a thread-safe setup function and stored where they can be retrieved one by one without calling strtok again. Thus, while the setup function would lock a common mutex and serialize access across all threads, the information retrieval function could run without any serialization.
 

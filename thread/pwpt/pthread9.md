@@ -1,346 +1,212 @@
 
 # 9 POSIX threads mini-reference
-This chapter is a compact reference to the POSIX. lc standard.
-# 9.1 POSIX 1003.1 c-1995 options
-Pthreads is intended to address a wide variety of audiences. High-performance
-computational programs can use it to support parallel decomposition of loops.
-Realtime programs can use it to support concurrent realtime I/O. Database and
-network servers can use it to easily support concurrent clients. Business or soft-
-ware development programs can use it to take advantage of parallel and concurrent
-operations on time-sharing systems.
-The Pthreads standard allows you to determine which optional capabilities are
-provided by the system, by defining a set of feature-test macros, which are shown
-in Table 9.1. Any implementation of Pthreads must inform you whether each
-option is supported, by three means:
-? By making a formal statement of support in the POSIX Conformance Doc-
-ument. You can use this information to help design your application to
-work on specific systems.
-? By defining compile-time symbolic constants in the \<unistd. h\> header file.
-You can test for these symbolic constants using #ifdef or #ifndef prepro-
-cessor conditionals to support a variety of Pthreads systems.
-? By returning a positive nonzero value when the sysconf function is called
-with the associated sysconf symbol. (This is not usually useful for the
-"feature-test" macros that specify whether options are present-if they are
-not, the associated interfaces usually are not supplied, and your code will
-not link, and may not even compile.)
-You might, for example, choose to avoid relying on priority scheduling because
-after reading the conformance documents you discovered that three out of the
-four systems you wish to support do not provide the feature. Or you might prefer
-to use priority inheritance for your mutexes on systems that provide the feature,
-but write the code so that it will not try to access the mutex protocol attribute on
-systems that do not provide that option.
-307
-308
-CHAPTER 9 POSIX threads mini-reference
-Symbolic constant,
-sysconf symbol name
-POSIX THREADS
-\_SC\_THREADS
-POSIX THREAD ATTR STACKSIZE
-\_SC\_THREAD\_ATTR STACKSIZE
-POSIX THREAD ATTR STACKADDR
-\_SC\_THREAD\_ATTR\_STACKADDR
-POSIX THREAD PRIORITY SCHEDULING
-\_SC\_THREAD\_PRIORITY\_SCHEDULING
-POSIX THREAD PRIO INHERIT
-\_SC\_THREAD\_PRIO INHERIT
-POSIX THREAD PRIO PROTECT
-\_SC\_THREAD\_PRIO\_PROTECT
-\_POSIX THREAD PROCESS SHARED
-\_SC\_THREAD\_PROCESS\_SHARED
-POSIX THREAD SAFE FUNCTIONS
-\_SC\_THREAD\_SAFE\_FUNCTIONS
-Description
-You can use threads (if your system
-doesn't define this, you're out of luck).
-You can control the size of a thread's
-stack.
-You can allocate and control a
-thread's stack.
-You can use realtime scheduling.
-You can create priority inheritance
-mutexes.
-You can create priority ceiling mutexes.
-You can create mutexes and condition
-variables that can be shared with an-
-other process.
-You can use the special "\_r" library
-functions that provide thread-safe
-behavior.
-TABLE 9.1 POSIX 1003.lc-1995 options
-## 9.2 POSIX 1003.lc-1995 limits
-The Pthreads standard allows you to determine the run-time limits of the sys-
-tem that may affect your application, for example, how many threads you can
-create, by defining a set of macros, which are shown in Table 9.2. Any implemen-
-tation of Pthreads must inform you of its limits, by three means:
-? By making a formal statement in the POSIX Conformance Document. You
-can use this information to help design your application to work on specific
-systems.
-? By defining compile-time symbolic constants in the \<limits. h\> header file.
-The symbolic constant may be omitted from \<limits.h\> when the limit is
-at least as large as the required minimum, but cannot be determined at
-compile time, for example, if it depends on available memory space. You
-can test for these symbolic constants using #ifdef or #ifndef preproces-
-sor conditionals.
-? By returning a positive nonzero value when the sysconf function is called
-with the associated sysconf symbol.
+This chapter is a compact reference to the POSIX.1c standard.
+
+# 9.1 POSIX 1003.1c-1995 options
+Pthreads is intended to address a wide variety of audiences. High-performance computational programs can use it to support parallel decomposition of loops. Realtime programs can use it to support concurrent realtime I/O. Database and network servers can use it to easily support concurrent clients. Business or soft- ware development programs can use it to take advantage of parallel and concurrent operations on time-sharing systems.
+
+The Pthreads standard allows you to determine which optional capabilities are provided by the system, by defining a set of feature-test macros, which are shown in Table 9.1. Any implementation of Pthreads must inform you whether each option is supported, by three means:
+- By making a formal statement of support in the POSIX Conformance Doc- ument. You can use this information to help design your application to work on specific systems.
+- By defining compile-time symbolic constants in the \<unistd. h\> header file. You can test for these symbolic constants using #ifdef or #ifndef prepro- cessor conditionals to support a variety of Pthreads systems.
+- By returning a positive nonzero value when the sysconf function is called with the associated sysconf symbol. (This is not usually useful for the "feature-test" macros that specify whether options are present-if they are not, the associated interfaces usually are not supplied, and your code will not link, and may not even compile.)
+
+You might, for example, choose to avoid relying on priority scheduling because after reading the conformance documents you discovered that three out of the four systems you wish to support do not provide the feature. Or you might prefer to use priority inheritance for your mutexes on systems that provide the feature, but write the code so that it will not try to access the mutex protocol attribute on systems that do not provide that option.
+
+Symbolic constant, sysconf symbol name | Description
+ ---- | ----
+\_POSIX\_THREADS \_SC\_THREADS | You can use threads (if your system doesn't define this, you're out of luck).
+\_POSIX\_THREAD\_ATTR\_STACKSIZE \_SC\_THREAD\_ATTR\_STACKSIZE | You can control the size of a thread's stack.
+\_POSIX\_THREAD\_ATTR\_STACKADDR \_SC\_THREAD\_ATTR\_STACKADDR | You can allocate and control a thread's stack.
+\_POSIX\_THREAD\_PRIORITY\_SCHEDULING \_SC\_THREAD\_PRIORITY\_SCHEDULING | You can use realtime scheduling.
+\_POSIX\_THREAD\_PRIO\_INHERIT \_SC\_THREAD\_PRIO\_INHERIT | You can create priority inheritance mutexes.
+\_POSIX\_THREAD\_PRIO\_PROTECT \_SC\_THREAD\_PRIO\_PROTECT | You can create priority ceiling mutexes.
+\_POSIX\_THREAD\_PROCESS\_SHARED \_SC\_THREAD\_PROCESS\_SHARED | You can create mutexes and condition variables that can be shared with another process.
+\_POSIX\_THREAD\_SAFE\_FUNCTIONS \_SC\_THREAD\_SAFE\_FUNCTIONS | You can use the special "\_r" library functions that provide thread-safe behavior.
+
+<center>**TABLE 9.1** *POSIX 1003.1c-1995 options*</center>
+## 9.2 POSIX 1003.1c-1995 limits
+The Pthreads standard allows you to determine the run-time limits of the sys- tem that may affect your application, for example, how many threads you can create, by defining a set of macros, which are shown in Table 9.2. Any implemen- tation of Pthreads must inform you of its limits, by three means:
+- By making a formal statement in the POSIX Conformance Document. You can use this information to help design your application to work on specific systems.
+- By defining compile-time symbolic constants in the \<limits. h\> header file. The symbolic constant may be omitted from \<limits.h\> when the limit is at least as large as the required minimum, but cannot be determined at compile time, for example, if it depends on available memory space. You can test for these symbolic constants using #ifdef or #ifndef preproces- sor conditionals.
+- By returning a positive nonzero value when the sysconf function is called with the associated sysconf symbol.
+
 You might, for example, design your application to rely on no more than 64
 threads, if the conformance documents showed that three out of the four systems
-POSIX 1003.1c-1995 interfaces
-309
-Run-time invariant values,
-sysconf symbol name
-Description
-PTHREAD DESTRUCTOR ITERATIONS
-\_SC\_THREAD\_DESTRUCTOR\_ITERATIONS
-PTHREAD KEYS MAX
-\_SC\_THREAD\_KEYS\_MAX
-PTHREAD STACK MIN
-SC THREAD STACK MIN
-PTHREAD THREADS MAX
-\_SC\_THREAD\_THREADS\_MAX
-Maximum number of attempts to
-destroy a thread's thread-specific data
-on termination (must be at least 4).
-Maximum number of thread-specific
-data keys available per process (must
-be at least 128).
-Minimum supported stack size for a
-thread.
-Maximum number of threads support-
-ed per process (must be at least 64).
-TABLE 9.2 POSIX 1003.1 c-1995 limits
-you wish to support do not support additional threads. Or you might prefer to
-write conditional code that relies on the value of the pthread\_threads\_max sym-
-bolic constant (if defined) or call sysconf to determine the limit at run time.
-## 9.3 POSIX 1003.1 c-1995 interfaces
-The interfaces are sorted by functional categories: threads, mutexes, and so
-forth. Within each category, the interfaces are listed in alphabetical order.
-Figure 9.1 describes the format of the entries.
-First, the header entry A) shows the name of the interface. If the interface is
-an optional feature of Pthreads, then the name of the feature-test macro for that
-? r
-?
-pthread\_mutexattr\_getpshared [\_posixjthread\_process\_shared]
-int pthread\_mutexattr\_getpshared (
-const pthread\_mutexattr\_t *attr,
-int *pshared);
-Determine whether mutexes created with attr can be shared by multiple processes.
-psbared
-PTHREAD\_PROCESS\_SHARED May be shared if in shared
-memory.
-pthread process PRIVATE Cannot be shared.
-?
-?
-'?
-References: 3.2,5.2.1
-Headers: \<pthread.h\>
-Errors: [EINVAL] attr invalid.
-Hint: pshared mutexes must be allocated in shared memory.
-FIGURE 9.1 Mini-reference format
-310 CHAPTER 9 POSIX threads mini-reference
-option is shown at the end of the line, in brackets. The interface pthread\_
-mutexattr\_getpshared, for example, is an option under the \_POSIX\_THREAD\_
-process\_shared feature.
-The prototype entry B) shows the full C language prototype for the interface,
-describing how to call the function, with all argument types.
-The description entry C) gives a brief synopsis of the interface. In this case,
-the purpose of the interface is to specify whether mutexes created using the
-attributes object can be shared between multiple processes.
-Functions with arguments that have symbolic values, like pshared in this
-example, will include a table D) that describes each possible value. The default
-value of the argument (the state of a new thread, or the default value of an
-attribute in a new attributes object, in this case pthread\_process\_private) is
-indicated by showing the name in bold.
-The references entry E) gives cross-references to the primary sections of this
-book that discuss the interface, or other closely related interfaces.
-The headers entry F) shows the header files needed to compile code using the
-function. If more than one header is shown, you need all of them.
-The errors entry G) describes each of the possible error numbers returned by
-the interface; Because Pthreads distinguishes between mandatory error detection
-("if occurs" in POSIX terms) and optional error detection ("if detected" in POSIX
-terms), the errors that an interface must report (if they occur) are shown in bold
-(see Section 9.3.1 for details on Pthreads errors).
-The hint entry (8) gives a single, and inevitably oversimplified, philosophical
-comment regarding the interface. Some hints point out common errors in using
-the interface; others describe something about the designers' intended use of the
-interface, or some fundamental restriction of the interface. In pthread\_mutexattr\_
-getpshared, for example, the hint points out that a mutex created to be "process
-shared" must be allocated in shared memory that's accessible by all participating
-processes.
+Run-time invariant values, sysconf symbol name | Description
+ --- | --- 
+\_PTHREAD\_DESTRUCTOR\_ITERATIONS \_SC\_THREAD\_DESTRUCTOR\_ITERATIONS   | Maximum number of attempts to destroy a thread's thread-specific data on termination (must be at least 4).
+\_PTHREAD\_KEYS\_MAX \_SC\_THREAD\_KEYS\_MAX                             | Maximum number of thread-specific data keys available per process (must be at least 128).
+\_PTHREAD\_STACK\_MIN SC\_THREAD\_STACK\_MIN                             | Minimum supported stack size for a thread.
+\_PTHREAD\_THREADS\_MAX \_SC\_THREAD\_THREADS\_MAX                       | Maximum number of threads support- ed per process (must be at least 64).
+
+<center>**TABLE 9.2** *POSIX 1003.1c-1995 limits*</center>
+
+you wish to support do not support additional threads. Or you might prefer to write conditional code that relies on the value of the pthread\_threads\_max sym- bolic constant (if defined) or call sysconf to determine the limit at run time.
+## 9.3 POSIX 1003.1c-1995 interfaces
+The interfaces are sorted by functional categories: threads, mutexes, and so forth. Within each category, the interfaces are listed in alphabetical order. Figure 9.1 describes the format of the entries.
+
+<center>![FIGURE 9.1 Mini-reference format](./img/fig9.1.png)
+
+First, the header entry A) shows the name of the interface. If the interface is an optional feature of Pthreads, then the name of the feature-test macro for that option is shown at the end of the line, in brackets. The interface pthread\_ mutexattr\_getpshared, for example, is an option under the \_POSIX\_THREAD\_ process\_shared feature.
+
+The prototype entry B) shows the full C language prototype for the interface, describing how to call the function, with all argument types. The description entry C) gives a brief synopsis of the interface. In this case, the purpose of the interface is to specify whether mutexes created using the attributes object can be shared between multiple processes.
+
+Functions with arguments that have symbolic values, like pshared in this example, will include a table D) that describes each possible value. The default value of the argument (the state of a new thread, or the default value of an attribute in a new attributes object, in this case pthread\_process\_private) is indicated by showing the name in bold.
+
+The references entry E) gives cross-references to the primary sections of this book that discuss the interface, or other closely related interfaces.
+
+The headers entry F) shows the header files needed to compile code using the function. If more than one header is shown, you need all of them.
+
+The errors entry G) describes each of the possible error numbers returned by the interface; Because Pthreads distinguishes between mandatory error detection ("if occurs" in POSIX terms) and optional error detection ("if detected" in POSIX terms), the errors that an interface must report (if they occur) are shown in bold (see Section 9.3.1 for details on Pthreads errors).
+
+The hint entry (8) gives a single, and inevitably oversimplified, philosophical comment regarding the interface. Some hints point out common errors in using the interface; others describe something about the designers' intended use of the interface, or some fundamental restriction of the interface. In pthread\_mutexattr\_ getpshared, for example, the hint points out that a mutex created to be "process shared" must be allocated in shared memory that's accessible by all participating processes.
+
 ### 9.3.1 Error detection and reporting
 The POSIX standard distinguishes carefully between two categories of error:
-1. Mandatory ("if occurs") errors involve circumstances beyond the control of
-the programmer. These errors must always be detected and reported by the
-system using a particular error code. If you cannot create a new thread
-because your process lacks sufficient virtual memory, then the implemen-
-tation must always tell you. You can't possibly be expected to check
-whether there's enough memory before creating the thread-for one thing,
-you have no way to know how much memory would be required.
-2. Optional ("if detected") errors are problems that are usually your mistake.
-You might try to lock a mutex that hadn't been initialized, for example, or
-try to unlock a mutex that's locked by another thread. Some systems may
-POSIX 1003. lc-1995 interfaces 311
-not detect these errors, but they're still errors in your code, and you ought
-to be able to avoid them without help from the system.
-While it would be "nice" for the system to detect optional errors and return the
-appropriate error number, sometimes it takes a lot of time to check or is difficult
-to check reliably. It may be expensive, for example, for the system to determine
-the identity of the current thread. Systems may therefore not remember which
-thread locked a mutex, and would be unable to detect that the unlock was erro-
-neous. It may not make sense to slow down the basic synchronization operations
-for correct programs just to make it a little easier to debug incorrect programs.
-Systems may provide debugging modes where some or all of the optional
-errors are detected. Digital UNIX, for example, provides "error check" mutexes
-and a "metered" execution mode, where the ownership of mutexes is always
-tracked and optional errors in locking and unlocking mutexes are reported. The
-UNIX98 specification includes "error check" mutexes (Section 10.1.2), so they will
-soon be available on most UNIX systems.
-### 9.3.2 Use of void* type
-ANSI C requires that you be allowed to convert any pointer type to void* and
-back, with the result being identical to the original value. However, ANSI C does
-not require that all pointer types have the same binary representation. Thus, a
-long* that you convert to void* in order to pass into a thread's start routine
-must always be used as a long*, not as, for example, a char*. In addition, the
-result of converting between pointer and integer types is "implementation
-defined." Most systems supporting UNIX will allow you to cast an integer value to
-void* and back, and to mix pointer types-but be aware that the code may not
-work on all systems.
-Some other standards, notably the POSIX. lb realtime standard, have solved
-the same problem (the need for an argument or structure member that can take
-any type value) in different ways. The sigevent structure in POSIX. lb, for exam-
-ple, includes a member that contains a value to be passed into a signal-catching
-function, called sigev\_value. Instead of defining sigev\_value as a void*, how-
-ever, and relying on the programmer to provide proper type casting, the sigev\_
-value member is a union sigval, containing overlayed int and void* members.
-This mechanism avoids the problem of converting between integer and pointer
-types, eliminating one of the conflicts with ANSI C guarantees.
+1. Mandatory ("if occurs") errors involve circumstances beyond the control of the programmer. These errors must always be detected and reported by the system using a particular error code. If you cannot create a new thread because your process lacks sufficient virtual memory, then the implemen- tation must always tell you. You can't possibly be expected to check whether there's enough memory before creating the thread-for one thing, you have no way to know how much memory would be required.
+2. Optional ("if detected") errors are problems that are usually your mistake. You might try to lock a mutex that hadn't been initialized, for example, or try to unlock a mutex that's locked by another thread. Some systems may not detect these errors, but they're still errors in your code, and you ought to be able to avoid them without help from the system.
+
+While it would be "nice" for the system to detect optional errors and return the appropriate error number, sometimes it takes a lot of time to check or is difficult to check reliably. It may be expensive, for example, for the system to determine the identity of the current thread. Systems may therefore not remember which thread locked a mutex, and would be unable to detect that the unlock was erro- neous. It may not make sense to slow down the basic synchronization operations for correct programs just to make it a little easier to debug incorrect programs.
+
+Systems may provide debugging modes where some or all of the optional errors are detected. Digital UNIX, for example, provides "error check" mutexes and a "metered" execution mode, where the ownership of mutexes is always tracked and optional errors in locking and unlocking mutexes are reported. The UNIX98 specification includes "error check" mutexes (Section 10.1.2), so they will soon be available on most UNIX systems.
+
+### 9.3.2 Use of void\* type
+ANSI C requires that you be allowed to convert any pointer type to void\* and back, with the result being identical to the original value. However, ANSI C does not require that all pointer types have the same binary representation. Thus, a long\* that you convert to void\* in order to pass into a thread's start routine must always be used as a long\*, not as, for example, a char\*. In addition, the result of converting between pointer and integer types is "implementation defined." Most systems supporting UNIX will allow you to cast an integer value to void\* and back, and to mix pointer types-but be aware that the code may not work on all systems.
+
+Some other standards, notably the POSIX. lb realtime standard, have solved the same problem (the need for an argument or structure member that can take any type value) in different ways. The sigevent structure in POSIX. lb, for exam- ple, includes a member that contains a value to be passed into a signal-catching function, called sigev\_value. Instead of defining sigev\_value as a void\*, how- ever, and relying on the programmer to provide proper type casting, the sigev\_ value member is a union sigval, containing overlayed int and void\* members. This mechanism avoids the problem of converting between integer and pointer types, eliminating one of the conflicts with ANSI C guarantees.
+
 ### 9.3.3 Threads
-Threads provide concurrency, the ability to have more than one "stream of
-execution" within a process at the same time. Each thread has its own hardware
-registers and stack. All threads in a process share the full virtual address space,
-plus all file descriptors, signal actions, and other process resources.
-312
-CHAPTER 9 POSIX threads mini-reference
-I pthread\_attr\_destroy
-int pthread\_attr\_destroy (
-pthread\_attr\_t *attr);
-Destroy a thread attributes object. The object can no longer be used.
-References: 2, 5.2.3
-Headers: \<pthread.h\>
-Errors: [EINVAL] attr is invalid.
-Hint: Does not affect threads created using attr.
-I pthread\_attr\_getdetachstate
-int pthread\_attr\_getdetachstate (
-const pthread\_attr\_t *attr,
-int *detachstate);
+Threads provide concurrency, the ability to have more than one "stream of execution" within a process at the same time. Each thread has its own hardware registers and stack. All threads in a process share the full virtual address space, plus all file descriptors, signal actions, and other process resources.
+
+```c
+int pthread_attr_destroy (
+    pthread_attr_t *attr);
+```
+Destroy a thread attributes object. The object can no longer be used.  
+
+> References: 2, 5.2.3  
+> Headers: \<pthread.h\>  
+> Errors: [EINVAL] attr is invalid.  
+> Hint: Does not affect threads created using attr.  
+
+```c
+int pthread_attr_getdetachstate (
+    const pthread_attr_t *attr,
+    int *detachstate);
+```
 Determine whether threads created with attr will run detached
-detachstate
-PTHREAD CREATE JOINABLE
-\_ \_ Thread ID is valid, must be
-joined.
-pthread\_create\_detached Thread ID is invalid, cannot be
-joined, canceled, or modified.
-References: 2, 5.2.3
-Headers: \<pthread.h\>
-Errors: [EINVAL] attr is invalid.
-Hint: You can't join or cancel detached threads.
-pthread\_attr\_getstackaddr [\_posix\_thread\_attr\_stackaddr]
-int pthread\_attr\_getstackaddr (
-const pthread\_attr\_t *attr,
-void **stackaddr);
+
+ | detachstate
+  --- | ---
+PTHREAD\_CREATE\_JOINABLE | Thread ID is valid, must be joined.
+PTHREAD\_CREATE\_DETACHED | Thread ID is invalid, cannot be joined, canceled, or modified.
+
+> References: 2, 5.2.3
+> Headers: \<pthread.h\>
+> Errors: [EINVAL] attr is invalid.
+> Hint: You can't join or cancel detached threads.
+
+```c
+int pthread_attr_getstackaddr (
+    const pthread_attr_t *attr,
+    void **stackaddr);
+```
 Determine the address of the stack on which threads created with attr will run.
-References: 2, 5.2.3
-Headers: \<pthread.h\>
-Errors: [EINVAL] attr is invalid.
-[ENOSYS] stacksize not supported.
-Hint: Create only one thread for each stack address!
-POSIX 1003.1 c-1995 interfaces
-313
-pthread\_attr\_getstacksize [\_posix\_thread\_attr\_stacksize]
-int pthread\_attr\_getstacksize (
-const pthread\_attr\_t *attr,
-size\_t *stacksize);
+
+> References: 2, 5.2.3
+> Headers: \<pthread.h\>
+> Errors: [EINVAL] attr is invalid.
+>         [ENOSYS] stacksize not supported.
+> Hint: Create only one thread for each stack address!
+```c
+int pthread_attr_getstacksize (
+    const pthread_attr_t *attr,
+    size_t *stacksize);
+```
 Determine the size of the stack on which threads created with attr will run.
-References: 2, 5.2.3
-Headers: \<pthread.h\>
-Errors: [EINVAL] attr invalid.
-[ENOSYS] stacksize not supported.
-Hint: Use on newly created attributes object to find the default stack size.
-pthread\_attr\_init
-int pthread\_attr\_init (
-pthread\_attr\_t *attr);
+
+> References: 2, 5.2.3
+> Headers: \<pthread.h\>
+> Errors: [EINVAL] attr invalid.
+>         [ENOSYS] stacksize not supported.
+> Hint: Use on newly created attributes object to find the default stack size.
+
+```c
+int pthread_attr_init (
+    pthread_attr_t *attr);
+```
 Initialize a thread attributes object with default attributes.
-References: 2, 5.2.3
-Headers: \<pthread.h\>
-Errors: [ENOMEM] insufficient memory for attr.
-Hint: Use to define thread types.
-I pthread\_attr\_setdetachstate
-int pthread\_attr\_setdetachstate (
-pthread\_attr\_t *attr,
-int detachstate);
+
+> References: 2, 5.2.3
+> Headers: \<pthread.h\>
+> Errors: [ENOMEM] insufficient memory for attr.
+> Hint: Use to define thread types.
+
+```c
+int pthread_attr_setdetachstate (
+    pthread_attr_t *attr,
+    int detachstate);
+```
 Specify whether threads created with attr will run detached.
-detachstate
-Thread ID is valid, must be
-joined.
-Thread ID is invalid, cannot be
-joinerl. c.-inri'leri. 'T
-PTHREAD\_CREATE\_JOINABLE
-PTHREAD CREATE DETACHED
-References: 2, 5.2.3
-Headers: \<pthread.h\>
-Errors: [EINVAL] attr invalid.
-I EINVAL] detachstate invalid.
-Hint: You can't join or cancel detached threads.
-314 CHAPTER 9 POSDC threads mini-reference
-pthread\_attr\_setstackaddr [\_posix\_thread\_attr\_stackaddr]
-int pthread\_attr\_setstackaddr (
-pthread\_attr\_t *attr,
-void *stackaddr);
-Threads created with attr will run on the stack starting at stackaddr. Must be at
-least pthread\_STACK\_min bytes.
-References: 2, 5.2.3
-Headers: \<pthread.h\>
-Errors: [EINVAL] attr invalid.
-[ENOSYS] stackaddr not supported.
-Hint: Create only one thread for each stack address, and be careful of
-stack alignment.
-pthread\_attr\_setstacksize [\_posix\_thread\_attr\_stacksize ]
-int pthread\_attr\_setstacksize (
-pthread\_attr\_t *attr,
-size\_t stacksize);
-Threads created with attr will run on a stack of at least stacksize bytes. Must be
-at least pthread\_stack\_min bytes.
-References: 2, 5.2.3
-Headers: \<pthread.h\>
-Errors: [EINVAL] attr or stacksize invalid.
-[EINVAL] stacksize too small or too big.
-[ENOSXS] stacksize not supported.
-Hint: Find the default first (pthread\_attr\_getstacksize), then increase
-by multiplying. Use only if a thread needs more than the default.
-pthread\_create
+
+ | detachstate
+ --- | ---
+PTHREAD\_CREATE\_JOINABLE | Thread ID is valid, must be joined.
+PTHREAD\_CREATE\_DETACHED | Thread ID is invalid, cannot be joined, canceled, or modified.
+
+> References: 2, 5.2.3
+> Headers: \<pthread.h\>
+> Errors: [EINVAL] attr invalid.
+> [EINVAL] detachstate invalid.
+> Hint: You can't join or cancel detached threads.
+
+```c
+int pthread_attr_setstackaddr (
+    pthread_attr_t *attr,
+    void *stackaddr);
+```
+Threads created with attr will run on the stack starting at stackaddr. Must be at least PTHREAD\_STACK\_MIN bytes.
+
+> References: 2, 5.2.3
+> Headers: \<pthread.h\>
+> Errors: [EINVAL] attr invalid.
+>         [ENOSYS] stackaddr not supported.
+> Hint: Create only one thread for each stack address, and be careful of stack alignment.
+
+```c
+int pthread_attr_setstacksize (
+    pthread_attr_t *attr,
+    size_t stacksize);
+```
+Threads created with attr will run on a stack of at least stacksize bytes. Must be at least pthread\_stack\_min bytes.
+
+> References: 2, 5.2.3
+> Headers: \<pthread.h\>
+> Errors: [EINVAL] attr or stacksize invalid.
+>         [EINVAL] stacksize too small or too big.
+>         [ENOSXS] stacksize not supported.
+> Hint: Find the default first (pthread\_attr\_getstacksize), then increase by multiplying. Use only if a thread needs more than the default.
+
+```c
 int pthread create (
-pthread t
-const pthread attr t
-void
-void
-*tid,
-*attr.
-*(*start)
-*arq);
-(void *),
-Create a thread running the start function, essentially an asynchronous call to the
-function start with argument value arg. The attr argument specifies optional
-creation attributes, and the identification of the new thread is returned intid.
-References: 2, 5.2.3
-Headers: \<pthread.h\>
-Errors: [EINVAL] attr invalid.
-[EA6AIN] insufficient resources.
-Hint: All resources needed by thread must already be initialized.
-POSIX 1003.1 c-1995 interfaces 315
-I pthread\_detach
-int pthread\_detach (
-pthread\_t thread);
+    pthread_t               *tid,
+    const pthread_attr_t    *attr,
+    void                    *(*start) (void *),
+    void                    *arg);
+```
+
+Create a thread running the start function, essentially an asynchronous call to the function start with argument value arg. The attr argument specifies optional creation attributes, and the identification of the new thread is returned intid.
+
+> References: 2, 5.2.3
+> Headers: \<pthread.h\>
+> Errors: [EINVAL] attr invalid.
+>         [EA6AIN] insufficient resources.
+> Hint: All resources needed by thread must already be initialized.
+
+```c
+int pthread_detach (
+    pthread_t thread);
+```
 Detach the thread. Use this to detach the main thread or to "change your mind"
 after creating a joinable thread in which you are no longer interested.
 References: 2, 5.2.3
@@ -376,7 +242,6 @@ Errors: [einvalj thread is not a joinable thread.
 [ESRCH] no thread could be found for ID thread.
 [edeadlk] attempt to join with self.
 Hint: Detached threads cannot be joined or canceled.
-316 CHAPTER 9 POSIX threads mini-reference
 I pthread\_self
 pthread\_t pthread\_self (void);
 Return the calling thread's ID.
@@ -449,7 +314,6 @@ References: 3.2,5.2.1
 Headers: \<pthread.h\>
 Errors: [EINVAL] attr or detachstate invalid.
 Hint: pshared mutexes must be allocated in shared memory.
-318 CHAPTER 9 POSIX threads mini-reference
 I pthread\_mutex\_destroy
 int pthread\_mutex\_destroy (
 pthread\_mutex\_t *mutex);
@@ -484,7 +348,7 @@ Errors: [EINVAL] thread priority exceeds mutex priority ceiling.
 [EINVAL] mutex is invalid.
 [EDEADLK] calling thread already owns mutex.
 Hint: Always unlock within the same thread.
-POSIX 1003. lc-1995 interfaces 319
+POSIX 1003.1c-1995 interfaces 319
 I pthread\_mutex\_trylock
 int pthread\_mutex\_trylock (
 pthread\_mutex\_t *mutex);
@@ -521,8 +385,6 @@ References: 3.3, 5.2.2
 Headers: \<pthread.h\>
 Errors: [EINVAL] attr invalid.
 Hint: Does not affect condition variables created using attr.
-320
-CHAPTER 9 POSIX threads mini-reference
 pthread\_condattr\_getpshared [\_posix\_thread\_process\_shared]
 int pthread\_condattr\_getpshared (
 const pthread\_condattr\_t *attr,
@@ -610,7 +472,6 @@ Headers: \<pthread.h\>
 Errors: [EINVAL] cond is invalid.
 Hint: Use when more than one waiter may respond to predicate change
 or if any waiting thread may not be able to respond.
-322 CHAPTER 9 POSIX threads mini-reference
 I pthread\_cond\_signal
 int pthread\_cond\_signal (
 pthread\_cond\_t *cond);
@@ -650,7 +511,7 @@ Errors: [EINVAL] cond or mutex is invalid.
 [EINVAL] mutex is not owned by calling thread.
 Hint: Mutex is always unlocked (before wait) and relocked (after wait) in-
 side pthread\_cond\_wait, even if the wait fails or is canceled.
-POSIX 1003.1 c-1995 interfaces 323
+POSIX 1003.1c-1995 interfaces 323
 ### 9.3.6 Cancellation
 Cancellation provides a way to request that a thread terminate "gracefully"
 when you no longer need it to complete its normal execution. Each thread can
@@ -686,8 +547,6 @@ References: 5.3
 Headers: \<pthread.h\>
 Hint: pthread\_cleanup\_push and pthread\_cleanup\_pop must be paired
 in the same lexical scope.
-324
-CHAPTER 9 POSIX threads mini-reference
 I pthread\_setcancelstate
 int pthread\_setcancelstate (
 int state,
@@ -725,7 +584,7 @@ Headers: \<pthread.h\>
 Errors: [einval] type is invalid.
 Hint: Use with caution-most code is not safe for use with asynchronous
 cancelability type.
-POSIX 1003.1 c-1995 interfaces 325
+POSIX 1003.1c-1995 interfaces 325
 I pthreadjestcancel
 void pthread\_testcancel (void);
 Creates a deferred cancellation point in the calling thread. The call has no effect if
@@ -761,7 +620,6 @@ Create a thread-specific data key visible to all threads. All existing and new t
 have value null for key until set using pthread\_setspecif ic. When any thread
 with a non-NULL value for key terminates, destructor is called with key's current
 value for that thread.
-326 CHAPTER 9 POSLK threads mini-reference
 References: 5.4,7.2,7.3.1
 Headers: \<pthread.h\>
 Errors: [EAGAIN] insufficient resources or PTHREAD\_keys\_MAX exceeded.
@@ -796,7 +654,7 @@ many cases realtime scheduling may impose overhead that results in slower exe-
 cution. Realtime scheduling is also subject to synchronization problems such as
 priority inversion (Sections 5.5.4 and 8.1.4), although Pthreads provides optional
 facilities to address some of these problems.
-POSLK 1003. lc-1995 interfaces 327
+POSLK 1003.1c-1995 interfaces 327
 pthread\_attr\_getinheritsched [\_posix\_thread\_priority\_scheduling]
 int pthread\_attr\_getinheritsched (
 const pthread\_attr\_t *attr,
@@ -830,8 +688,6 @@ const pthread\_attr\_t *attr,
 int *policy);
 Determine the scheduling policy used by threads created with attr. The default
 policy is implementation defined.
-328
-CHAPTER 9 POSIX threads mini-reference
 SCHED FIFO
 SCHED RR
 SCHED OTHER
@@ -869,7 +725,7 @@ Errors: [ENOSYS] priority scheduling is not supported.
 [EINVAL] attr invalid.
 Hint: Implementation must support one or both of these, but need not
 support both.
-POSIX 1003.1 c-1995 interfaces 329
+POSIX 1003.1c-1995 interfaces 329
 pthread\_attr\_setinheritsched [\_posix\_thread\_priority\_scheduling]
 int pthread\_attr\_setinheritsched (
 pthread\_\_attr\_t *attr,
@@ -906,8 +762,6 @@ pthread\_attr\_t *attr,
 int policy);
 Specify the scheduling policy used by threads created with attr. The default
 policy is implementation defined.
-330
-CHAPTER 9 POSIX threads mini-reference
 SCHED FIFO
 SCHED\_RR
 SCHED OTHER
@@ -947,7 +801,7 @@ Errors: [ENOSYS] priority scheduling is not supported.
 [ENOTSUP] contentionscope set to supported value.
 Hint: Implementation must support one or both of these, but need not
 support both.
-POSIX 1003.1c~ 1995 interfaces
+POSIX 1003.1c-1995 interfaces
 331
 pthread\_getschedparam [\_posix\_thread\_priority\_scheduling]
 int pthread\_getschedparam (
@@ -984,7 +838,6 @@ Errors: [ENOSYS] priority scheduling is not supported.
 [EINVAL] mutex invalid.
 Hint: Protect protocol is inappropriate unless the creator of the mutex
 also creates and controls all threads that might lock the mutex.
-332 CHAPTER 9 POSIX threads mini-reference
 pthread\_mutex\_setprioceiling [\_posix\_thread\_prio\_protect]
 int pthread\_mutex\_getprioceiling (
 pthread\_mutex\_t *mutex,
@@ -1017,7 +870,7 @@ const pthread\_mutexattr\_t *attr,
 int *protocol);
 Determine whether mutexes created with attr have priority ceiling protocol (pro-
 tect), priority inheritance protocol {inherit), or no priority protocol (none).
-POSIX 1003.1 c-1995 interfaces 333
+POSIX 1003.1c-1995 interfaces 333
 protocol
 PTHREAD\_PRIO\_HONE No priority inheritance
 protocol.
@@ -1053,8 +906,6 @@ pthread\_mutexattr\_t *attr,
 int protocol);
 Specify whether mutexes created with attr have priority ceiling protocol {protect),
 priority inheritance protocol (inherit), or no priority protocol (none).
-334
-CHAPTER 9 POSIX threads mini-reference
 PTHREAD\_PRIO\_NONE
 PTHREAD\_PRIO\_IKHERIT
 PTHREAD PRIO PROTECT
@@ -1105,7 +956,7 @@ Hint:
 [EPERM] no permission to set policy or param.
 Try to avoid dynamically modifying thread scheduling policy and
 parameters, if possible.
-POSIX 1003.1C-1995 interfaces
+POSIX 1003.1c-1995 interfaces
 335
 sched\_get\_priority\_max [\_posix\_priority\_scheduling]
 int sched\_get\_priority\_max (
@@ -1151,7 +1002,6 @@ Errors: [ENOSYS] priority scheduling is not supported.
 [EINVAL] policy is invalid.
 Hint: Priority min and max are integer values-you can compute relative
 values, for example, half and quarter points in range.
-336 CHAPTER 9 POSIX threads mini-reference
 ### 9.3.9 Fork handlers
 Pthreads provides some new functions to help the new threaded environment
 to coexist with the traditional process-based UNIX environment. Creation of a
@@ -1187,7 +1037,7 @@ already owns the file stream lock, the lock count is incremented-an identical nu
 ber of calls to funlockfile is required to release the file stream lock.
 * Digital UNIX and Solaris both (incorrectly) place the definition in \<pthread. h\>. The UNIX 98
 brand will require that they be fixed.
-POSIX 1003.1 c-1995 interfaces 337
+POSIX 1003.1c-1995 interfaces 337
 Although most stdio functions, such as printf and f gets, are thread-safe, you
 may sometimes find that it is important that a sequence of printf calls, for exam-
 ple, from one thread cannot be separated by calls made from another thread. Also,
@@ -1223,7 +1073,6 @@ currently. Returns EOF for read errors or end-of-file condition.
 References: 6.4.2
 Headers: \<stdio.h\>
 Hint: Replace old calls to getc to retain fastest access.
-338 CHAPTER 9 POSIX threads mini-reference
 getchar\_unlocked
 int getc\_unlocked (void);
 Return a single character from the stdio stream stdin without locking the file
@@ -1261,7 +1110,7 @@ Thread-safe functions provide improved access to traditional features of
 ANSI C and POSIX that cannot be effectively made thread-safe without interface
 changes. These routines are designated by the "\_r" suffix added to the traditional
 function name they replace, for example, getlogin\_r for getlogin.
-POSIX 1003.1 c-1995 interfaces 339
+POSIX 1003.1c-1995 interfaces 339
 I getlogirw
 int getlogin\_r (
 char *name,
@@ -1300,7 +1149,6 @@ const struct tm*tm,
 char *buf);
 Convert the "broken-down" time in the structure pointed to by tm into a string,
 which is stored in the buffer pointed to by buf. The buffer pointed to by buf must
-340 CHAPTER 9 POS1X threads mini-reference
 contain at least 26 bytes. The function returns a pointer to the buffer on success,
 or null on failure.
 References: 6.5.4
@@ -1334,7 +1182,7 @@ as local time, which is stored in the structure pointed to by result. The functi
 returns a pointer to the structure on success, or null on failure.
 References: 6.5.4
 Headers: \<time.h\>
-POSIX 1003.1 c-1995 interfaces 341
+POSIX 1003.1c-1995 interfaces 341
 rand\_r
 int rand\_r (
 unsigned int *seed);
@@ -1374,7 +1222,6 @@ sysconf with the \_sc\_getgr\_r\_size\_max parameter.
 References: 6.5.6
 Headers: \<sys/types.h\>, \<grp.h\>
 Errors: [ erange ] the specified buffer is too small.
-342 CHAPTER 9 POSIX threads mini-reference
 I getpwuid\_r
 int getpwuid\_r (
 uid\_t uid,
@@ -1457,7 +1304,6 @@ siginfo\_t *info,
 const struct timespec *timeout);
 If a signal in set is pending, atomically clear it from the set of pending signals and
 return the signal number in the si\_signo member of info. The cause of the signal
-344 CHAPTER 9 POSIX threads mini-reference
 shall be stored in the si\_code member. If any value is queued to the selected signal,
 return the first queued value in the si\_value member. If no signal in set is pend-
 ing, suspend the calling thread until one or more become pending. If the time in-
@@ -1496,7 +1342,7 @@ return the first queued value in the si\_value member. If no signal in set is pe
 ing, suspend the calling thread until one or more become pending. This function re-
 turns the signal number-on error, it returns -1 and sets err no to the appropriate
 error code.
-POSIX 1003.lc-1995 interfaces 345
+POSIX 1003.1c-1995 interfaces 345
 References: 6.6.4
 Headers: \<signal.h\>
 Errors: [einval] set contains an invalid signal number.
@@ -1534,7 +1380,6 @@ Errors: [EINVAL] sem is not a valid semaphore.
 [ENOSYS] semaphores are not supported.
 [EPERM] the process lacks appropriate privilege.
 Hint: Use a value of 1 for a lock, a value of 0 for waiting.
-346 CHAPTER 9 POSIX threads mini-reference
 semjrywait [posixsemaphoresj
 int sem\_trywait (
 sem\_t *sem);
