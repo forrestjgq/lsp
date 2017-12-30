@@ -1,5 +1,6 @@
 
 # From the maker
+![Cover](./img/cover.jpeg)
 
 \<\<Programming with POSIX thread\>\> by David R. Butenhof is a guide book for pthread development. Unfortunately this book was published too early and never been updated. That is why no pure text PDF can be found on internet.
 

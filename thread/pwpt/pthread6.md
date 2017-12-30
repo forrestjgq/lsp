@@ -1232,36 +1232,36 @@ To awaken a thread from a POSIX signal-catching function, you need a mechanism t
 
 In case you're curious, here is the full list of POSIX 1003.1-1996 functions that are async-signal safe (some of these functions exist only when certain POSIX options are denned, such as **\_posix\_asynchronous\_io** or **\_posix\_timers**):
 
-                 |             |                  |  |
-| --           | --                |  -- |
-access           | getoverrun  | sigismember
-aio\_error        | getgroups   | sigpending
-aio\_return       | getpgrp     | sigprocmask
-aio\_suspend      | getpid      | sigqueue
-alarm            | getppid     | sigsuspend
-cfgetispeed      | getuid      | sleep
-cfgetospeed      | kill        | stat
-cfsetispeed      | link        | sysconf
-cfsetospeed      | lseek       | tcdrain
-chdir            | mkdir       | tcflow
-chmod            | mkfifo      | tcflush
-chown            | open        | tcgetattr
-clock\_gettime    | pathconf    | tcgetpgrp
-close            | pause       | tcsendbreak
-creat            | pipe        | tcsetattr
-dup2             | read        | tcsetpgrp
-dup              | rename      | time
-execle           | rmdir       | timer\_getoverrun
-execve           | sem\_post    | timer\_gettime
-exit             | setgid      | timer\_settime
-fcntl            | setpgid     | times
-fdatasync        | setsid      | umask
-fork             | setuid      | uname
-fstat            | sigaction   | unlink
-fsync            | sigaddset   | utime
-getegid          | sigdelset   | wait
-geteuid          | sigemptyset | waitpid
-getgid           | sigfillset  | write
+|                |             |                   |
+| --             | --          | --                |
+| access         | getoverrun  | sigismember       |
+| aio\_error     | getgroups   | sigpending        |
+| aio\_return    | getpgrp     | sigprocmask       |
+| aio\_suspend   | getpid      | sigqueue          |
+| alarm          | getppid     | sigsuspend        |
+| cfgetispeed    | getuid      | sleep             |
+| cfgetospeed    | kill        | stat              |
+| cfsetispeed    | link        | sysconf           |
+| cfsetospeed    | lseek       | tcdrain           |
+| chdir          | mkdir       | tcflow            |
+| chmod          | mkfifo      | tcflush           |
+| chown          | open        | tcgetattr         |
+| clock\_gettime | pathconf    | tcgetpgrp         |
+| close          | pause       | tcsendbreak       |
+| creat          | pipe        | tcsetattr         |
+| dup2           | read        | tcsetpgrp         |
+| dup            | rename      | time              |
+| execle         | rmdir       | timer\_getoverrun |
+| execve         | sem\_post   | timer\_gettime    |
+| exit           | setgid      | timer\_settime    |
+| fcntl          | setpgid     | times             |
+| fdatasync      | setsid      | umask             |
+| fork           | setuid      | uname             |
+| fstat          | sigaction   | unlink            |
+| fsync          | sigaddset   | utime             |
+| getegid        | sigdelset   | wait              |
+| geteuid        | sigemptyset | waitpid           |
+| getgid         | sigfillset  | write             |
 
 POSIX. 1b provides counting semaphores, and most systems that support Pthreads also support POSIX. lb semaphores. You may notice that the **sem\_post** function, which wakes threads waiting on a semaphore, appears in the list of async-signal safe functions. If your system supports POSIX semaphores (**\<unistd.h\>** defines the **\_posix\_semaphores** option), then Pthreads adds the ability to use semaphores between threads within a process. That means you can post a semaphore, from within a POSIX signal-catching function, to wake a thread in the same process or in another process.
 
