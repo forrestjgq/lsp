@@ -15,7 +15,7 @@ During the introduction to this book, I mentioned some of the ways you can struc
 | Work crew     | Each thread performs an operation on its own data. Threads in a work crew may all perform the same operation, or each a sep- arate operation, but they always proceed independently. |
 | Client/server | A client "contracts" with an independent server for each job. Often the "contract" is anonymous-a request is made through some interface that queues the work item. |
 
-<center>**TABLE 4.**1 *Thread programming models*</center>
+<center>**TABLE 4.1** *Thread programming models*</center>
 
 All of these models can be combined in arbitrary ways and modified beyond all recognition to fit individual situations. A step in a pipeline could involve requesting a service from a server thread, and the server might use a work crew, and one or more workers in the crew might use a pipeline. Or a parallel search "engine" might initiate several threads, each trying a different search algorithm.
 
@@ -58,7 +58,7 @@ graph LR;
 
 Each stage of a pipeline is represented by a variable of type staget. staget contains a mutex to synchronize access to the stage. The avail condition variable is used to signal a stage that data is ready for it to process, and each stage signals its own ready condition variable when it is ready for new data. The data member is the data passed from the previous stage, thread is the thread operating this stage, and next is a pointer to the following stage.
 
-The **pipe\_t** structure describes a pipeline. It provides pointers to the first and last stage of a pipeline. The first stage, head, represents the first thread in the pipeline. The last stage, tail, is a special **stage\_t** that has no thread-it is a place to store the final result of the pipeline.
+The `pipe_t` structure describes a pipeline. It provides pointers to the first and last stage of a pipeline. The first stage, head, represents the first thread in the pipeline. The last stage, tail, is a special `stage_t` that has no thread-it is a place to store the final result of the pipeline.
 
 ```c
 /** pipe.c part 1 definitions */
@@ -91,7 +91,7 @@ typedef struct pipe_tag {
     int               active;            /* Active data elements */
 } pipe_t;
 ```
-Part 2 shows **pipe\_send**, a utility function used to start data along a pipeline, and also called by each stage to pass data to the next stage.
+Part 2 shows `pipe_send`, a utility function used to start data along a pipeline, and also called by each stage to pass data to the next stage.
 
 It begins by waiting on the specified pipeline stage's ready condition variable until it can accept new data.
 
@@ -137,11 +137,11 @@ int pipe_send (stage_t *stage, long data)
     return status;
 }
 ```
-Part 3 shows **pipe\_stage**, the start function for each thread in the pipeline. The thread's argument is a pointer to its **stage\_t** structure.
+Part 3 shows `pipe_stage`, the start function for each thread in the pipeline. The thread's argument is a pointer to its `stage_t` structure.
 
 The thread loops forever, processing data. Because the mutex is locked outside the loop, the thread appears to have the pipeline stage's mutex locked all the time. However, it spends most of its time waiting for new data, on the avail condition variable. Remember that a thread automatically unlocks the mutex associated with a condition variable, while waiting on that condition variable. In reality, therefore, the thread spends most of its time with mutex unlocked.
 
-When given data, the thread increases its own data value by one, and passes the result to the next stage. The thread then records that the stage no longer has data by clearing the **data\_ready** flag, and signals the ready condition variable to wake any thread that might be waiting for this pipeline stage.
+When given data, the thread increases its own data value by one, and passes the result to the next stage. The thread then records that the stage no longer has data by clearing the `data_ready` flag, and signals the ready condition variable to wake any thread that might be waiting for this pipeline stage.
 
 ```c
 /** pipe.c part 3 pipe_stage */
@@ -181,13 +181,13 @@ void *pipe_stage (void *arg)
      */
 }
 ```
-Part 4 shows **pipe\_create**, the function that creates a pipeline. It can create a pipeline of any number of stages, linking them together in a list.
+Part 4 shows `pipe_create`, the function that creates a pipeline. It can create a pipeline of any number of stages, linking them together in a list.
 
-For each stage, it allocates a new **stage\_t** structure and initializes the members. Notice that one additional "stage" is allocated and initialized to hold the final result of the pipeline.
+For each stage, it allocates a new `stage_t` structure and initializes the members. Notice that one additional "stage" is allocated and initialized to hold the final result of the pipeline.
 
-The link member of the final stage is set to NULL to terminate the list, and the pipeline's tail is set to point at the final stage. The tail pointer allows **pipe\_result** to easily find the final product of the pipeline, which is stored into the final stage.
+The link member of the final stage is set to NULL to terminate the list, and the pipeline's tail is set to point at the final stage. The tail pointer allows `pipe_result` to easily find the final product of the pipeline, which is stored into the final stage.
 
-After all the stage data is initialized, **pipe\_create** creates a thread for each stage. The extra "final stage" does not get a thread-the termination condition of the for loop is that the current stage's next link is not NULL, which means that it will not process the final stage.
+After all the stage data is initialized, `pipe_create` creates a thread for each stage. The extra "final stage" does not get a thread-the termination condition of the for loop is that the current stage's next link is not NULL, which means that it will not process the final stage.
 
 ```c
 /* pipe.c part 4 pipe_create */
@@ -253,13 +253,13 @@ int pipe_create (pipe_t *pipe, int stages)
     return 0;
 }
 ```
-Part 5 shows **pipe\_start** and **pipe\_result**. The **pipe\_start** function pushes an item of data into the beginning of the pipeline and then returns immediately without waiting for a result. The **pipe\_result** function allows the caller to wait for the final result, whenever the result might be needed.
+Part 5 shows `pipe_start` and `pipe_result`. The `pipe_start` function pushes an item of data into the beginning of the pipeline and then returns immediately without waiting for a result. The `pipe_result` function allows the caller to wait for the final result, whenever the result might be needed.
 
-The **pipe\_start** function sends data to the first stage of the pipeline. The function increments a count of "active" items in the pipeline, which allows **pipe\_result** to detect that there are no more active items to collect, and to return immediately instead of blocking. You would not always want a pipeline to behave this way-it makes sense for this example because a single thread alternately "feeds" and "reads" the pipeline, and the application would hang forever if the user inadvertently reads one more item than had been fed.
+The `pipe_start` function sends data to the first stage of the pipeline. The function increments a count of "active" items in the pipeline, which allows `pipe_result` to detect that there are no more active items to collect, and to return immediately instead of blocking. You would not always want a pipeline to behave this way-it makes sense for this example because a single thread alternately "feeds" and "reads" the pipeline, and the application would hang forever if the user inadvertently reads one more item than had been fed.
 
-The **pipe\_result** function first checks whether there is an active item in the pipeline. If not, it returns with a status of 0, after unlocking the pipeline mutex.
+The `pipe_result` function first checks whether there is an active item in the pipeline. If not, it returns with a status of 0, after unlocking the pipeline mutex.
 
-If there is another item in the pipeline, **pipe\_result** locks the tail (final) stage, and waits for it to receive data. It copies the data and then resets the stage so it can receive the next item of data. Remember that the final stage does not have a thread, and cannot reset itself.
+If there is another item in the pipeline, `pipe_result` locks the tail (final) stage, and waits for it to receive data. It copies the data and then resets the stage so it can receive the next item of data. Remember that the final stage does not have a thread, and cannot reset itself.
 
 ```c
 /* pipe.c part 5 pipe_start,pipe_result */
@@ -386,19 +386,19 @@ The threads in a work crew don't have to use a SIMD model, though. They may perf
 
 Section 7.2, by the way, shows the development of a more robust and general (and more complicated) "work queue manager" package. A "work crew" and a "work queue" are related in much the same way as "invariants" and "critical sections"-it depends on how you look at what's happening. A work crew is the set of threads that independently processes data, whereas a work queue is a mechanism by which your code may request that data be processed by anonymous and independent "agents." So in this section, we develop a "work crew," whereas in Section 7.2 we develop a more sophisticated "work queue." The focus differs, but the principle is the same.
 
-The following program, called **crew.c**, shows a simple work crew. Run the program with two arguments, a string, and a file path. The program will queue the file path to the work crew. A crew member will determine whether the file path is a file or a directory-if a file, it will search the file for the string; if a directory, it will use **readdir\_r** to find all directories and regular files within the directory, and queue each entry as new work. Each file containing the search string will be reported on **stdout**.
+The following program, called `crew.c`, shows a simple work crew. Run the program with two arguments, a string, and a file path. The program will queue the file path to the work crew. A crew member will determine whether the file path is a file or a directory-if a file, it will search the file for the string; if a directory, it will use `readdir_r` to find all directories and regular files within the directory, and queue each entry as new work. Each file containing the search string will be reported on `stdout`.
 
 Part 1 shows the header files and definitions used by the program.
 
-The symbol **CREW\_SIZE** determines how many threads are created for each work crew.
+The symbol `CREW_SIZE` determines how many threads are created for each work crew.
 
-Each item of work is described by a **work\_t** structure. This structure has a pointer to the next work item (set to null to indicate the end of the list), a pointer to the file path described by the work item, and a pointer to the string for which the program is searching. As currently constructed, all work items point to the same search string.
+Each item of work is described by a `work_t` structure. This structure has a pointer to the next work item (set to null to indicate the end of the list), a pointer to the file path described by the work item, and a pointer to the string for which the program is searching. As currently constructed, all work items point to the same search string.
 
-Each member of a work crew has a **worker\_t** structure. This structure contains the index of the crew member in the crew vector, the thread identifier of the crew member (thread), and a pointer to the **crew\_t** structure (crew).
+Each member of a work crew has a `worker_t` structure. This structure contains the index of the crew member in the crew vector, the thread identifier of the crew member (thread), and a pointer to the `crew_t` structure (crew).
 
-The **crew\_t** structure describes the work crew state. It records the number of members in the work crew (**crew\_size**) and an array of **worker\_t** structures (crew). It also has a counter of how many work items remain to be processed (**work\_count**) and a list of outstanding work items (first points to the earliest item, and last to the latest). Finally, it contains the various Pthreads synchronization objects: a mutex to control access, a condition variable (done) to wait for the work crew to finish a task, and a condition variable on which crew members wait to receive new work (go).
+The `crew_t` structure describes the work crew state. It records the number of members in the work crew (`crew_size`) and an array of `worker_t` structures (crew). It also has a counter of how many work items remain to be processed (`work_count`) and a list of outstanding work items (first points to the earliest item, and last to the latest). Finally, it contains the various Pthreads synchronization objects: a mutex to control access, a condition variable (done) to wait for the work crew to finish a task, and a condition variable on which crew members wait to receive new work (go).
 
-The allowed size of a file name and path name may vary depending on the file system to which the path leads. When a crew is started, the program calculates the allowable file name and path length for the specified file path by calling pathconf, and stores the values in **path\_max** and **name\_max**, respectively, for later use.
+The allowed size of a file name and path name may vary depending on the file system to which the path leads. When a crew is started, the program calculates the allowable file name and path length for the specified file path by calling pathconf, and stores the values in `path_max` and `name_max`, respectively, for later use.
 
 ```c
 /* crew.c */
@@ -444,23 +444,23 @@ typedef struct crew_tag {
 size_t path_max;                        /* Filepath length */
 size_t name_max;                        /* Name length */
 ```
-Part 2 shows **worker\_routine**, the start function for crew threads. The outer loop repeats processing until the thread is told to terminate.
+Part 2 shows `worker_routine`, the start function for crew threads. The outer loop repeats processing until the thread is told to terminate.
 
-POSIX is a little ambiguous about the actual size of the struct dirent type. The actual requirement for **readdir\_r** is that you pass the address of a buffer large enough to contain a struct dirent with a name member of at least **NAME\_MAX** bytes. To ensure that we have enough space, allocate a buffer the size of the system's struct dirent plus the maximum size necessary for a file name on the file system we're using. This may be bigger than necessary, but it surely won't be too small.
+POSIX is a little ambiguous about the actual size of the struct dirent type. The actual requirement for `readdir_r` is that you pass the address of a buffer large enough to contain a struct dirent with a name member of at least `NAME_MAX` bytes. To ensure that we have enough space, allocate a buffer the size of the system's struct dirent plus the maximum size necessary for a file name on the file system we're using. This may be bigger than necessary, but it surely won't be too small.
 
 This condition variable loop blocks each new crew member until work is made available.
 
 This wait is a little different. While the work list is empty, wait for more work. The crew members never terminate-once they're all done with the current assignment, they're ready for a new assignment. (This example doesn't take advantage of that capability-the process will terminate once the single search command has completed.)
 
-Remove the first work item from the queue. If the queue becomes empty, also clear the pointer to the last entry, **crew-\>last**.
+Remove the first work item from the queue. If the queue becomes empty, also clear the pointer to the last entry, `crew-\>last`.
 
 Unlock the work crew mutex, so that the bulk of the crew's work can proceed concurrently.
 
-Determine what sort of file we've got in the work item's path string. We use lstat, which will return information for a symbolic link, rather than stat, which would return information for the file to which the link pointed. By not following symbolic links, we reduce the amount of work in this example, and, especially, avoid following links into other file systems where our namejmax and **path\_max** sizes may not be sufficient.
+Determine what sort of file we've got in the work item's path string. We use lstat, which will return information for a symbolic link, rather than stat, which would return information for the file to which the link pointed. By not following symbolic links, we reduce the amount of work in this example, and, especially, avoid following links into other file systems where our namejmax and `path_max` sizes may not be sufficient.
 
-If the file is a link, report the name, but do nothing else with it. Note that each message includes the thread's work crew index (**mine-\>index**), so that you can easily see "concurrency at work" within the example.
+If the file is a link, report the name, but do nothing else with it. Note that each message includes the thread's work crew index (`mine-\>index`), so that you can easily see "concurrency at work" within the example.
 
-If the file is a directory, open it with **opendir**. Find all entries in the directory by repeatedly calling **readdir\_r**. Each directory entry is entered as a new work item.
+If the file is a directory, open it with `opendir`. Find all entries in the directory by repeatedly calling `readdir_r`. Each directory entry is entered as a new work item.
 
 If the file is a regular file, open it and read all text, looking for the search string. If we find it, write a message and exit the search loop.
 
@@ -729,13 +729,13 @@ void *worker_routine (void *arg)
     return NULL;
 }
 ```
-Part 3 shows **crew\_create**, the function used to create a new work crew. This simple example does not provide a way to destroy a work crew, because that is not necessary-the work crew would be destroyed only when the main program was prepared to exit, and process exit will destroy all threads and process data.
+Part 3 shows `crew_create`, the function used to create a new work crew. This simple example does not provide a way to destroy a work crew, because that is not necessary-the work crew would be destroyed only when the main program was prepared to exit, and process exit will destroy all threads and process data.
 
-The **crew\_create** function begins by checking the **crew\_size** argument. The size of the crew is not allowed to exceed the size of the crew array in crewt. If the requested size is acceptable, copy it into the structure.
+The `crew_create` function begins by checking the `crew_size` argument. The size of the crew is not allowed to exceed the size of the crew array in crewt. If the requested size is acceptable, copy it into the structure.
 
 Start with no work and an empty work queue. Initialize the crew's synchronization objects.
 
-Then, for each crew member, initialize the member's **worker\_t** data. The index of the member within the crew array is recorded, and a pointer back to the **crew\_t**. Then the crew member thread is created, with a pointer to the member's workert as its argument.
+Then, for each crew member, initialize the member's `worker_t` data. The index of the member within the crew array is recorded, and a pointer back to the `crew_t`. Then the crew member thread is created, with a pointer to the member's workert as its argument.
 
 ```c
 /* crew.c part 3 crew_create */
@@ -785,15 +785,15 @@ int crew_create (crew_t *crew, int crew_size)
     return 0;
 }
 ```
-Part 4 shows the **crew\_start** function, which is called to assign a new path name and search string to the work crew. The function is synchronous-that is, after assigning the task it waits for the crew members to complete the task before returning to the caller. The **crew\_start** function assumes that the **crew\_t** structure has been previously created by calling **crew\_create**, shown in part 3, but does not attempt to validate the structure.
+Part 4 shows the `crew_start` function, which is called to assign a new path name and search string to the work crew. The function is synchronous-that is, after assigning the task it waits for the crew members to complete the task before returning to the caller. The `crew_start` function assumes that the `crew_t` structure has been previously created by calling `crew_create`, shown in part 3, but does not attempt to validate the structure.
 
-Wait for the crew members to finish any previously assigned work. Although **crew\_start** is synchronous, the crew may be processing a task assigned by another thread. On creation, the crew's **work\_count** is set to 0, so the first call to crew start will not need to wait.
+Wait for the crew members to finish any previously assigned work. Although `crew_start` is synchronous, the crew may be processing a task assigned by another thread. On creation, the crew's `work_count` is set to 0, so the first call to crew start will not need to wait.
 
-Get the proper values of **path\_max** and **name\_max** for the file system specified by the file path we'll be reading. The pathconf function may return a value of-1 without setting errno, if the requested value for the file system is "unlimited." To detect this, we need to clear errno before making the call. If pathconf returns -1 without setting errno, assume reasonable values.
+Get the proper values of `path_max` and `name_max` for the file system specified by the file path we'll be reading. The pathconf function may return a value of-1 without setting errno, if the requested value for the file system is "unlimited." To detect this, we need to clear errno before making the call. If pathconf returns -1 without setting errno, assume reasonable values.
 
 The values returned by pathconf don't include the terminating null character of a string-so add one character to both.
 
-Allocate a work queue entry (**work\_t**) and fill it in. Add it to the end of the request queue.
+Allocate a work queue entry (`work_t`) and fill it in. Add it to the end of the request queue.
 
 We've queued a single work request, so awaken one of the waiting work crew members by signaling the condition variable. If the attempt fails, free the work request, clear the work queue, and return with the error.
 
@@ -887,11 +887,11 @@ int crew_start (
     return 0;
 }
 ```
-Part 5 shows the initial thread (**main**) for the little work crew sample.
+Part 5 shows the initial thread (`main`) for the little work crew sample.
 
 The program requires three arguments-the program name, a string for which to search, and a path name. For example, "crew butenhof ~"
 
-On a Solaris system, call **thr\_setconcurrency** to ensure that at least one LWP (kernel execution context) is created for each crew member. The program will work without this call, but, on a uniprocessor, you would not see any concurrency. See Section 5.6.3 for more information on "many to few" scheduling models, and Section 10.1.3 for information on "set concurrency" functions.
+On a Solaris system, call `thr_setconcurrency` to ensure that at least one LWP (kernel execution context) is created for each crew member. The program will work without this call, but, on a uniprocessor, you would not see any concurrency. See Section 5.6.3 for more information on "many to few" scheduling models, and Section 10.1.3 for information on "set concurrency" functions.
 
 Create a work crew, and assign to it the concurrent file search.
 
@@ -959,13 +959,13 @@ In the following program, server, c, each of four threads will repeatedly read, 
 
 These symbols define the commands that can be sent to the "prompt server." It can be asked to read input, write output, or quit.
 
-The **request\_t** structure defines each request to the server. The outstanding requests are linked in a list using the next member. The operation member contains one of the request codes (read, write, or quit). The synchronous member is nonzero if the client wishes to wait for the operation to be completed (synchronous), or 0 if it does not wish to wait (asynchronous).
+The `request_t` structure defines each request to the server. The outstanding requests are linked in a list using the next member. The operation member contains one of the request codes (read, write, or quit). The synchronous member is nonzero if the client wishes to wait for the operation to be completed (synchronous), or 0 if it does not wish to wait (asynchronous).
 
-The **tty\_server\_t** structure provides the context for the server thread. It has the synchronization objects (mutex and request), a flag denoting whether the server is running, and a list of requests that have been made and not yet processed (first and last).
+The `tty_server_t` structure provides the context for the server thread. It has the synchronization objects (mutex and request), a flag denoting whether the server is running, and a list of requests that have been made and not yet processed (first and last).
 
-This program has a single server, and the control structure (**tty\_server**) is statically allocated and initialized here. The list of requests is empty, and the server is not running. The mutex and condition variable are statically initialized.
+This program has a single server, and the control structure (`tty_server`) is statically allocated and initialized here. The list of requests is empty, and the server is not running. The mutex and condition variable are statically initialized.
 
-The main program; and client threads coordinate their shutdown using these synchronization objects (**client\_mutex** and **clients\_done**) rather than using pthread join.
+The main program; and client threads coordinate their shutdown using these synchronization objects (`client_mutex` and `clients_done`) rather than using pthread join.
 
 ```c
 /* server.c part 1 definitions */
@@ -1015,17 +1015,17 @@ int client_threads;
 pthread_mutex_t client_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t clients_done = PTHREAD_COND_INITIALIZER;
 ```
-Part 2 shows the server thread function, **tty\_server\_routine**. It loops, processing requests continuously until asked to quit.
+Part 2 shows the server thread function, `tty_server_routine`. It loops, processing requests continuously until asked to quit.
 
 The server waits for a request to appear using the request condition variable.
 
-Remove the first request from the queue-if the queue is now empty, also clear the pointer to the last entry (**tty_server. last**).
+Remove the first request from the queue-if the queue is now empty, also clear the pointer to the last entry (`tty_server. last`).
 
-The switch statement performs the requested work, depending on the operation given in the request packet, reqquit tells the server to shut down. **REQ\_READ** tells the server to read, with an optional prompt string. **REQ\_WRITE** tells the server to write a string.
+The switch statement performs the requested work, depending on the operation given in the request packet, reqquit tells the server to shut down. `REQ_READ` tells the server to read, with an optional prompt string. `REQ_WRITE` tells the server to write a string.
 
-If a request is marked "synchronous" (synchronous flag is nonzero), the server sets **done\_flag** and signals the done condition variable. When the request is synchronous, the client is responsible for freeing the request packet. If the request was asynchronous, the server frees request on completion.
+If a request is marked "synchronous" (synchronous flag is nonzero), the server sets `done_flag` and signals the done condition variable. When the request is synchronous, the client is responsible for freeing the request packet. If the request was asynchronous, the server frees request on completion.
 
-If the request was **REQ\_QUIT**, terminate the server thread by breaking out of the while loop, to the return statement.
+If the request was `REQ_QUIT`, terminate the server thread by breaking out of the while loop, to the return statement.
 
 ```c
 /* server.c part 2 tty_server_routine */
@@ -1115,15 +1115,15 @@ void *tty_server_routine (void *arg)
     return NULL;
 }
 ```
-Part 3 shows the function that is called to initiate a request to the tty server thread. The caller specifies the desired operation (**REQ\_QUIT**, **REQ\_READ**, or **REQ\_WRITE**), whether the operation is synchronous or not (**sync**), an optional prompt string (**prompt**) for **REQ\_READ** operations, and the pointer to a string (input for **REQ\_WRITE**, or a buffer to return the result of an **REQ\_READ** operation).
+Part 3 shows the function that is called to initiate a request to the tty server thread. The caller specifies the desired operation (`REQ_QUIT`, `REQ_READ`, or `REQ_WRITE`), whether the operation is synchronous or not (`sync`), an optional prompt string (`prompt`) for `REQ_READ` operations, and the pointer to a string (input for `REQ_WRITE`, or a buffer to return the result of an `REQ_READ` operation).
 
-If a tty server thread is not already running, start one. A temporary thread attributes object (**detached\_attr**) is created, and the *detachstate* attribute is set to **pthread\_create\_detached**. Thread attributes will be explained later in Section 5.2.3. In this case, we are just saying that we will not need to use the thread identifier after creation.
+If a tty server thread is not already running, start one. A temporary thread attributes object (`detached_attr`) is created, and the *detachstate* attribute is set to `pthread_create_detached`. Thread attributes will be explained later in Section 5.2.3. In this case, we are just saying that we will not need to use the thread identifier after creation.
 
-Allocate and initialize a server request (**reguest\_t**) packet. If the request is synchronous, initialize the condition variable (done) in the request packet-otherwise the condition variable isn't used. The new request is linked onto the request queue.
+Allocate and initialize a server request (`reguest_t`) packet. If the request is synchronous, initialize the condition variable (done) in the request packet-otherwise the condition variable isn't used. The new request is linked onto the request queue.
 
 Wake the server thread to handle the queued request.
 
-If the request is synchronous, wait for the server to set **done\_flag** and signal the done condition variable. If the operation is **REQ\_READ**, copy the result string into the output buffer. Finally, destroy the condition variable, and free the request packet.
+If the request is synchronous, wait for the server to set `done_flag` and signal the done condition variable. If the operation is `REQ_READ`, copy the result string into the output buffer. Finally, destroy the condition variable, and free the request packet.
 
 ```c
 /*server.c part 3 tty_server_request*/
@@ -1282,13 +1282,13 @@ void *client_routine (void *arg)
     return NULL;
 }
 ```
-Part 5 shows the main program for **server.c**. It creates a set of client threads to utilize the tty server, and waits for them.
+Part 5 shows the main program for `server.c`. It creates a set of client threads to utilize the tty server, and waits for them.
 
-On a Solaris system, set the concurrency level to the number of client threads by calling **thr\_setconcurrency**. Because all the client threads will spend some of their time blocked on condition variables, we don't really need to increase the concurrency level for this program-however, it will provide less predictable execution behavior.
+On a Solaris system, set the concurrency level to the number of client threads by calling `thr_setconcurrency`. Because all the client threads will spend some of their time blocked on condition variables, we don't really need to increase the concurrency level for this program-however, it will provide less predictable execution behavior.
 
 Create the client threads.
 
-This construct is much like **pthread\_join**, except that it completes only when all of the client threads have terminated. As I have said elsewhere, **pthread\_join** is nothing magical, and there is no reason to use it to detect thread termination unless it does exactly what you want. Joining multiple threads in a loop with **pthread\_join** is rarely exactly what you want, and a "multiple join" like that shown here is easy to construct.
+This construct is much like `pthread_join`, except that it completes only when all of the client threads have terminated. As I have said elsewhere, `pthread_join` is nothing magical, and there is no reason to use it to detect thread termination unless it does exactly what you want. Joining multiple threads in a loop with `pthread_join` is rarely exactly what you want, and a "multiple join" like that shown here is easy to construct.
 
 ```c
 /* server.c part 5 main */

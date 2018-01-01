@@ -1,4 +1,4 @@
-
+.
 
 
 # 1 Introduction
@@ -22,7 +22,7 @@ Section 1.1 presents the framework for a number of analogies that I will use to 
 
 Section 1.2 defines some essential concepts and terms used in this book. The most important of these concepts deserves a special introduction, which will also serve to demonstrate the convention with which various particularly important points shall be emphasized throughout this book:
 
-> **I Asynchronous**:  
+> **Asynchronous**:  
 > Any two operations are "asynchronous" when they can proceed independently of each other
 
 Section 1.3 describes how you already use asynchronous programming on a regular basis, both as a UNIX programmer and user, and as a human being in the real world. I wouldn't dare to claim that asynchronous programming is easy, but the basic concepts it tries to model are so easy and natural that you rarely need even to think about them until you try to apply them to software. 
@@ -35,7 +35,7 @@ Although there are a lot of excellent reasons to use threads, there is a price t
 
 You have seen some of the fundamental benefits and costs. It may be obvious that you do not want to rush out and put threads into every application or library you write. Section 1.8 asks the question 'To thread, or not to thread?" and I will attempt to guide you toward determining the proper answer in various cases.
 
-You will know at that point what threads are, what they do, and when to use them. Aside from brief examples, you haven't yet seen any detailed information about the particular programming interfaces (APIs) that compose Pthreads. Section 1.9 points out some of the basic landmarks of the Pthreads universe to get you oriented before we plunge ahead. The most important part of this section is 1.9.3, which describes the Pthreads model for reporting errors-which is somewhat different than the rest of UNIX and POSIX.
+You will know at that point what threads are, what they do, and when to use them. Aside from brief examples, you haven't yet seen any detailed information about the particular programming interfaces (APIs) that compose Pthreads. Section 1.9 points out some of the basic landmarks of the Pthreads universe to get you oriented before we plunge ahead. The most important part of this section is [1.9.3](#1.9.3), which describes the Pthreads model for reporting errors-which is somewhat different than the rest of UNIX and POSIX.
 
 ## 1.1 The "bailing programmers"
 
@@ -57,9 +57,11 @@ When the rower tires, he can signal one of the other programmers to take over th
 
 So, just what do the Bailing Programmers have to do with threads? I'm glad you asked! The elements of the story represent analogies that apply to the Pthreads programming model. We'll explore some additional analogies in later sections, and even expand the story a little, but for now consider a few basics:
 
-- A **programmer** is an entity that is capable of independent activity. Our programmers represent threads. A thread is not really much like a programmer, who, as we all know, is a fascinatingly sophisticated mixture of engineer, mathematician, and artist that no computer can match. Still, as a representation of the "active element" in our programming model, it will be sufficient.
-- The **bailing bucket** and the **oars** are "tokens" that can be held by only one individual at a time. They can be thought of as shared data, or as synchronization objects. The primary Pthreads synchronization object, by the way, is called a mutex.
-- **Nudges** and **shouts** are communication mechanisms associated with a synchronization object, on which individuals wait for some condition. Pthreads provides condition variables, which may be signaled or broadcast to indicate changes in shared data state.
+- A **programmer** is an entity that is capable of independent activity. Our programmers represent *threads*. A thread is not really much like a programmer, who, as we all know, is a fascinatingly sophisticated mixture of engineer, mathematician, and artist that no computer can match. Still, as a representation of the "active element" in our programming model, it will be sufficient.
+
+- The **bailing bucket** and the **oars** are "tokens" that can be held by only one individual at a time. They can be thought of as shared data, or as synchronization objects. The primary Pthreads synchronization object, by the way, is called a *mutex*.
+
+- **Nudges** and **shouts** are communication mechanisms associated with a synchronization object, on which individuals wait for some condition. Pthreads provides *condition variables*, which may be signaled or broadcast to indicate changes in shared data state.
 
 
 ## 1.2 Definitions and terminology
@@ -72,17 +74,13 @@ This book will use several critical terms that may be unfamiliar to you unless y
 
 ### 1.2.1 Asynchronous
 
-Asynchronous means that things happen independently (concurrently) unless there's some enforced dependency. Life is asynchronous. The dependencies are supplied by nature, and events that are not dependent on one another can occur simultaneously. A programmer cannot row without the oars, or bail effectively without the bucket-but a programmer with oars can row while another programmer with a bucket bails. Traditional computer programming, on the other hand, causes all events to occur in series unless the programmer takes "extraordinary measures" to allow them to happen concurrently.
+*Asynchronous* means that things happen independently (concurrently) unless there's some enforced dependency. Life is asynchronous. The dependencies are supplied by nature, and events that are not dependent on one another can occur simultaneously. A programmer cannot row without the oars, or bail effectively without the bucket-but a programmer with oars can row while another programmer with a bucket bails. Traditional computer programming, on the other hand, causes all events to occur in series unless the programmer takes "extraordinary measures" to allow them to happen concurrently.
 
 The greatest complication of "asynchrony" has been that there's little advantage to being asynchronous unless you can have more than one activity going at a time. If you can start an asynchronous operation, but then you can do nothing but wait for it, you're not getting much benefit from the asynchrony.
 
 ### 1.2.2 Concurrency
 
-Concurrency, which an English dictionary will tell you refers to things happening at the same time, is used to refer to things that appear to happen at the same time, but which may occur serially. Concurrency describes the behavior of threads or processes on a uniprocessor system. The definition of concurrent execution in POSIX requires that "functions that suspend the execution of the calling thread shall not cause the execution of other threads to be indefinitely suspended."
-
-Concurrent operations may be arbitrarily interleaved so that they make progress independently (one need not be completed before another begins), but concurrency does not imply that the operations proceed simultaneously. Nevertheless, concurrency allows applications to take advantage of asynchronous capabilities, and "do work" while independent operations are proceeding.
-
-Most programs have asynchronous aspects that may not be immediately obvious. Users, for example, prefer asynchronous interfaces. They *expect* to be able to issue a command while they're thinking about it, even before the program has finished with the last one. And when a windowing interface provides separate windows, don't you intuitively expect those windows to act asynchronously? Nobody likes a "busy" cursor. Pthreads provides you with both concurrency and asynchrony, and the combination is exactly what you need to easily write responsive and efficient programs. Your program can "wait in parallel" for slow I/O devices, and automatically take advantage of multiprocessor systems to compute in parallel.
+*Concurrency*, which an English dictionary will tell you refers to things happening at the same time, is used to refer to things that appear to happen at the same time, but which may occur serially. Concurrency describes the behavior of threads or processes on expect to be able to issue a command while they're thinking about it, even before the program has finished with the last one. And when a windowing interface provides separate windows, don't you intuitively *expect* those windows to act asynchronously? Nobody likes a "busy" cursor. Pthreads provides you with both concurrency and asynchrony, and the combination is exactly what you need to easily write responsive and efficient programs. Your program can "wait in parallel" for slow I/O devices, and automatically take advantage of multiprocessor systems to compute in parallel.
 
 ### 1.2.3 Uniprocessor and multiprocessor
 
@@ -102,39 +100,42 @@ True parallelism can occur only on a multiprocessor system, but concurrency can 
 
 More usefully, thread-safe functions can be broken down into smaller critical sections. That allows more than one thread to execute within the function, although not within the same part. Even better, the code can be redesigned to protect critical data rather than critical code, which may allow fully parallel execution of the code, when the threads don't need to use the same data at the same time.
 
-The putchar function, for example, which writes a character into a standard I/O (stdio) buffer, might be made thread-safe by turning putchar into a critical section. That is, putchar might lock a "putchar mutex," write the character, and then unlock the putchar mutex. You could call putchar from two threads, and no data would be corrupted-it would be thread-safe. However, only one thread could write its character at a time, and the others would wait, even if they were writing to different stdio streams.
+The `putchar` function, for example, which writes a character into a standard I/O (*stdio*) buffer, might be made thread-safe by turning `putchar` into a critical section. That is, `putchar` might lock a "putchar mutex" write the character, and then unlock the `putchar` mutex. You could call `putchar` from two threads, and no data would be corrupted-it would be thread-safe. However, only one thread could write its character at a time, and the others would wait, even if they were writing to different *stdio* streams.
 
-The correct solution is to associate the mutex with the stream, protecting the data rather than the code. Now your threads, as long as they are writing to different streams, can execute putchar in parallel. More importantly, all functions that access a stream can use the same mutex to safely coordinate their access to that stream.
+The correct solution is to associate the mutex with the stream, protecting the data rather than the code. Now your threads, as long as they are writing to different streams, can execute `putchar` in parallel. More importantly, all functions that access a stream can use the same mutex to safely coordinate their access to that stream.
 
-The term "reentrant" is sometimes used to mean "efficiently thread-safe." That is, the code was made thread-safe by some more sophisticated measures than converting the function or library into a single serial region. Although existing code can usually be made thread-safe by adding mutexes and thread-specific data, it is often necessary to change the interface to make a function reentrant. Reentrant code should avoid relying on static data and, ideally, should avoid reliance on any form of synchronization between threads.
+The term "**reentrant**" is sometimes used to mean "efficiently thread-safe". That is, the code was made thread-safe by some more sophisticated measures than converting the function or library into a single serial region. Although existing code can usually be made thread-safe by adding mutexes and thread-specific data, it is often necessary to change the interface to make a function reentrant. Reentrant code should avoid relying on static data and, ideally, should avoid reliance on any form of synchronization between threads.
 
-Often, a function can avoid internal synchronization by saving state in a "context structure" that is controlled by the caller. The caller is then responsible for any necessary synchronization of the data. The UNIX readdir function, for example, returns each directory entry in sequence. To make readdir thread-safe, you might add a mutex that readdir locked each time it was called, and unlocked before it returned to the caller. Another approach, as Pthreads has taken with **readdir\_r**, is to avoid any locking within the function, letting the caller allocate a structure that maintains the context of **readdir\_r** as it searches a directory.
+Often, a function can avoid internal synchronization by saving state in a "context structure" that is controlled by the caller. The caller is then responsible for any necessary synchronization of the data. The UNIX `readdir` function, for example, returns each directory entry in sequence. To make `readdir` thread-safe, you might add a mutex that `readdir` locked each time it was called, and unlocked before it returned to the caller. Another approach, as Pthreads has taken with `readdir_r`, is to avoid any locking within the function, letting the caller allocate a structure that maintains the context of `readdir_r` as it searches a directory.
 
-At first glance, it may seem that we're just making the caller perform what ought to be the job of **readdir\_r**. But remember that only the caller knows how the data will be used. If only one thread uses this particular directory context, for example, then no synchronization is needed. Even when the data is shared between threads, the caller may be able to supply more efficient synchronization, for example, if the context can be protected using a mutex that the application also uses for other data.
+At first glance, it may seem that we're just making the caller perform what ought to be the job of `readdir_r`. But remember that only the caller knows how the data will be used. If only one thread uses this particular directory context, for example, then no synchronization is needed. Even when the data is shared between threads, the caller may be able to supply more efficient synchronization, for example, if the context can be protected using a mutex that the application also uses for other data.
 
 ### 1.2.6 Concurrency control functions
 
 Any "concurrent system" must provide a core set of essential functions that you need to create concurrent execution contexts, and control how they operate within your library or application. Here are three essential facilities, or aspects, of any concurrent system:
 
-1. *Execution* context is the state of a concurrent entity. A concurrent system must provide a way to create and delete execution contexts, and maintain their state independently. It must be able to save the state of one context and dispatch to another at various times, for example, when one needs to wait for an external event. It must be able to continue a context from the point where it last executed, with the same register contents, at a later time.
+1. *Execution context* is the state of a concurrent entity. A concurrent system must provide a way to create and delete execution contexts, and maintain their state independently. It must be able to save the state of one context and dispatch to another at various times, for example, when one needs to wait for an external event. It must be able to continue a context from the point where it last executed, with the same register contents, at a later time.
+
 2. *Scheduling* determines which context (or set of contexts) should execute at any given point in time, and switches between contexts when necessary.
-3. *Synchronization* provides mechanisms for concurrent execution contexts to coordinate their use of shared resources. We use this term in a way that is nearly the opposite of the standard dictionary meaning. You'll find a definition much like "cause to occur at the same time," whereas we usually mean something that might better be expressed as "prevent from occurring at the same time." In a thesaurus, you may find that "cooperate" is a synonym for "synchronize"-and synchronization is the mechanism by which threads cooperate to accomplish a task. This book will use the term "synchronization," though, because that is what you'll see used, almost universally.
+
+3. *Synchronization* provides mechanisms for concurrent execution contexts to coordinate their use of shared resources. We use this term in a way that is nearly the opposite of the standard dictionary meaning. You'll find a definition much like "cause to occur at the same time", whereas we usually mean something that might better be expressed as "prevent from occurring at the same time." In a thesaurus, you may find that "cooperate" is a synonym for "synchronize"-and synchronization is the mechanism by which threads *cooperate* to accomplish a task. This book will use the term "synchronization", though, because that is what you'll see used, almost universally.
 
 There are many ways to provide each of these facilities-but they are always present in some form. The particular choices presented in this book are dictated by the book's subject-Pthreads. Table 1.1 shows a few examples of the three facilities in various systems.
 
 
-| Category              | Execution context | Scheduling               | Synchronization                 |
-| --------------------- | ----------------- | ------------------------ | ------------------------------- |
-| Real traffic          | automobile        | traffic lights and signs | turn signals and brake lights   |
-| UNIX (before threads) | process           | priority (nice)          | wait and pipes                  |
-| Pthreads              | thread            | policy, priority         | condition variables and mutexes |
+| Category                  | Execution context | Scheduling               | Synchronization                 |
+| ---------------------     | ----------------- | ------------------------ | ------------------------------- |
+| **Real traffic**          | automobile        | traffic lights and signs | turn signals and brake lights   |
+| **UNIX (before threads)** | process           | priority (`nice`)        | `wait` and pipes                |
+| **Pthreads**              | thread            | policy, priority         | condition variables and mutexes |
+
 <center>**TABLE 1.1** *Execution contexts, schedulers, and synchronization*</center>
 
 A system's scheduling facility may allow each thread to run until it voluntarily yields the processor to another thread ("run until block"). It may provide timeslicing, where each thread is forced to periodically yield so that other threads may run ("round-robin"). It may provide various scheduling policies that allow the application to control how each thread is scheduled according to that thread's function. It may provide a "class scheduler" where dependencies between threads are described so that, for example, the scheduler can ensure that members of a tightly coupled parallel algorithm are scheduled at the same time.
 
-Synchronization may be provided using a wide variety of mechanisms. Some of the most common forms are mutexes, condition variables, semaphores, and events. You may also use message passing mechanisms, such as UNIX pipes, sockets, POSIX message queues, or other protocols for communicating between asynchronous processes-on the same system or across a network. Any form of communication protocol contains some form of synchronization, because passing data around with no synchronization results in chaos, not communication.
+Synchronization may be provided using a wide variety of mechanisms. Some of the most common forms are mutexes, condition variables, semaphores, and events. You may also use message passing mechanisms, such as UNIX pipes, sockets, POSIX message queues, or other protocols for communicating between asynchronous processes-on the same system or across a network. Any form of communication protocol contains some form of synchronization, because passing data around with no synchronization results in chaos, not *communication*.
 
-The terms thread, mutex, and condition variable are the main topics of this book. For now, it is enough to know that a thread represents an "executable thing" on your computer. A mutex provides a mechanism to prevent threads from colliding unexpectedly, and a condition variable allows a thread, once it has avoided such a collision, to wait until it is safe to proceed. Both mutexes and condition variables are used to synchronize the operation of threads.
+The terms *thread*, *mutex*, and *condition variable* are the main topics of this book. For now, it is enough to know that a *thread* represents an "executable thing" on your computer. A *mutex* provides a mechanism to prevent threads from colliding unexpectedly, and a *condition variable* allows a thread, once it has avoided such a collision, to wait until it is safe to proceed. Both mutexes and condition variables are used to synchronize the operation of threads.
 
 
 
@@ -148,7 +149,7 @@ Lewis Carroll, Through the Looking-Glass:
 > pleased to know it.  
 > "I never thought of that before!" she said.
 
-If you haven't been involved in traditional realtime programming, asynchronous programming may seem new and different. But you've probably been using asynchronous programming techniques all along. You've probably used UNIX, for example, and, even as a user, the common UNIX shells from sh to ksh have been designed for asynchronous programming. You've also been using asynchronous "programming" techniques in real life since you were born.
+If you haven't been involved in traditional realtime programming, asynchronous programming may seem new and different. But you've probably been using asynchronous programming techniques all along. You've probably used UNIX, for example, and, even as a user, the common UNIX shells from `sh` to `ksh` have been designed for asynchronous programming. You've also been using asynchronous "programming" techniques in real life since you were born.
 
 Most people understand asynchronous behavior much more thoroughly than they expect, once they get past the complications of formal and restricted definitions.
 
@@ -158,13 +159,13 @@ In any UNIX system, processes execute asynchronously with respect to each other,
 
 > Time is a synchronization mechanism.
 
-In many cases you provide synchronization between a series of processes yourself, maybe without even thinking about it. For example, you run the compiler after you've finished editing the source files. It wouldn't occur to you to compile them first, or even at the same time. That's elementary reallife synchronization.
+In many cases you provide synchronization between a series of processes yourself, maybe without even thinking about it. For example, you run the compiler after you've finished editing the source files. It wouldn't occur to you to compile them first, or even at the same time. That's elementary real-life synchronization.
 
 > UNIX pipes and files can be synchronization mechanisms.
 
-In other cases you may use more complicated software synchronization mechanisms. When you type "**ls | more**" to a shell to pass the output of the **ls** command into the more command, you're describing synchronization by specifying a data dependency. The shell starts both commands right away, but the more command can't generate any output until it receives input from **ls** through the pipe. Both commands proceed concurrently (or even in parallel on a multiprocessor) with **ls** supplying data and more processing that data, independently of each other. If the pipe buffer is big enough, **ls** could complete before more ever started; but more can't ever get ahead of ls.
+In other cases you may use more complicated software synchronization mechanisms. When you type "`ls | more`" to a shell to pass the output of the `ls` command into the `more` command, you're describing synchronization by specifying a data dependency. The shell starts both commands right away, but the more command can't generate any output until it receives input from `ls` through the pipe. Both commands proceed concurrently (or even in parallel on a multiprocessor) with `ls` supplying data and more processing that data, independently of each other. If the pipe buffer is big enough, `ls` could complete before more ever started; but more can't ever get ahead of ls.
 
-Some UNIX commands perform synchronization internally. For example, the command "**cc -o thread thread.c**" might involve a number of separate processes. The **cc** command might be a "front end" to the C language environment, which runs a filter to expand preprocessor commands (like **#include** and **#if**), a compiler to translate the program into an intermediate form, an optimizer to reorder the translation, an assembler to translate the intermediate form into object language, and a loader to translate that into an executable binary file. As with **ls | more**, all these programs may be running at the same time, with synchronization provided by pipes, or by access to temporary files.
+Some UNIX commands perform synchronization internally. For example, the command "`cc -o thread thread.c`" might involve a number of separate processes. The `cc` command might be a "front end" to the C language environment, which runs a filter to expand preprocessor commands (like `#include` and `#if`), a compiler to translate the program into an intermediate form, an optimizer to reorder the translation, an assembler to translate the intermediate form into object language, and a loader to translate that into an executable binary file. As with `ls | more`, all these programs may be running at the same time, with synchronization provided by pipes, or by access to temporary files.
 
 UNIX processes can operate asynchronously because each process includes all the information needed to execute code. The operating system can save the state of one process and switch to another without affecting the operation of either. Any general-purpose asynchronous "entity" needs enough state to enable the operating system to switch between them arbitrarily. But a UNIX process includes additional state that is not directly related to "execution context," such as an address space and file descriptors.
 
@@ -176,7 +177,7 @@ You can think of a thread as a sort of "stripped down" process, lean and mean an
 
 When a processor switches between two processes, all of the hardware state for that process becomes invalid. Some may need to be changed as part of the context switch procedure-data cache and virtual memory translation entries may be flushed, for example. Even when they do not need to be flushed immediately, however, the data is not useful to the new process. Each process has a separate virtual memory address space, but threads running within the same process share the virtual address space and all other process data.
 
-Threads can make high-bandwidth communication easier between independent parts of your program. You don't have to worry about message passing mechanisms like pipes or about keeping shared memory region address references consistent between several different address spaces. Synchronization is faster, and programming is much more natural. If you create or open a file, all threads can use it. If you allocate a dynamic data structure with malloc, you can pass the address to other threads and they can reference it. Threads make it easy to take advantage of concurrency.
+Threads can make high-bandwidth communication easier between independent parts of your program. You don't have to worry about message passing mechanisms like pipes or about keeping shared memory region address references consistent between several different address spaces. Synchronization is faster, and programming is much more natural. If you create or open a file, all threads can use it. If you allocate a dynamic data structure with `malloc`, you can pass the address to other threads and they can reference it. Threads make it easy to take advantage of concurrency.
 
 ### 1.3.2 ... because the world is asynchronous
 
@@ -196,7 +197,7 @@ Each thread can process similar parts of a problem, just like supermarket cashie
 
 As you read this book you'll be introduced to concepts that may seem unfamiliar: mutexes, condition variables, race conditions, deadlocks, and priority inversions. Threaded programming may feel daunting and unnatural. But I'll explain all those concepts as we move through this book, and once you've been writing multithreaded code for a while you may find yourself noticing real-world analogies to the concepts. Threads and all this other stuff are formalized and restricted representations of things you already understand.
 
-If you find yourself thinking that someone shouldn't interrupt you because you have the conversation mutex locked, you've begun to develop an intuitive understanding of threaded programming(It may also be a good time to take a break and read some healthy escapist fiction for a while.). You can apply that understanding to help you design better threaded code with less effort. If something wouldn't make sense in real life, you probably shouldn't try it in a program either.
+If you find yourself thinking that someone shouldn't interrupt you because you have the conversation mutex locked, you've begun to develop an intuitive understanding of threaded programming(*Author: It may also be a good time to take a break and read some healthy escapist fiction for a while.*). You can apply that understanding to help you design better threaded 
 
 
 
@@ -207,22 +208,21 @@ This book contains a number of examples. All are presented as complete programs,
 
 All of these programs do something, but many do not do anything of any particular importance. The purpose of the examples is to demonstrate thread management and synchronization techniques, which are mere overhead in most real programs. They would be less effective at revealing the details if that "overhead" was buried within large programs that "did something."
 
-Within the book, examples are presented in sections, usually one function at a time. The source code is separated from the surrounding text by a header and trailer block which include the file name and, if the example comprises more than one section, a section number and the name of the function. Each line of the source code has a line number at the left margin. Major functional blocks of each section are described in specially formatted paragraphs preceding the source code. These paragraphs are marked by line numbers outside the left margin of the paragraph, denoting the line numbers in the source listing to which the paragraph refers. Here's an example:
+Within the book, examples are presented in sections, usually one function at a time. The source code is separated from the surrounding text by a header and trailer block which include the file name and, if the example comprises more than one section, a section number and the name of the function.(*Forrest: the first line of commented code block, instead header and trailer, shows this information.*) Each line of the source code has a line number at the left margin. Major functional blocks of each section are described in specially formatted paragraphs preceding the source code. These paragraphs are marked by line numbers outside the left margin of the paragraph, denoting the line numbers in the source listing to which the paragraph refers. Here's an example:
 
-> **Example 1-2**  
-> These lines show the header files included in most of the examples. The \<pthread.h\> header file declares constants and prototypes for the Pthreads functions, and the errors.h header file includes various other headers and some error-checking functions.
+[2-3] These lines show the header files included in most of the examples. The `<pthread.h>` header file declares constants and prototypes for the Pthreads functions, and the `errors.h` header file includes various other headers and some error-checking functions.
 
- ```c
- /* sample.c part 1 sampleinfo */
- # include <pthread.h>
- # include "errors.h"
- ```
+```c
+/* sample.c part 1 sampleinfo */
+# include <pthread.h>
+# include "errors.h"
+```
 
 I have written these examples to use error checking everywhere. That is, I check for errors on each function call. As long as you code carefully, this isn't necessary, and some experts recommend testing only for errors that can result from insufficient resources or other problems beyond your control. I disagree, unless of course you're the sort of programmer who never makes a mistake. Checking for errors is not that tedious, and may save you a lot of trouble during debugging.
 
-You can build and run all of the examples for yourself-the source code is available online at [http://www.aw.com/butenhof/posixcode.html](http://www.aw.com/butenhof/posixcode.html). A Makefile is provided to build all of the examples, though it requires modifications for various platforms. On Digital UNIX, the examples were built with **CFLAGS=-pthread -stdl -wl**. On Solaris, they were built with **CFLAGS=-D\_REENTRANT -D\_POSIX\_C\_SOURCE=199506 -lpthread**. Some of the examples require interfaces that may not be in the Pthreads library on your system, for example, **clock\_gettime**, which is part of the POSIX.lb realtime standard. The additional realtime library is specified by the **RTFLAGS** variable, which is defined as **RTFLAGS=-lrt** on Digital UNIX, and as **RTFLAGS=-lposix4** on Solaris.
+You can build and run all of the examples for yourself-the source code is available online at [http://www.aw.com/butenhof/posixcode.html](http://www.aw.com/butenhof/posixcode.html).(*Forrest: actually, the publisher website has been redirected to pearson and source code can no more be downloaded. But I found a copy in [github](https://github.com/snikulov/prog_posix_threads).*) A Makefile is provided to build all of the examples, though it requires modifications for various platforms. On Digital UNIX, the examples were built with `CFLAGS=-pthread -stdl -wl`. On Solaris, they were built with `CFLAGS=-D_REENTRANT -D_POSIX_C_SOURCE=199506 -lpthread`. Some of the examples require interfaces that may not be in the Pthreads library on your system, for example, `clock_gettime`, which is part of the POSIX.1b realtime standard. The additional realtime library is specified by the `RTFLAGS` variable, which is defined as `RTFLAGS=-lrt` on Digital UNIX, and as `RTFLAGS=-lposix4` on Solaris.
 
-On Solaris 2.5 systems, several of the examples require calls to **thr\_setconcurrency** to ensure proper operation. This function causes Solaris to provide the process with additional concurrency. In a few cases, the example will not operate at all without this call, and in other cases, the example would fail to demonstrate some behavior.
+On Solaris 2.5 systems, several of the examples require calls to `thr_setconcurrency` to ensure proper operation. This function causes Solaris to provide the process with additional concurrency. In a few cases, the example will not operate at all without this call, and in other cases, the example would fail to demonstrate some behavior.
 
 
 ## 1.5 Asynchronous programming, by example
@@ -242,14 +242,13 @@ The program prompts for input lines in a loop until it receives an error or end 
 
 ### 1.5.1 The baseline, synchronous version
 
-Include the header file **errors.h**, which includes standard headers like \<unistd.h\> and \<stdio.h\> and defines error reporting macros that are used throughout the examples in this book. We don't use the error reporting macros in this particular example, but consistency is nice, sometimes.
+Include the header file `errors.h`, which includes standard headers like `<unistd.h>` and `<stdio.h>` and defines error reporting macros that are used throughout the examples in this book. We don't use the error reporting macros in this particular example, but consistency is nice, sometimes.
 
-The "baseline" version, alarm.c, is a synchronous alarm program with a single routine, main. Most of main is a loop, which processes simple commands until f gets returns a NULL (error or end of file). Each line is "parsed" with sscanf to separate the number of seconds to wait (%d, the first sequence of digits) from the message string to print (%64[ A\n], the rest of the line, up to 64 characters excluding newline).
+The "baseline" version, `alarm.c`, is a synchronous alarm program with a single routine, `main`. Most of `main` is a loop, which processes simple commands until `fgets` returns a `NULL` (error or end of file). Each line is "parsed" with `sscanf` to separate the number of seconds to wait (`%d`, the first sequence of digits) from the message string to print (`%64[^\n]`, the rest of the line, up to 64 characters excluding newline).
 
 ```c
 /** alarm.c */
-
-# include "errors.h"
+#include "errors.h"
 
 int main (int argc, char *argv[])
 {
@@ -259,18 +258,17 @@ int main (int argc, char *argv[])
 
     while (1) {
         printf ("Alarm> ");
-        if (fgets (line, sizeof (line), stdin) == NULL) exit @);
+        if (fgets (line, sizeof (line), stdin) == NULL) exit (0);
         if (strlen (line) <= 1) continue;
 
         /*
-        * Parse input line into seconds (%d) and a message
-        * (%64[^\n]), consisting of up to 64 characters
-        * separated from the seconds by whitespace.
-        */
-
-        if (sscanf (line, "%d %64[^\n]",
+         * Parse input line into seconds (%d) and a message
+         * (%64[^\n]), consisting of up to 64 characters
+         * separated from the seconds by whitespace.
+         */
+        if (sscanf (line, "%d %64[^\n]", 
             &seconds, message) < 2) {
-            fprintf (stderr, "Bad commandXn");
+            fprintf (stderr, "Bad command\n");
         } else {
             sleep (seconds);
             printf ("(%d) %s\n", seconds, message);
@@ -278,25 +276,24 @@ int main (int argc, char *argv[])
     }
 }
 ```
-The problem with the program alarm, c is that only one alarm request can be active at a time. If you set an alarm to remind you to do something in 10 minutes F00 seconds), you can't decide to have it remind you of something else in 5 minutes. The program is doing something synchronously that you would probably like to be asynchronous.
+The problem with the program `alarm.c` is that only one alarm request can be active at a time. If you set an alarm to remind you to do something in 10 minutes (600 seconds), you can't decide to have it remind you of something else in 5 minutes. The program is doing something synchronously that you would probably like to be asynchronous.
 
 
 
 ### 1.5.2 A version using multiple processes
 
-There are lots of ways to make this program asynchronous; for example, you could run more than one copy of the program. One way to run multiple copies is to fork a child process for each command, as shown in alarm\_fork.c. The new version is asynchronous-you can enter commands at any time, and they will be carried out independently. It isn't much more complicated than the original, which is nice.
+There are lots of ways to make this program asynchronous; for example, you could run more than one copy of the program. One way to run multiple copies is to fork a child process for each command, as shown in `alarm_fork.c`. The new version is asynchronous-you can enter commands at any time, and they will be carried out independently. It isn't much more complicated than the original, which is nice.
 
-The main difference between alarm.c and alarm\_fork.c is that instead of calling sleep directly, it uses fork to create a new child process, which then calls sleep (and, eventually, printf) asynchronously, while the parent process continues.
+[28-38] The main difference between `alarm.c` and `alarm_fork.c` is that instead of calling `sleep` directly, it uses `fork` to create a new child process, which then calls `sleep` (and, eventually, `printf`) asynchronously, while the parent process continues.
 
-The primary complication in this version is the need to "reap" any child processes that have terminated. If the program fails to do this, the system will save them all until the program terminates. The normal way to reap terminated child processes is to call one of the wait functions. In this case, we call waitpid, which allows the caller to specify the wnohang flag. The function will immediately reap one child process if any have terminated, or will immediately return with a process ID (pid) of 0. The parent process continues to reap terminated child processes until there are no more to reap. When the loop terminates, main loops back to line 13 to read a new command.
+[43-47] The primary complication in this version is the need to "reap" any child processes that have terminated. If the program fails to do this, the system will save them all until the program terminates. The normal way to reap terminated child processes is to call one of the `wait` functions. In this case, we call `waitpid`, which allows the caller to specify the `WNOHANG` flag. The function will immediately reap one child process if any have terminated, or will immediately return with a process ID (`pid`) of 0. The parent process continues to reap terminated child processes until there are no more to reap. When the loop terminates, main loops back to line 14 to read a new command.
 
 ```c
 /** alarm_fork.c */
+#include <sys/types.h>
+#include <wait.h>
+#include "errors.h"
 
- # include <sys/types.h>
- # include <wait.h>
- # include "errors.h"
- 
 int main (int argc, char *argv[])
 {
     int status;
@@ -306,7 +303,7 @@ int main (int argc, char *argv[])
     char message[64];
 
     while (1) {
-        printf ("Alarm> " );
+        printf ("Alarm> ");
         if (fgets (line, sizeof (line), stdin) == NULL) exit (0);
         if (strlen (line) <= 1) continue;
 
@@ -315,8 +312,7 @@ int main (int argc, char *argv[])
          * (%64[^\n]), consisting of up to 64 characters
          * separated from the seconds by whitespace.
          */
-
-        if (sscanf (line, "%d %64[^\n]",
+        if (sscanf (line, "%d %64[^\n]", 
             &seconds, message) < 2) {
             fprintf (stderr, "Bad command\n");
         } else {
@@ -325,14 +321,14 @@ int main (int argc, char *argv[])
                 errno_abort ("Fork");
             if (pid == (pid_t)0) {
                 /*
-                 * In the child, wait and then print a message
+                 * If we're in the child, wait and then print a message
                  */
                 sleep (seconds);
                 printf ("(%d) %s\n", seconds, message);
                 exit (0);
             } else {
                 /*
-                 * In the parent, call waitpid() to collect children
+                 * In the parent, call waitpid() to collect any children
                  * that have already terminated.
                  */
                 do {
@@ -344,19 +340,18 @@ int main (int argc, char *argv[])
         }
     }
 }
-
 ```
 
 ### 1.5.3 A version using multiple threads
 
-Now, let us try another alarm program, alarm\_thread.c. It is much like the fork version in alarm\_fork.c, except that it uses threads instead of child processes to create asynchronous alarms. Four Pthreads calls are used in this program:
+Now, let us try another alarm program, `alarm_thread.c`. It is much like the `fork` version in `alarm_fork.c`, except that it uses threads instead of child processes to create asynchronous alarms. Four Pthreads calls are used in this program:
 
-- **pthread\_create** creates a thread running the routine specified in the third argument (alarm\_thread), returning an identifier for the new thread to the variable referenced by thread.
-- **pthread\_detach** allows Pthreads to reclaim the thread's resources as soon as it terminates.
-- **pthread\_exit** terminates the calling thread.
-- **pthread\_self** returns the calling thread's identifier.
+- `pthread_create` creates a thread running the routine specified in the third argument (`alarm_thread`), returning an identifier for the new thread to the variable referenced by thread.
+- `pthread_detach` allows Pthreads to reclaim the thread's resources as soon as it terminates.
+- `pthread_exit` terminates the calling thread.
+- `pthread_self` returns the calling thread's identifier.
 
-The **alarm\_t** structure defines the information stored for each alarm command, the number of seconds until the alarm is due, and the message string that will be printed by the thread.
+[5-8] The `alarm_t` structure defines the information stored for each alarm command, the number of seconds until the alarm is due, and the message string that will be printed by the thread.
 
 ```c
 /** alarm_thread.c part 1 definitions */
@@ -364,14 +359,14 @@ The **alarm\_t** structure defines the information stored for each alarm command
  # include "errors.h"
 
 typedef struct alarm_tag {
-    int seconds;
-    char message[64];
+    int         seconds;
+    char        message[64];
 } alarm_t;
 ```
 
-The alarm\_thread function is the "alarm thread." That is, each alarm thread is created running this function, and when the function returns the thread terminates. The function's argument (void \*arg) is the fourth argument that was passed to pthread\_create, in this case, a pointer to the control packet (alarm\_t) created for the alarm request that the thread is to satisfy. The thread starts by "mapping" the void * argument as a pointer to a control packet. The thread detaches itself by calling pthread\_detach, which informs Pthreads that the application does not need to know when the thread terminates or its termination status.
+[2-9] The `alarm_thread` function is the "alarm thread". That is, each alarm thread is created running this function, and when the function returns the thread terminates. The function's argument `(void *arg)` is the fourth argument that was passed to `pthread_create`, in this case, a pointer to the control packet (`alarm_t`) created for the alarm request that the thread is to satisfy. The thread starts by "mapping" the `void *` argument as a pointer to a control packet. The thread detaches itself by calling `pthread_detach`, which informs Pthreads that the application does not need to know when the thread terminates or its termination status.
 
-The thread sleeps for the number of seconds specified in its control packet, and then prints the message string. Finally, the thread frees the control packet and returns. When a thread returns from its initial routine, as it does here, the thread terminates. Normally, Pthreads would hold the thread's resources so that another thread could later determine that it had exited and retrieve a final result. Because the thread detached itself, none of that is necessary.
+[10-13] The thread sleeps for the number of seconds specified in its control packet, and then prints the message string. Finally, the thread frees the control packet and returns. When a thread returns from its initial routine, as it does here, the thread terminates. Normally, Pthreads would hold the thread's resources so that another thread could later determine that it had exited and retrieve a final result. Because the thread detached itself, none of that is necessary.
 
 ```c
 /** alarm_thread.c part 2 alarm_thread */
@@ -390,11 +385,11 @@ void *alarm_thread (void *arg)
 }
 ```
 
-The main program of **alarm\_thread.c** is much the same as the other two variants. It loops, reading and interpreting command lines as long as it can read from stdin.
+The `main` program of `alarm_thread.c` is much the same as the other two variants. It loops, reading and interpreting command lines as long as it can read from `stdin`.
 
-In this variation, main allocates heap storage (**alarm\_t**) for each alarm command. The alarm time and message are stored in this structure, so each thread can be given the appropriate information. If the sscanf call fails to "parse" a correct command, the heap storage is freed.
+[13-26] In this variation, `main` allocates heap storage (`alarm_t`) for each alarm command. The alarm time and message are stored in this structure, so each thread can be given the appropriate information. If the `sscanf` call fails to "parse" a correct command, the heap storage is freed.
 
-An alarm thread is created, running function **alarm\_thread**, with the alarm data (**alarm\_t**) as the thread's argument.
+[27-30] An alarm thread is created, running function `alarm_thread`, with the alarm data (`alarm_t`) as the thread's argument.
 
 ```c
 /** alarm_thread.c part 3 main */
@@ -405,7 +400,7 @@ int main (int argc, char *argv[])
     alarm_t *alarm;
     pthread_t thread;
 
-    while A) {
+    while (1) {
         printf ("Alarm> ");
         if (fgets (line, sizeof (line), stdin) == NULL) exit (0);
         if (strlen (line) <= 1) continue;
@@ -418,7 +413,7 @@ int main (int argc, char *argv[])
          * (%64[^\n]), consisting of up to 64 characters
          * separated from the seconds by whitespace.
          */
-        if (sscanf (line, "%d %64[^\n]",
+        if (sscanf (line, "%d %64[^\n]", 
             &alarm->seconds, alarm->message) < 2) {
             fprintf (stderr, "Bad command\n");
             free (alarm);
@@ -429,23 +424,22 @@ int main (int argc, char *argv[])
                 err_abort (status, "Create alarm thread");
         }
     }
- }
-
+}
 ```
 
 
 
 ### 1.5.4 Summary
 
-A good way to start thinking about threads is to compare the two asynchronous versions of the alarm program. First, in the fork version, each alarm has an independent address space, copied from the main program. That means we can put the seconds and message values into local variables-once the child has been created (when fork returns), the parent can change the values without affecting the alarm. In the threaded version, on the other hand, all threads share the same address space-so we call **malloc** to create a new structure for each alarm, which is passed to the new thread. The extra bookkeeping required introduces a little complexity into the threaded version.
+A good way to start thinking about threads is to compare the two asynchronous versions of the alarm program. First, in the `fork` version, each alarm has an independent address space, copied from the main program. That means we can put the seconds and message values into local variables-once the child has been created (when `fork` returns), the parent can change the values without affecting the alarm. In the threaded version, on the other hand, all threads share the same address space-so we call `malloc` to create a new structure for each alarm, which is passed to the new thread. The extra bookkeeping required introduces a little complexity into the threaded version.
 
-In the version using fork, the main program needs to tell the kernel to free resources used by each child process it creates, by calling **waitpid** or some other member of the wait "family." The **alarm\_fork.c** program, for example, calls waitpid in a loop after each command, to collect all child processes that have completed. You do not need to wait for a thread unless you need the thread's return value-in **alarm\_thread.c**, for example, each alarm thread detaches itself (at line 6, part 2) so that the resources held by the thread will be returned immediately when it terminates.
+In the version using `fork`, the main program needs to tell the kernel to free resources used by each child process it creates, by calling `waitpid` or some other member of the wait "family." The `alarm_fork.c` program, for example, calls `waitpid` in a loop after each command, to collect all child processes that have completed. You do not need to wait for a thread unless you need the thread's return value-in `alarm_thread.c`, for example, each alarm thread detaches itself (at line 7, part 2) so that the resources held by the thread will be returned immediately when it terminates.
 
-In the threaded version, the "primary activities" (sleeping and printing the message) must be coded in a separate routine. In **alarm.c** and **alarm\_fork.c**, those activities were performed without a call. In simple cases such as our alarm program, it is often easier to understand the program with all code in one place, so that might seem like an advantage for **alarm\_fork.c**. In more complicated programs, though, it is rare that a program's "primary activities" are so simple that they can be performed in a single routine without resulting in total confusion.
+In the threaded version, the "primary activities" (sleeping and printing the message) must be coded in a separate routine. In `alarm.c` and `alarm_fork.c`, those activities were performed without a call. In simple cases such as our alarm program, it is often easier to understand the program with all code in one place, so that might seem like an advantage for `alarm_fork.c`. In more complicated programs, though, it is rare that a program's "primary activities" are so simple that they can be performed in a single routine without resulting in total confusion.
 
 In a real alarm program, you wouldn't want to create a process for each alarm. You might easily have hundreds of alarms active, and the system probably wouldn't let you create that many processes. On the other hand, you probably can create hundreds of threads within a process. While there is no real need to maintain a stack and thread context for each alarm request, it is a perfectly viable design.
 
-A more sophisticated version of **alarm\_thread.c** might use only two threads: one to read input from the user, and another to wait for expiration of the next alarm-I'll show that version later, after we've worked through some more basic concepts. You could do the same thing with two processes, of course, but it would be more cumbersome. Passing information between two threads is easy and fast-no shared memory to map, no pipes to read or write, no concerns about whether you are passing addresses that may not mean the same thing in both processes. Threads share everything in their address space-any address that's valid in one thread is valid in all threads.
+A more sophisticated version of `alarm_thread.c` might use only two threads: one to read input from the user, and another to wait for expiration of the next alarm-I'll show that version later, after we've worked through some more basic concepts. You could do the same thing with two processes, of course, but it would be more cumbersome. Passing information between two threads is easy and fast-no shared memory to map, no pipes to read or write, no concerns about whether you are passing addresses that may not mean the same thing in both processes. Threads share everything in their address space-any address that's valid in one thread is valid in all threads.
 
 
 
@@ -461,14 +455,16 @@ Lewis Carroll, Through the Looking-Glass:
 Some advantages of the multithreaded programming model follow:
 
 1. Exploitation of program parallelism on multiprocessor hardware. Parallelism is the only benefit that requires special hardware. The others can help most programs without special hardware.
+
 2. More efficient exploitation of a program's natural concurrency, by allowing the program to perform computations while waiting for slow I/O operations to complete.
+
 3. A modular programming model that clearly expresses relationships between independent "events" within the program.
 
 These advantages are detailed in the following sections.
 
 ### 1.6.1 Parallelism
 
-On a multiprocessor system, threading allows a process to perform more than one independent computation at the same time. A computation-intensive threaded application running on two processors may achieve nearly twice the performance of a traditional single-threaded version. "Nearly twice" takes into account the fact that you'll always have some overhead due to creating the extra thread(s) and performing synchronization. This effect is often referred to as "scaling." A two-processor system may perform 1.95 times as fast as a single processor, a three-processor system 2.9 times as fast, a four-processor system 3.8 times as fast, and so forth. Scaling almost always falls off as the number of processors increases because there's more chance of lock and memory collisions, which cost time.
+On a multiprocessor system, threading allows a process to perform more than one independent computation at the same time. A computation-intensive threaded application running on two processors may achieve nearly twice the performance of a traditional single-threaded version. "Nearly twice" takes into account the fact that you'll always have some overhead due to creating the extra thread(s) and performing synchronization. This effect is often referred to as "scaling". A two-processor system may perform 1.95 times as fast as a single processor, a three-processor system 2.9 times as fast, a four-processor system 3.8 times as fast, and so forth. Scaling almost always falls off as the number of processors increases because there's more chance of lock and memory collisions, which cost time.
 <div align="center">
 $$
 Speedup = \frac{1}{\left ( 1 - p \right ) + \frac{p}{n}}
@@ -480,7 +476,7 @@ Scaling can be predicted by "Amdahl's law," which is shown in Figure 1.1. In the
 
 Amdahl's law is a simple relationship showing how parallelism is limited by the amount of serialization needed. When the program has no parallelizable code (*p* is 0), the speedup is 1. That is, it is not a parallel program. If the program requires no synchronization or other serial code (*p* is 1), then the speedup is *n* (the number of processors). As more synchronization is required, parallelism provides less benefit. To put it another way, you'll get better scaling with activities that are completely independent than with activities that are highly dependent: The independent activities need less synchronization.
 
-The diagram in Figure 1.2 shows the effect of Amdahl's law. "Clock time" progresses from left to right across the page, and the diagram shows the number of processors working in parallel at any moment. Areas where the diagram has only a single horizontal line show that the process is serialized. Areas that have several horizontal lines in parallel show where the process benefits from multiple processors. If you can apply multiple processors for only 10% of your program's execution time, and you have four processors, then Amdahl's law predicts a speedup of **1 / (0.9+ (0.1 /4))**, or about 8%.
+The diagram in Figure 1.2 shows the effect of Amdahl's law. "Clock time" progresses from left to right across the page, and the diagram shows the number of processors working in parallel at any moment. Areas where the diagram has only a single horizontal line show that the process is serialized. Areas that have several horizontal lines in parallel show where the process benefits from multiple processors. If you can apply multiple processors for only 10% of your program's execution time, and you have four processors, then Amdahl's law predicts a speedup of `1/(0.9+(0.1/4))`, or about 8%.
 
 <div align="center">
 ![**FIGURE 1.2** Parallelism charted against time](./img/fig1.2.png)
@@ -624,7 +620,7 @@ As I explained in the preface, I will use the informal term "Pthreads" to refer 
 
 You may remember from Section 1.2 that the three essential aspects of a thread system are execution context, scheduling, and synchronization. When you evaluate any thread system, or compare any two thread systems, start by categorizing the features into capabilities that support execution contexts, scheduling, and synchronization.
 
-With Pthreads, you create an execution context (thread) by calling **pthread\_create**. Creating a thread also schedules the thread for execution, and it will begin by calling a "thread start function" that you specified. Pthreads allows you to specify scheduling parameters either at the time you create the thread, or later on while the thread is running. A thread normally terminates when it calls **pthread\_exit**, or returns from the thread start function, although we will encounter a few other possibilities later.
+With Pthreads, you create an execution context (thread) by calling `pthread_create`. Creating a thread also schedules the thread for execution, and it will begin by calling a "thread start function" that you specified. Pthreads allows you to specify scheduling parameters either at the time you create the thread, or later on while the thread is running. A thread normally terminates when it calls `pthread_exit`, or returns from the thread start function, although we will encounter a few other possibilities later.
 
 The primary Pthreads synchronization model uses mutexes for protection and condition variables for communication. You can also use other synchronization mechanisms such as semaphores, pipes, and message queues. A mutex allows one thread to lock shared data while using it so that other threads cannot accidentally interfere. A condition variable allows a thread to wait for shared data to reach some desired state (such as "queue not empty" or "resource available").
 
@@ -662,9 +658,9 @@ New functions in the Pthreads standard reserve the return value for error status
 
 Pthreads also provides a per-thread errno, which supports other code that uses errno. This means that when one thread calls some function that reports an error using errno, the value cannot be overwritten, or read, by any other thread-you may go on using errno just as you always have. But if you're designing new interfaces you should consider following the new Pthreads convention for reporting errors. Setting or reading the per-thread errno involves more overhead than reading or writing a memory location, or returning a value from a function.
 
-To wait for a thread, for example, and check for an error, you might use code like that shown in the following code example, **thread\_error.c**. The **pthread\_join** function, used to wait for a thread to terminate, will report an invalid thread identifier by returning the error code ESRCH. An uninitialized **pthread\_t** is likely to be an invalid thread identifier on most implementations. The result of running this program should be a message such as "error 3: no such process."
+To wait for a thread, for example, and check for an error, you might use code like that shown in the following code example, `thread_error.c`. The `pthread_join` function, used to wait for a thread to terminate, will report an invalid thread identifier by returning the error code ESRCH. An uninitialized `pthread_t` is likely to be an invalid thread identifier on most implementations. The result of running this program should be a message such as "error 3: no such process."
 
-In the unlikely event that the uninitialized thread variable has a **pthread\_t** value that is not invalid, it should be the ID of the initial thread (there are no other threads in this process). In this case, **pthread\_join** should either fail with edeadlk, if your implementation of Pthreads detects self-deadlock, or the thread will hang waiting for itself to exit.
+In the unlikely event that the uninitialized thread variable has a `pthread_t` value that is not invalid, it should be the ID of the initial thread (there are no other threads in this process). In this case, `pthread_join` should either fail with edeadlk, if your implementation of Pthreads detects self-deadlock, or the thread will hang waiting for itself to exit.
 
 ```c
 /** thread error.c */
@@ -695,7 +691,7 @@ int main (int argc, char *argv[])
 
 Note that there is no equivalent to the perror function to format and print an error value returned by the Pthreads interfaces. Instead, use strerror to get a string description of the error number, and print the string to the file stream stderr.
 
-To avoid cluttering each function call in the example programs with a block of code to report each error and call abort, I have built two error macros-**err\_abort** detects a standard Pthreads error, and **errno\_abort** is used when a value of -1 means that errno contains an error code. The following header file, called errors.h, shows these macros. The errors.h header file also includes several system header files, which would otherwise be required by most of the example programs-this helps to reduce the size of the examples.
+To avoid cluttering each function call in the example programs with a block of code to report each error and call abort, I have built two error macros-`err_abort` detects a standard Pthreads error, and `errno_abort` is used when a value of -1 means that errno contains an error code. The following header file, called errors.h, shows these macros. The errors.h header file also includes several system header files, which would otherwise be required by most of the example programs-this helps to reduce the size of the examples.
 
 ```c
 /** errors.h */
@@ -749,7 +745,7 @@ To avoid cluttering each function call in the example programs with a block of c
  #endif
 ```
 
-The one exception to the Pthreads error rules is **pthread\_getspecific**, which returns the thread-specific data value of a shared "key." Section 5.4 describes thread-specific data in detail, but for now we're just concerned with error reporting. The capability of managing thread-specific data is critical to many applications, and the function has to be as fast as possible, so the **pthread\_getspecific** function doesn't report errors at all. If the **pthread\_key\_t** value is illegal, or if no value has been set in the thread, **pthread\_getspecific** just returns the value null.
+The one exception to the Pthreads error rules is `pthread_getspecific`, which returns the thread-specific data value of a shared "key." Section 5.4 describes thread-specific data in detail, but for now we're just concerned with error reporting. The capability of managing thread-specific data is critical to many applications, and the function has to be as fast as possible, so the `pthread_getspecific` function doesn't report errors at all. If the `pthread_key_t` value is illegal, or if no value has been set in the thread, `pthread_getspecific` just returns the value null.
 
 
 
