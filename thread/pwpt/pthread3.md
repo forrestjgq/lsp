@@ -19,7 +19,7 @@ Section 3.4 completes this chapter on synchronization with some important inform
 ## 3.1 Invariants, critical sections, and predicates
 
 Lewis Carroll, Through the Looking-Glass:
-> "/ know what you're thinking about,"  
+> "I know what you're thinking about,"  
 > said Tweedledum; "but it isn't so, nohow."  
 > "Contrariwise," continued Tweedledee,  
 > "if it was so, it might be; and if it were so, it would be;  
@@ -48,7 +48,7 @@ Lewis Carroll, Alice's Adventures in Wonderland:
 
 Most threaded programs need to share some data between threads. There may be trouble if two threads try to access shared data at the same time, because one thread may be in the midst of modifying some data invariant while another acts on the data as if it were consistent. This section is all about protecting the program from that sort of trouble.
 
-The most common and general way to synchronize between threads is to ensure that all memory accesses to the same (or related) data are "mutually exclusive." That means that only one thread is allowed to write at a time-others must wait for their turn. Pthreads provides mutual exclusion using a special form of Edsger Dijkstra's semaphore [Dijkstra, 1968a], called a mutex. The word mutex is a clever combination of "mut" from the word "mutual" and "ex" from the word "exclusion."
+The most common and general way to synchronize between threads is to ensure that all memory accesses to the same (or related) data are "mutually exclusive". That means that only one thread is allowed to write at a time-others must wait for their turn. Pthreads provides mutual exclusion using a special form of Edsger Dijkstra's semaphore [*Dijkstra, 1968a*], called a *mutex*. The word *mutex* is a clever combination of "mut" from the word "mutual" and "ex" from the word "exclusion."
 
 Experience has shown that it is easier to use mutexes correctly than it is to use other synchronization models such as a more general semaphore. It is also easy to build any synchronization models using mutexes in combination with condition variables (we'll meet them at the next corner, in Section 3.3). Mutexes are simple, flexible, and can be implemented efficiently.
 
@@ -68,7 +68,7 @@ Figure 3.2 shows a timing diagram of three threads sharing a mutex. Sections of 
 ![**FIGURE 3.2** Mutex operation](./img/fig3.2.png)
 </div>
 
-Initially, the mutex is unlocked. Thread 1 locks the mutex and, because there is no contention, it succeeds immediately-thread l's line moves below the center of the box. Thread 2 then attempts to lock the mutex and, because the mutex is already locked, thread 2 blocks, its line remaining above the center line. Thread 1 unlocks the mutex, unblocking thread 2, which then succeeds in locking the mutex. Slightly later, thread 3 attempts to lock the mutex, and blocks. Thread 1 calls `pthread_mutex_trylock` to try to lock the mutex and, because the mutex is locked, returns immediately with EBUSY status. Thread 2 unlocks the mutex, which unblocks thread 3 so that it can lock the mutex. Finally, thread 3 unlocks the mutex to complete our example.
+Initially, the mutex is unlocked. Thread 1 locks the mutex and, because there is no contention, it succeeds immediately-thread 1's line moves below the center of the box. Thread 2 then attempts to lock the mutex and, because the mutex is already locked, thread 2 blocks, its line remaining above the center line. Thread 1 unlocks the mutex, unblocking thread 2, which then succeeds in locking the mutex. Slightly later, thread 3 attempts to lock the mutex, and blocks. Thread 1 calls `pthread_mutex_trylock` to try to lock the mutex and, because the mutex is locked, returns immediately with `EBUSY` status. Thread 2 unlocks the mutex, which unblocks thread 3 so that it can lock the mutex. Finally, thread 3 unlocks the mutex to complete our example.
 
 ### 3.2.1 Creating and destroying a mutex
 
@@ -81,63 +81,62 @@ int pthread_mutex_destroy (pthread_mutex_t *mutex);
 
 A mutex is represented in your program by a variable of type `pthread_mutex_t`. You should never make a copy of a mutex, because the result of using a copied mutex is undefined. You can, however, freely copy a pointer to a mutex so that various functions and threads can use it for synchronization.
 
-Most of the time you'll probably declare mutexes using extern or static storage class, at "file scope," that is, outside of any function. They should have "normal" (extern) storage class if they are used by other files, or static storage class if used only within the file that declares the variable. When you declare a static mutex that has default attributes, you should use the `pthread_mutex_INITIALIZER` macro, as shown in the `mutex_static.c` program shown next. (You can build and run this program, but don't expect anything interesting to happen, since main is empty.)
+Most of the time you'll probably declare mutexes using `extern` or `static` storage class, at "file scope", that is, outside of any function. They should have "normal" (`extern`) storage class if they are used by other files, or `static` storage class if used only within the file that declares the variable. When you declare a `static` mutex that has default attributes, you should use the `PTHREAD_MUTEX_INITIALIZER` macro, as shown in the `mutex_static.c` program shown next. (You can build and run this program, but don't expect anything interesting to happen, since `main` is empty.)
 
 ```c
 /** mutex_static.c */
-    #include <pthread.h>
-    #include "errors.h"
+#include <pthread.h>
+#include "errors.h"
 
-    /*
-    * Declare a structure, with a mutex, statically initialized. This
-    * is the same as using pthread_mutex_init, with the default
-    * attributes.
-    */
-    typedef struct my_struct_tag {
-        pthread_mutex_t mutex; /* Protects access to value */
-        int value; /* Access protected by mutex */
-    } my_struct_t;
+/*
+ * Declare a structure, with a mutex, statically initialized. This is the
+ * same as using pthread_mutex_init, with the default attributes.
+ */
+typedef struct my_struct_tag {
+    pthread_mutex_t     mutex;  /* Protects access to value */
+    int                 value;  /* Access protected by mutex */
+} my_struct_t;
 
-    my_struct_t data = {PTHREAD_MUTEX_INITIALIZER, 0};
+my_struct_t data = {PTHREAD_MUTEX_INITIALIZER, 0};
 
-    int main (int argc, char *argv[])
-    {
-        return 0;
-    }
+int main (int argc, char *argv[])
+{
+    return 0;
+}
 ```
 
-Often you cannot initialize a mutex statically, for example, when you use malloc to create a structure that contains a mutex. Then you will need to call `pthread_mutex_init` to initialize the mutex dynamically, as shown in `mutex_dynamic.c`, the next program. You can also dynamically initialize a mutex that you declare statically-but you must ensure that each mutex is initialized before it is used, and that each is initialized only once. You may initialize it before creating any threads, for example, or by calling `pthread_once` (Section 5.1). Also, if you need to initialize a mutex with nondefault attributes, you must use dynamic initialization (see Section 5.2.1).
+Often you cannot initialize a mutex statically, for example, when you use `malloc` to create a structure that contains a mutex. Then you will need to call `pthread_mutex_init` to initialize the mutex dynamically, as shown in `mutex_dynamic.c`, the next program. You can also dynamically initialize a mutex that you declare statically-but you must ensure that each mutex is initialized before it is used, and that each is initialized only once. You may initialize it before creating any threads, for example, or by calling `pthread_once` (Section 5.1). Also, if you need to initialize a mutex with nondefault attributes, you must use dynamic initialization (see Section 5.2.1).
 
 ```c
 /** mutex_dynamic.c */
-    #include <pthread.h>
-    #include "errors.h"
+#include <pthread.h>
+#include "errors.h"
 
-    /*
-     * Define a structure, with a mutex.
-     */
-    typedef struct my_struct_tag {
-        pthread_mutex_t mutex; /* Protects access to value */
-        int value; /* Access protected by mutex */
-    } my_struct_t;
+/*
+ * Define a structure, with a mutex.
+ */
+typedef struct my_struct_tag {
+    pthread_mutex_t     mutex;  /* Protects access to value */
+    int                 value;  /* Access protected by mutex */
+} my_struct_t;
 
-    int main (int argc, char *argv[])
-    {
-        my_struct_t *data;
-        int status;
+int main (int argc, char *argv[])
+{
+    my_struct_t *data;
+    int status;
 
-        data = malloc (sizeof (my_struct_t));
-        if (data == NULL)
-            errno_abort ("Allocate structure");
-        status = pthread_mutex_init (&data->mutex, NULL);
-        if (status != 0)
-            err_abort (status, "Init mutex");
-        status = pthread_mutex_destroy (&data->mutex);
-        if (status != 0)
-            err_abort (status, "Destroy mutex");
-        (void)free (data);
-        return status;
-    }
+    data = malloc (sizeof (my_struct_t));
+    if (data == NULL)
+        errno_abort ("Allocate structure");
+    status = pthread_mutex_init (&data->mutex, NULL);
+    if (status != 0)
+        err_abort (status, "Init mutex");
+    status = pthread_mutex_destroy (&data->mutex);
+    if (status != 0)
+        err_abort (status, "Destroy mutex");
+    (void)free (data);
+    return status;
+}
 ```
 
 It is a good idea to associate a mutex clearly with the data it protects, if possible, by keeping the definition of the mutex and data together. In `mutex_static.c` and `mutex_dynamic.c`, for example, the mutex and the data it protects are defined in the same structure, and line comments document the association. When you no longer need a mutex that you dynamically initialized by calling `pthread_mutex_init`, you should destroy the mutex by calling `pthread_mutex_destroy`. You do not need to destroy a mutex that was statically initialized using the `PTHREAD_MUTEX_INITIALIZER` macro.
