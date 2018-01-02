@@ -90,7 +90,7 @@ By *multiprocessor*, I mean a computer with more than one processor sharing a co
 
 ### 1.2.4 Parallelism
 
-*Parallelism* describes concurrent sequences that proceed simultaneously. In other words, software "parallelism" is the same as English "concurrency" and different from software "concurrency." Parallelism has a vaguely redeeming analogy to the English definition: It refers to things proceeding in the same direction independently (without intersection).
+*Parallelism* describes concurrent sequences that proceed simultaneously. In other words, software "parallelism" is the same as English "concurrency" and different from software "concurrency". Parallelism has a vaguely redeeming analogy to the English definition: It refers to things proceeding in the same direction independently (without intersection).
 
 True parallelism can occur only on a multiprocessor system, but concurrency can occur on both uniprocessor and multiprocessor systems. Concurrency can occur on a uniprocessor because concurrency is, essentially, the illusion of parallelism. While parallelism requires that a program be able to perform two computations at once, concurrency requires only that the programmer be able to pretend that two things can happen at once.
 
@@ -118,7 +118,7 @@ Any "concurrent system" must provide a core set of essential functions that you 
 
 2. *Scheduling* determines which context (or set of contexts) should execute at any given point in time, and switches between contexts when necessary.
 
-3. *Synchronization* provides mechanisms for concurrent execution contexts to coordinate their use of shared resources. We use this term in a way that is nearly the opposite of the standard dictionary meaning. You'll find a definition much like "cause to occur at the same time", whereas we usually mean something that might better be expressed as "prevent from occurring at the same time." In a thesaurus, you may find that "cooperate" is a synonym for "synchronize"-and synchronization is the mechanism by which threads *cooperate* to accomplish a task. This book will use the term "synchronization", though, because that is what you'll see used, almost universally.
+3. *Synchronization* provides mechanisms for concurrent execution contexts to coordinate their use of shared resources. We use this term in a way that is nearly the opposite of the standard dictionary meaning. You'll find a definition much like "cause to occur at the same time", whereas we usually mean something that might better be expressed as "prevent from occurring at the same time". In a thesaurus, you may find that "cooperate" is a synonym for "synchronize"-and synchronization is the mechanism by which threads *cooperate* to accomplish a task. This book will use the term "synchronization", though, because that is what you'll see used, almost universally.
 
 There are many ways to provide each of these facilities-but they are always present in some form. The particular choices presented in this book are dictated by the book's subject-Pthreads. Table 1.1 shows a few examples of the three facilities in various systems.
 
@@ -181,13 +181,13 @@ Threads can make high-bandwidth communication easier between independent parts o
 
 ### 1.3.2 ... because the world is asynchronous
 
-Thinking asynchronously can seem awkward at first, but it'll become natural with a little practice. Start by getting over the unnatural expectation that everything will happen serially unless you do something "unusual." On a one-lane road cars proceed one at a time-but on a two-lane road two cars go at once. You can go out for a cup of coffee, leaving your computer compiling some code and fully expecting that it will proceed without you. Parallelism happens everywhere in the real world, and you expect it.
+Thinking asynchronously can seem awkward at first, but it'll become natural with a little practice. Start by getting over the unnatural expectation that everything will happen serially unless you do something "unusual". On a one-lane road cars proceed one at a time-but on a two-lane road two cars go at once. You can go out for a cup of coffee, leaving your computer compiling some code and fully expecting that it will proceed without you. Parallelism happens everywhere in the real world, and you expect it.
 
 A row of cashiers in a store serve customers in parallel; the customers in each line generally wait their turn. You can improve throughput by opening more lines, as long as there are registers and cashiers to serve them, and enough customers to be served by them. Creating two lines for the same register may avoid confusion by keeping lines shorter-but nobody will get served faster. Opening three registers to serve two customers may look good, but it is just a waste of resources.
 
 In an assembly line, workers perform various parts of the complete job in parallel, passing work down the line. Adding a station to the line may improve performance if it parallels or subdivides a step in the assembly that was so complicated that the operator at the next station spent a lot of time waiting for each piece. Beware of improving one step so much that it generates more work than the next step on the assembly line can handle.
 
-In an office, each project may be assigned to a "specialist." Common specialties include marketing, management, engineering, typing pool, sales, support, and so forth. Each specialist handles her project independently on behalf of the customer or some other specialist, reporting back in some fashion when done. Assigning a second specialist to some task, or denning narrower specialties (for example, assigning an engineer or manager permanently to one product) may improve performance as long as there's enough work to keep her busy. If not, some specialists play games while others' in-baskets overflow.
+In an office, each project may be assigned to a "specialist". Common specialties include marketing, management, engineering, typing pool, sales, support, and so forth. Each specialist handles her project independently on behalf of the customer or some other specialist, reporting back in some fashion when done. Assigning a second specialist to some task, or denning narrower specialties (for example, assigning an engineer or manager permanently to one product) may improve performance as long as there's enough work to keep her busy. If not, some specialists play games while others' in-baskets overflow.
 
 Motor vehicles move in parallel on a highway. They can move at different speeds, pass each other, and enter and exit the highway independently. The drivers must agree to certain conventions in order to avoid collisions. Despite speed limits and traffic signs, compliance with the "rules of the road" is mostly voluntary. Similarly, threads must be coded to "agree" to rules that protect the program, or risk ending up undergoing emergency debugging at the thread hospital.
 
@@ -206,7 +206,7 @@ If you find yourself thinking that someone shouldn't interrupt you because you h
 
 This book contains a number of examples. All are presented as complete programs, and they have been built and tested on Digital UNIX 4.0d and Solaris 2.5.
 
-All of these programs do something, but many do not do anything of any particular importance. The purpose of the examples is to demonstrate thread management and synchronization techniques, which are mere overhead in most real programs. They would be less effective at revealing the details if that "overhead" was buried within large programs that "did something."
+All of these programs do something, but many do not do anything of any particular importance. The purpose of the examples is to demonstrate thread management and synchronization techniques, which are mere overhead in most real programs. They would be less effective at revealing the details if that "overhead" was buried within large programs that "did something".
 
 Within the book, examples are presented in sections, usually one function at a time. The source code is separated from the surrounding text by a header and trailer block which include the file name and, if the example comprises more than one section, a section number and the name of the function.(*Forrest: the first line of commented code block, instead header and trailer, shows this information.*) Each line of the source code has a line number at the left margin. Major functional blocks of each section are described in specially formatted paragraphs preceding the source code. These paragraphs are marked by line numbers outside the left margin of the paragraph, denoting the line numbers in the source listing to which the paragraph refers. Here's an example:
 
@@ -433,7 +433,7 @@ int main (int argc, char *argv[])
 
 A good way to start thinking about threads is to compare the two asynchronous versions of the alarm program. First, in the `fork` version, each alarm has an independent address space, copied from the main program. That means we can put the seconds and message values into local variables-once the child has been created (when `fork` returns), the parent can change the values without affecting the alarm. In the threaded version, on the other hand, all threads share the same address space-so we call `malloc` to create a new structure for each alarm, which is passed to the new thread. The extra bookkeeping required introduces a little complexity into the threaded version.
 
-In the version using `fork`, the main program needs to tell the kernel to free resources used by each child process it creates, by calling `waitpid` or some other member of the wait "family." The `alarm_fork.c` program, for example, calls `waitpid` in a loop after each command, to collect all child processes that have completed. You do not need to wait for a thread unless you need the thread's return value-in `alarm_thread.c`, for example, each alarm thread detaches itself (at line 7, part 2) so that the resources held by the thread will be returned immediately when it terminates.
+In the version using `fork`, the main program needs to tell the kernel to free resources used by each child process it creates, by calling `waitpid` or some other member of the wait "family". The `alarm_fork.c` program, for example, calls `waitpid` in a loop after each command, to collect all child processes that have completed. You do not need to wait for a thread unless you need the thread's return value-in `alarm_thread.c`, for example, each alarm thread detaches itself (at line 7, part 2) so that the resources held by the thread will be returned immediately when it terminates.
 
 In the threaded version, the "primary activities" (sleeping and printing the message) must be coded in a separate routine. In `alarm.c` and `alarm_fork.c`, those activities were performed without a call. In simple cases such as our alarm program, it is often easier to understand the program with all code in one place, so that might seem like an advantage for `alarm_fork.c`. In more complicated programs, though, it is rare that a program's "primary activities" are so simple that they can be performed in a single routine without resulting in total confusion.
 
@@ -497,11 +497,11 @@ The threaded programming model allows the program to make computational progress
 
 For example, you need to either handle asynchronous notification when the I/O completes, or poll for completion. If you issued an asynchronous I/O and then entered a polling loop, you would lose the advantage of asynchronous I/O-your application would just wait. If you poll elsewhere, or handle asynchronous notification, then issuing the I/O and processing the resulting data occur in different locations within your program. That makes the code more difficult to analyze and maintain. When you use synchronous I/O you just perform the I/O and then do whatever comes next. Synchronous I/O within multiple threads gives nearly all the advantages of asynchronous I/O. In most cases you will find it much easier to write complex asynchronous code using threads than using traditional asychronous programming techniques.
 
-You could write an alarm program, like those shown in Section 1.5, as an asynchronous program without using processes or threads, with timer signals for the alarms and asynchronous reads for input. Using timer signals is more complicated in many ways, since you are severely limited in what you can do within a signal handler. Asynchronous I/O does not allow you to take advantage of the convenience of stdio functions. The basic program function will be scattered through a series of signal handlers and functions, and will probably be harder to understand.
+You could write an *alarm* program, like those shown in Section 1.5, as an asynchronous program without using processes or threads, with timer signals for the alarms and asynchronous reads for input. Using timer signals is more complicated in many ways, since you are severely limited in what you can do within a signal handler. Asynchronous I/O does not allow you to take advantage of the convenience of `stdio` functions. The basic program function will be scattered through a series of signal handlers and functions, and will probably be harder to understand.
 
 Asynchronous I/O does have one advantage over threaded concurrency, though. Just as a thread is usually "cheaper" (in execution time and storage space) than a process, the context required for an asynchronous I/O operation is almost always cheaper than a thread. If you plan to have a lot of asynchronous I/O operations active at the same time, that might be important enough to justify using the more complicated programming model. But watch out-some "asynchronous I/O" packages just distribute your I/O requests across a pool of threads! Most of the time you will be better off using threads.
 
-Another method of coding an asynchronous application is for each action to be treated as an "event." Events are queued by some "hidden" process, and dispatched serially to be handled by the application, usually through "callback" routines registered with the dispatcher. Event dispatchers have been popularized by windowing interface systems such as the Apple Macintosh toolbox, Microsoft Windows, and X Windows on UNIX (used by Motif and CDE).
+Another method of coding an asynchronous application is for each action to be treated as an "event". Events are queued by some "hidden" process, and dispatched serially to be handled by the application, usually through "callback" routines registered with the dispatcher. Event dispatchers have been popularized by windowing interface systems such as the Apple Macintosh toolbox, Microsoft Windows, and X Windows on UNIX (used by Motif and CDE).
 
 The event mechanism alleviates much of the complication of using signals and asynchronous I/O, as long as the events are supported directly by the event dispatcher. All, for example, handle input from the keyboard or pointer device, and generally one can request a timer event to be inserted automatically at a desired time. Thus, the alarm program, written to an event interface, need only initialize the event dispatcher and enter a loop to process events. Input events would be dispatched to the parser, resulting in a request for a new timer event; and timer events would be dispatched to a function that would format and print the alarm message.
 
@@ -520,7 +520,7 @@ On the other hand, one might code the application to create a new thread that ru
 
 It may be surprising that programming with threads is a good idea even if you know your code will never run on a multiprocessor. But it is true. Writing with threads forces you to think about and plan for the synchronization requirements of your program. You've always had to think about program dependencies, but threads help to move the requirements from comments into the executable structure of the program.
 
-Assembly language programs can use all the same sequential control structures (loops, conditional code) as programs written in a high-level language. However, it can be difficult to determine whether a branch instruction represents the top or bottom of a loop, a simple conditional, a "conditional goto," or something more exotic. Switching to a higher-level language that supports these sequential controls directly in source, for example, the C language do, while, for, if, and switch statements, makes these sequential programming constructs explicit in the source language. Making control structures explicit in the program source code means that more of your program's design is explicit in the source, and that makes it easier for someone else to understand.
+Assembly language programs can use all the same sequential control structures (loops, conditional code) as programs written in a high-level language. However, it can be difficult to determine whether a branch instruction represents the top or bottom of a loop, a simple conditional, a "conditional goto," or something more exotic. Switching to a higher-level language that supports these sequential controls directly in source, for example, the C language `do`, `while`, `for`, `if`, and `switch` statements, makes these sequential programming constructs explicit in the source language. Making control structures explicit in the program source code means that more of your program's design is explicit in the source, and that makes it easier for someone else to understand.
 
 Similarly, a C language program (or even an assembler program) may use data encapsulation and polymorphism by adhering to programming conventions, and with luck those conventions may be carefully documented and the documentation kept updated. But if that same code is written in an object-oriented language, the encapsulation and polymorphism become explicit in the source language.
 
@@ -541,7 +541,7 @@ Lewis Carroll, Through the Looking-Glass:
 > At last he said, "You're traveling the wrong way,"  
 > and shut up the window, and went away.
 
-Of course there's always "the flip side." As I showed in the previous section, threads provide definite and powerful advantages, even on uniprocessor systems. They provide even more advantages on a multiprocessor.
+Of course there's always "the flip side". As I showed in the previous section, threads provide definite and powerful advantages, even on uniprocessor systems. They provide even more advantages on a multiprocessor.
 
 So why wouldn't you want to use threads? Everything has a cost, and threaded programming is no exception. In many cases the advantage exceeds the cost; in others it doesn't. To be fair, the following subsections discuss the cost of threaded programming.
 
@@ -549,7 +549,7 @@ So why wouldn't you want to use threads? Everything has a cost, and threaded pro
 
 Overhead costs in threaded code include direct effects such as the time it takes to synchronize your threads. Many clever algorithms are available for avoiding synchronization in some cases, but none of them is portable. You'll have to use some synchronization in just about any threaded code. It is easy to lose performance by using too much synchronization; for example, by separately protecting two variables that are always used together. Protecting each variable separately means you spend a lot more time on synchronization without gaining parallelism, since any thread that needs one variable will need the other as well.
 
-The overhead of threaded programming can also include more subtle effects. For example, threads that constantly write the same memory locations may spend a lot of time synchronizing the memory system on processors that support "read/ write ordering." Other processors may spend that time synchronizing only when you use special instructions such as a memory barrier, or a "multiprocessor atomic" operation like test-and-set. Section 3.4 says a lot more about these effects.
+The overhead of threaded programming can also include more subtle effects. For example, threads that constantly write the same memory locations may spend a lot of time synchronizing the memory system on processors that support "read/write ordering". Other processors may spend that time synchronizing only when you use special instructions such as a memory barrier, or a "multiprocessor atomic" operation like test-and-set. Section 3.4 says a lot more about these effects.
 
 Removing a bottleneck in your code, for example, by adding threads to perform multiple concurrent I/O operations, may end up revealing another bottleneck at a lower level-in the ANSI C library, the operating system, the file system, the device driver, the memory or I/O architecture, or the device controller. These effects are often difficult to predict, or measure, and are usually not well documented.
 
@@ -567,7 +567,7 @@ The important points are that good sequential code is not necessarily good threa
 
 ### 1.7.3 Harder to debug
 
-You will learn more about debugging threaded code, and, more importantly, not debugging threaded code, in Chapter 8. You will see some of the tools you may encounter as well as some techniques you can use on your own. By then you will know all about mutexes and memory visibility, and you will be ready to deal with deadlocks and races. Don't worry about the details now-the point of this brief section is to demonstrate that you will have to learn about threaded debugging, and it is not as easy yet as anyone would like it to be. (So when was debugging ever easy?)
+You will learn more about debugging threaded code, and, more importantly, not debugging threaded code, in [Chapter 8](#8). You will see some of the tools you may encounter as well as some techniques you can use on your own. By then you will know all about mutexes and memory visibility, and you will be ready to deal with deadlocks and races. Don't worry about the details now-the point of this brief section is to demonstrate that you will have to learn about threaded debugging, and it is not as easy yet as anyone would like it to be. (So when was debugging *ever* easy?)
 
 Systems that support threads generally extend traditional sequential debugging tools to provide basic debugging support. The system may provide a debugger that allows you to see the call tree for all of your program's threads, for example, and set breakpoints that activate only in particular threads. The system may provide some form of performance analyzer that lets you measure the processor time accumulated within each function for a specific thread or across all threads.
 
@@ -589,11 +589,11 @@ Lewis Carroll, The Hunting of the Snark:
 
 Threads don't necessarily provide the best solution to every programming problem. They're not always easier to use, and they don't always result in better performance.
 
-A few problems are really "inherently nonconcurrent," and adding threads will only slow the program down and complicate it. If every step in your program depends directly on the result of the previous step, then using threads probably won't help. Each thread would have to wait for another thread to complete.
+A few problems are really "inherently nonconcurrent", and adding threads will only slow the program down and complicate it. If every step in your program depends directly on the result of the previous step, then using threads probably won't help. Each thread would have to wait for another thread to complete.
 
 The most obvious candidates for threaded coding are new applications that accomplish the following:
 
-1. Perform extensive computation that can be parallelized (or "decomposed") into multiple threads, and which is intended to run on multiprocessor hardware, or
+1. Perform extensive computation that can be parallelized (or "decomposed") into multiple threads, and which is intended to run on multiprocessor hardware, *or*
 2. Perform substantial I/O which can be overlapped to improve throughput-many threads can wait for different I/O requests at the same time. Distributed server applications are good candidates, since they may have work to do in response to multiple clients, and they must also be prepared for unsolicited I/O over relatively slow network connections.
 
 Most programs have some natural concurrency, even if it is only reading a command from the input device while processing the previous command. Threaded applications are often faster, and usually more responsive, than sequential programs that do the same job. They are generally much easier to develop and maintain than nonthreaded asynchronous applications that do the same job.
@@ -610,11 +610,12 @@ Lewis Carroll. Through the Looking-Glass:
 > the poems that ever were invented-and a good many  
 > that haven't been invented just yet."
 
-First of all, this book focuses on "POSIX threads." Technically, that means the thread "application programming interfaces" (API) specified by the international formal standard POSIX 1003.1c-1995. This standard was approved by the IEEE in June 1995. A new edition of POSIX 1003.1, called ISO/IEC 9945-1:1996 (ANSI/ IEEE Std 1003.1, 1996 Edition) is available from the IEEE.(see below) This new document includes 1003.1b-1993 (realtime), 1003.1c-1995 (threads), and 1003.H-1995 (corrections to 1003.1b-1993). Unless you are writing an implementation of the standard, or are extremely curious, you probably don't want to bother buying the POSIX standard. For writing threaded code, you'll find books like this one much more useful, supplemented by the programming documentation for the operating system you're using.
+First of all, this book focuses on "POSIX threads". Technically, that means the thread "application programming interfaces" (API) specified by the international formal standard POSIX 1003.1c-1995. This standard was approved by the IEEE in June 1995. A new edition of POSIX 1003.1, called *ISO/IEC 9945-1:1996(ANSI/IEEE Std 1003.1, 1996 Edition)* is available from the IEEE(see **Hint** below). This new document includes 1003.1b-1993 (realtime), 1003.1c-1995 (threads), and 1003.1i-1995 (corrections to 1003.1b-1993). Unless you are writing an implementation of the standard, or are extremely curious, you probably don't want to bother buying the POSIX standard. For writing threaded code, you'll find books like this one much more useful, supplemented by the programming documentation for the operating system you're using.
 
-> Contact the IEEE at 1-800-678-IEEE. 9945-1:1996 Information Technology-Portable Operating System Interface (POSIX)-Part 1: System Application: Program Interface (API) [C Language], ISBN 1-55937-573-6, order number SH94352.
+> **Hint:**  
+> Contact the IEEE at 1-800-678-IEEE. *9945-1:1996 Information Technology-Portable Operating System Interface (POSIX)-Part 1: System Application: Program Interface (API) [C Language]*, ISBN 1-55937-573-6, order number SH94352.  
 
-As I explained in the preface, I will use the informal term "Pthreads" to refer to "POSIX 1003.1c-1995." I will use the slightly more formal term "POSIX. lb" to refer to "POSIX 1003.1b-1993" in the text, "POSIX. 14" to refer to the POSIX 1003.14 "Multiprocessor Profile," and similar abbreviated notation for other POSIX standards. I'll use the full names where precision is important, for example, to compare POSIX 1003.1-1990 and POSIX 1003.1-1996, and also in section titles and captions that appear in the table of contents.
+As I explained in the preface, I will use the informal term "Pthreads" to refer to "POSIX 1003.1c-1995". I will use the slightly more formal term "POSIX.1b" to refer to "POSIX 1003.1b-1993" in the text, "POSIX.14" to refer to the POSIX 1003.14 "Multiprocessor Profile", and similar abbreviated notation for other POSIX standards. I'll use the full names where precision is important, for example, to compare POSIX 1003.1-1990 and POSIX 1003.1-1996, and also in section titles and captions that appear in the table of contents.
 
 ### 1.9.1 Architectural overview
 
@@ -622,51 +623,54 @@ You may remember from Section 1.2 that the three essential aspects of a thread s
 
 With Pthreads, you create an execution context (thread) by calling `pthread_create`. Creating a thread also schedules the thread for execution, and it will begin by calling a "thread start function" that you specified. Pthreads allows you to specify scheduling parameters either at the time you create the thread, or later on while the thread is running. A thread normally terminates when it calls `pthread_exit`, or returns from the thread start function, although we will encounter a few other possibilities later.
 
-The primary Pthreads synchronization model uses mutexes for protection and condition variables for communication. You can also use other synchronization mechanisms such as semaphores, pipes, and message queues. A mutex allows one thread to lock shared data while using it so that other threads cannot accidentally interfere. A condition variable allows a thread to wait for shared data to reach some desired state (such as "queue not empty" or "resource available").
+The primary Pthreads synchronization model uses *mutexes* for protection and *condition variables* for communication. You can also use other synchronization mechanisms such as semaphores, pipes, and message queues. A mutex allows one thread to lock shared data while using it so that other threads cannot accidentally interfere. A condition variable allows a thread to wait for shared data to reach some desired state (such as "queue not empty" or "resource available").
 
 ### 1.9.2 Types and interfaces
 
 This section briefly outlines the Pthreads data types, and some of the rules for interpreting them. For a full description of the "object" represented by each type and how to create and use those objects in a program, see the appropriate sections later in this book, as shown in Table 1.2.
 
-| Type                  | Section | Description                              |
-| --------------------- | ------- | ---------------------------------------- |
-| pthread\_t            | 2       | thread identifier                        |
-| pthread\_mutex\_t     | 3.2     | mutex                                    |
-| pthread\_cond\_t      | 3.3     | condition variable                       |
-| pthread\_key\_t       | 5.4     | "access key" for thread-specific data    |
-| pthread\_attr\_t      | 5.2.3   | thread attributes object                 |
-| pthread\_mutexattr\_t | 5.2.1   | mutex attributes object                  |
-| pthread\_condattr\_t  | 5.2.2   | condition variable attributes object     |
-| pthread\_once\_t      | 5.1     | "one time initialization" control context |
+| Type                  | Section         | Description                               |
+| --------------------- | -------         | ----------------------------------------  |
+| `pthread_t`           | [2](#2)         | thread identifier                         |
+| `pthread_mutex_t`     | [3.2](#3.2)     | mutex                                     |
+| `pthread_cond_t`      | [3.3](#3.3)     | condition variable                        |
+| `pthread_key_t`       | [5.4](#5.4)     | "access key" for thread-specific data     |
+| `pthread_attr_t`      | [5.2.3](#5.2.3) | thread attributes object                  |
+| `pthread_mutexattr_t` | [5.2.1](#5.2.1) | mutex attributes object                   |
+| `pthread_condattr_t`  | [5.2.2](#5.2.2) | condition variable attributes object      |
+| `pthread_once_t`      | [5.1](#5.1)     | "one time initialization" control context |
+
 <center>**TABLE 1.2** *POSIX threads types*</center>
 
-> All Pthreads types are "opaque," Portable code cannot make assumptions regarding the representation of these types.
+> All Pthreads types are "opaque".  
+> Portable code cannot make assumptions regarding the representation of these types.  
 
-All of the "pthread" types listed in Table 1.2 are considered opaque. There is no public definition of these types' representation, and programmers should never assume anything about the representation. You should use them only in the manner specifically described by the standard. A thread identifier, for example, may be an integer, or a pointer, or a structure, and any code that uses a thread identifier in a way that is not compatible with all of those definitions is incorrect.
+All of the "pthread" types listed in Table 1.2 are considered *opaque*. There is no public definition of these types' representation, and programmers should never assume anything about the representation. You should use them only in the manner specifically described by the standard. A thread identifier, for example, may be an integer, or a pointer, or a structure, and any code that uses a thread identifier in a way that is not compatible with all of those definitions is incorrect.
 
 ### 1.9.3 Checking for errors
 
-> Pthreads introduces a new way to report errors, without using the errno variable.
+> Pthreads introduces a new way to report errors, without using the `errno` variable.
 
-The Pthreads amendment is the first part of POSIX to depart from the ancient UNIX and C language conventions regarding error status. Traditionally, functions that succeed returned a useful value if appropriate, or otherwise indicated success by returning the value 0. On failure, they returned the special value -1, and set the global value errno to a code specifying the type of error.
+Thr Pthreads amendment is the first part of POSIX to depart from the ancient UNIX and C language conventions regarding error status. Traditionally, functions that succeed returned a useful value if appropriate, or otherwise indicated success by returning the value 0. On failure, they returned the special value -1, and set the global value `errno` to a code specifying the type of error.
 
-The old mechanism has a number of problems, including the fact that it is difficult to create a function that can both report an error and return a useful value of -1. There are even worse problems when you add multiple threads to a process. In traditional UNIX systems, and in the original POSIX. 1-1990 standard, errno was an extern int variable. Since such a variable can have only one value at a time, it can support only a single stream of execution within the process.
+The old mechanism has a number of problems, including the fact that it is difficult to create a function that can both report an error and return a useful value of -1. There are even worse problems when you add multiple threads to a process. In traditional UNIX systems, and in the original POSIX.1-1990 standard, `errno` was an extern `int` variable. Since such a variable can have only one value at a time, it can support only a single stream of execution within the process.
 
-> Pthreads functions don't set errno on errors! (But most other POSIX functions do.)
+> Pthreads functions don't set `errno` on errors!  
+> (But most other POSIX functions do.)  
 
-New functions in the Pthreads standard reserve the return value for error status, and errno is not used. Pthreads functions return the value 0 on success, and include an extra output parameter to specify an address where "useful results" are stored. When a function cannot complete successfully, an error code from the <errno.h> header file is returned instead of 0 as the function value.
+New functions in the Pthreads standard reserve the return value for error status, and `errno` is not used. Pthreads functions return the value 0 on success, and include an extra output parameter to specify an address where "useful results" are stored. When a function cannot complete successfully, an error code from the `<errno.h>` header file is returned instead of 0 as the function value.
 
-Pthreads also provides a per-thread errno, which supports other code that uses errno. This means that when one thread calls some function that reports an error using errno, the value cannot be overwritten, or read, by any other thread-you may go on using errno just as you always have. But if you're designing new interfaces you should consider following the new Pthreads convention for reporting errors. Setting or reading the per-thread errno involves more overhead than reading or writing a memory location, or returning a value from a function.
+Pthreads also provides a per-thread `errno`, which supports other code that uses `errno`. This means that when one thread calls some function that reports an error using `errno`, the value cannot be overwritten, or read, by any other thread-you may go on using `errno` just as you always have. But if you're designing new interfaces you should consider following the new Pthreads convention for reporting errors. Setting or reading the per-thread `errno` involves more overhead than reading or writing a memory location, or returning a value from a function.
 
-To wait for a thread, for example, and check for an error, you might use code like that shown in the following code example, `thread_error.c`. The `pthread_join` function, used to wait for a thread to terminate, will report an invalid thread identifier by returning the error code ESRCH. An uninitialized `pthread_t` is likely to be an invalid thread identifier on most implementations. The result of running this program should be a message such as "error 3: no such process."
+To wait for a thread, for example, and check for an error, you might use code like that shown in the following code example, `thread_error.c`. The `pthread_join` function, used to wait for a thread to terminate, will report an invalid thread identifier by returning the error code `ESRCH`. An uninitialized `pthread_t` is likely to be an invalid thread identifier on most implementations. The result of running this program should be a message such as "error 3: no such process".
 
-In the unlikely event that the uninitialized thread variable has a `pthread_t` value that is not invalid, it should be the ID of the initial thread (there are no other threads in this process). In this case, `pthread_join` should either fail with edeadlk, if your implementation of Pthreads detects self-deadlock, or the thread will hang waiting for itself to exit.
+In the unlikely event that the uninitialized thread variable has a `pthread_t` value that is not invalid, it should be the ID of the initial thread (there are no other threads in this process). In this case, `pthread_join` should either fail with `EDEADLK`, if your implementation of Pthreads detects self-deadlock, or the thread will hang waiting for itself to exit.
 
 ```c
-/** thread error.c */
- #include <pthread.h>
- #include <stdio.h>
- #include <errno.h>
+/** thread_error.c */
+#include <pthread.h>
+#include <stdio.h>
+#include <errno.h>
 
 int main (int argc, char *argv[])
 {
@@ -689,31 +693,32 @@ int main (int argc, char *argv[])
 }
 ```
 
-Note that there is no equivalent to the perror function to format and print an error value returned by the Pthreads interfaces. Instead, use strerror to get a string description of the error number, and print the string to the file stream stderr.
+Note that there is no equivalent to the `perror` function to format and print an error value returned by the Pthreads interfaces. Instead, use `strerror` to get a string description of the error number, and print the string to the file stream `stderr`.
 
-To avoid cluttering each function call in the example programs with a block of code to report each error and call abort, I have built two error macros-`err_abort` detects a standard Pthreads error, and `errno_abort` is used when a value of -1 means that errno contains an error code. The following header file, called errors.h, shows these macros. The errors.h header file also includes several system header files, which would otherwise be required by most of the example programs-this helps to reduce the size of the examples.
+To avoid cluttering each function call in the example programs with a block of code to report each error and call abort, I have built two error macros-`err_abort` detects a standard Pthreads error, and `errno_abort` is used when a value of -1 means that `errno` contains an error code. The following header file, called `errors.h`, shows these macros. The `errors.h` header file also includes several system header files, which would otherwise be required by most of the example programs-this helps to reduce the size of the examples.
 
 ```c
 /** errors.h */
- #ifndef __errors_h
- #define __errors_h
+#ifndef __errors_h
+#define __errors_h
 
- #include <unistd.h>
- #include <errno.h>
- #include <stdio.h>
- #include <stdlib.h>
- #include <string.h>
+#include <unistd.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 /*
  * Define a macro that can be used for diagnostic output from
  * examples. When compiled -DDEBUG, it results in calling printf
  * with the specified argument list. When DEBUG is not defined, it
  * expands to nothing.
  */
- #ifdef DEBUG
- # define DPRINTF(arg) printf arg
- #else
- # define DPRINTF(arg)
- #endif
+#ifdef DEBUG
+# define DPRINTF(arg) printf arg
+#else
+# define DPRINTF(arg)
+#endif
 
 /*
  * NOTE: the "do {" ... "} while (0);" bracketing around the macros
@@ -721,31 +726,31 @@ To avoid cluttering each function call in the example programs with a block of c
  * were function calls, even in contexts where a trailing ";" would
  * generate a null statement. For example,
  *
- * if (status != 0)
- *     err_abort (status, "message");
- * else
- *     return status;
+ *      if (status != 0)
+ *          err_abort (status, "message");
+ *      else
+ *          return status;
  *
  * will not compile if err_abort is a macro ending with "}", because
  * C does not expect a ";" to follow the "}". Because C does expect
  * a ";" following the ")" in the do...while construct, err_abort and
  * errno_abort can be used as if they were function calls.
  */
- #define err_abort(code,text) do { \
-         fprintf (stderr, "%s at \"%s\":%d: %s\n", \
-             text, __FILE__, __LINE__, strerror (code)); \
-         abort (); \
-     } while (0)
- #define errno_abort(text) do { \
-     fprintf (stderr, "%s at \"%s\":%d: %s\n", \
-         text, __FILE__, __LINE__, strerror (errno)); \
-     abort (); \
- } while (0)
+#define err_abort(code,text) do { \
+    fprintf (stderr, "%s at \"%s\":%d: %s\n", \
+        text, __FILE__, __LINE__, strerror (code)); \
+    abort (); \
+    } while (0)
+#define errno_abort(text) do { \
+    fprintf (stderr, "%s at \"%s\":%d: %s\n", \
+        text, __FILE__, __LINE__, strerror (errno)); \
+    abort (); \
+    } while (0)
 
- #endif
+#endif
 ```
 
-The one exception to the Pthreads error rules is `pthread_getspecific`, which returns the thread-specific data value of a shared "key." Section 5.4 describes thread-specific data in detail, but for now we're just concerned with error reporting. The capability of managing thread-specific data is critical to many applications, and the function has to be as fast as possible, so the `pthread_getspecific` function doesn't report errors at all. If the `pthread_key_t` value is illegal, or if no value has been set in the thread, `pthread_getspecific` just returns the value null.
+The one exception to the Pthreads error rules is `pthread_getspecific`, which returns the thread-specific data value of a shared "key". Section 5.4 describes thread-specific data in detail, but for now we're just concerned with error reporting. The capability of managing thread-specific data is critical to many applications, and the function has to be as fast as possible, so the `pthread_getspecific` function doesn't report errors at all. If the `pthread_key_t` value is illegal, or if no value has been set in the thread, `pthread_getspecific` just returns the value null.
 
 
 
