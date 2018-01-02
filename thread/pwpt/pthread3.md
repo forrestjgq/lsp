@@ -161,9 +161,9 @@ You cannot lock a mutex when the calling thread already has that mutex locked. T
 
 The following program, `alarm_mutex.c`, is an improved version of `alarm_thread.c` (from Chapter 1). It lines up multiple alarm requests in a single "alarm server" thread.
 
-The `alarm_t` structure now contains an absolute time, as a standard UNIX `time_t`, which is the number of seconds from the UNIX Epoch (Jan 1 1970 00:00) to the expiration time. This is necessary so that `alarm_t` structures can be sorted by "expiration time" instead of merely by the requested number of seconds. In addition, there is a link member to connect the list of alarms.
+[13-18] The `alarm_t` structure now contains an absolute time, as a standard UNIX `time_t`, which is the number of seconds from the UNIX Epoch (Jan 1 1970 00:00) to the expiration time. This is necessary so that `alarm_t` structures can be sorted by "expiration time" instead of merely by the requested number of seconds. In addition, there is a link member to connect the list of alarms.
 
-The `alarm_mutex` mutex coordinates access to the list head for alarm requests, called `alarm_list`. The mutex is statically initialized using default attributes, with the `pthread_mutex_initializer` macro. The list head is initialized to null, or empty.
+[20-21] The `alarm_mutex` mutex coordinates access to the list head for alarm requests, called `alarm_list`. The mutex is statically initialized using default attributes, with the `PTHREAD_MUTEX_INITIALIZER` macro. The list head is initialized to `NULL`, or empty.
 
 ```c
 /** alarm_mutex.c part 1 definitions */
@@ -179,10 +179,10 @@ The `alarm_mutex` mutex coordinates access to the list head for alarm requests, 
  * been on the list.
  */
 typedef struct alarm_tag {
-    struct alarm_tag *link;
-    int seconds;
-    time_t time; /* seconds from EPOCH */
-    char message[64];
+    struct alarm_tag    *link;
+    int                 seconds;
+    time_t              time;   /* seconds from EPOCH */
+    char                message[64];
 } alarm_t;
 
 pthread_mutex_t alarm_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -193,15 +193,15 @@ The code for the `alarm_thread` function follows. This function is run as a thre
 
 If you would prefer that the program process all outstanding alarm requests before exiting, you can easily modify the program to accomplish this. The main thread must notify `alarm_thread`, by some means, that it should terminate when it finds the `alarm_list` empty. You could, for example, have main set a new global variable `alarm_done` and then terminate using `pthread_exit` rather than exit. When `alarm_thread` finds `alarm_list` empty and `alarm_done` set, it would immediately call `pthread_exit` rather than waiting for a new entry.
 
-If there are no alarms on the list, `alarm_thread` needs to block itself, with the mutex unlocked, at least for a short time, so that main will be able to add a new alarm. It does this by setting `sleep_time` to one second.
+[30-31] If there are no alarms on the list, `alarm_thread` needs to block itself, with the mutex unlocked, at least for a short time, so that main will be able to add a new alarm. It does this by setting `sleep_time` to one second.
 
-If an alarm is found, it is removed from the list. The current time is retrieved by calling the time function, and it is compared to the requested time for the alarm. If the alarm has already expired, then `alarm_thread` will set `sleep_time` to 0. If the alarm has not expired, `alarm_thread` computes the difference between the current time and the alarm expiration time, and sets `sleep_time` to that number of seconds.
+[32-43] If an alarm is found, it is removed from the list. The current time is retrieved by calling the time function, and it is compared to the requested time for the alarm. If the alarm has already expired, then `alarm_thread` will set `sleep_time` to 0. If the alarm has not expired, `alarm_thread` computes the difference between the current time and the alarm expiration time, and sets `sleep_time` to that number of seconds.
 
-The mutex is always unlocked before sleeping or yielding. If the mutex remained locked, then main would be unable to insert a new alarm on the list. That would make the program behave synchronously-the user would have to wait until the alarm expired before doing anything else. (The user would be able to enter a single command, but would not receive another prompt until the next alarm expired.) Calling sleep blocks `alarm_thread` for the required period of time-it cannot run until the timer expires.
+[53-59] The mutex is always unlocked before sleeping or yielding. If the mutex remained locked, then main would be unable to insert a new alarm on the list. That would make the program behave synchronously-the user would have to wait until the alarm expired before doing anything else. (The user would be able to enter a single command, but would not receive another prompt until the next alarm expired.) Calling sleep blocks `alarm_thread` for the required period of time-it cannot run until the timer expires.
 
 Calling `sched_yield` instead is slightly different. We'll describe `sched_yield` in detail later (in Section 5.5.2)-for now, just remember that calling `sched_yield` will yield the processor to a thread that is ready to run, but will return immediately if there are no ready threads. In this case, it means that the main thread will be allowed to process a user command if there's input waiting-but if the user hasn't entered a command, sched yield will return immediately.
 
-If the alarm pointer is not null, that is, if an alarm was processed from `alarm_list`, the function prints a message indicating that the alarm has expired. After printing the message, it frees the alarm structure. The thread is now ready to process another alarm.
+[65-68] If the alarm pointer is not NULL, that is, if an alarm was processed from `alarm_list`, the function prints a message indicating that the alarm has expired. After printing the message, it frees the alarm structure. The thread is now ready to process another alarm.
 
 ```c
 /** alarm_mutex.c part 2 alarm_thread */
@@ -229,7 +229,7 @@ void *alarm_thread (void *arg)
          * If the alarm list is empty, wait for one second. This
          * allows the main thread to run, and read another
          * command. If the list is not empty, remove the first
-         * item. Compute the number of seconds to wait - if the
+         * item. Compute the number of seconds to wait -- if the
          * result is less than 0 (the time has passed), then set
          * the sleep_time to 0.
          */
@@ -242,11 +242,11 @@ void *alarm_thread (void *arg)
                 sleep_time = 0;
             else
                 sleep_time = alarm->time - now;
-        #ifdef DEBUG
+#ifdef DEBUG
             printf ("[waiting: %d(%d)\"%s\"]\n", alarm->time,
                 sleep_time, alarm->message);
-        #endif
-        }
+#endif
+            }
 
         /*
          * Unlock the mutex before waiting, so that the main
