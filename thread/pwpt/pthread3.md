@@ -275,19 +275,19 @@ void *alarm_thread (void *arg)
     }
 }
 ```
-And finally, the code for the main program for `alarm_nutex.c`. The basic structure is the same as all of the other versions of the alarm program that we've developed-a loop, reading simple commands from *stdin* and processing each in turn. This time, instead of waiting synchronously as in `alarm.c`, or creating a new asynchronous entity to process each alarm command as in `alarm_fork.c` and `alarm_thread.c`, each request is queued to a server thread, `alarm_thread`. As soon as main has queued the request, it is free to read the next command.
+And finally, the code for the main program for `alarm_mutex.c`. The basic structure is the same as all of the other versions of the alarm program that we've developed-a loop, reading simple commands from `stdin` and processing each in turn. This time, instead of waiting synchronously as in `alarm.c`, or creating a new asynchronous entity to process each alarm command as in `alarm_fork.c` and `alarm_thread.c`, each request is queued to a server thread, `alarm_thread`. As soon as main has queued the request, it is free to read the next command.
 
-Create the server thread that will process all alarm requests. Although we don't use it, the thread's ID is returned in local variable thread. 
+[9-12] Create the server thread that will process all alarm requests. Although we don't use it, the thread's ID is returned in local variable thread. 
 
-Read and process a command, much as in any of the other versions of our alarm program. As in `alarm_thread.c`, the data is stored in a heap structure allocated by ma Hoc.
+[14-29] Read and process a command, much as in any of the other versions of our alarm program. As in `alarm_thread.c`, the data is stored in a heap structure allocated by ma Hoc.
 
-The program needs to add the alarm request to `alarm_list`, which is shared by both `alarm_thread` and main. So we start by locking the mutex that synchronizes access to the shared data, `alarm_mutex`.
+[31-33] The program needs to add the alarm request to `alarm_list`, which is shared by both `alarm_thread` and `main`. So we start by locking the mutex that synchronizes access to the shared data, `alarm_mutex`.
 
-Because `alarm_thread` processes queued requests, serially, it has no way of knowing how much time has elapsed between reading the command and processing it. Therefore, the alarm structure includes the absolute time of the alarm expiration, which we calculate by adding the alarm interval, in seconds, to the current number of seconds since the UNIX Epoch, as returned by the time function.
+[34] Because `alarm_thread` processes queued requests, serially, it has no way of knowing how much time has elapsed between reading the command and processing it. Therefore, the alarm structure includes the absolute time of the alarm expiration, which we calculate by adding the alarm interval, in seconds, to the current number of seconds since the UNIX Epoch, as returned by the time function.
 
-The alarms are sorted in order of expiration time on the `alarm_list` queue. The insertion code searches the queue until it finds the first entry with a time greater than or equal to the new alarm's time. The new entry is inserted preceding the located entry. Because `alarm_list` is a simple linked list, the traversal maintains a current entry pointer (this) and a pointer to the previous entry's link member, or to the `alarm_list` head pointer (last).
+[40-50] The alarms are sorted in order of expiration time on the `alarm_list` queue. The insertion code searches the queue until it finds the first entry with a time greater than or equal to the new alarm's time. The new entry is inserted preceding the located entry. Because `alarm_list` is a simple linked list, the traversal maintains a current entry pointer (`this`) and a pointer to the previous entry's link member, or to the `alarm_list` head pointer (`last`).
 
-If no alarm with a time greater than or equal to the new alarm's time is found, then the new alarm is inserted at the end of the list. That is, if the alarm pointer is null on exit from the search loop (the last entry on the list always has a link pointer of null), the previous entry (or queue head) is made to point to the new entry.
+[57-60] If no alarm with a time greater than or equal to the new alarm's time is found, then the new alarm is inserted at the end of the list. That is, if the alarm pointer is NULL on exit from the search loop (the last entry on the list always has a link pointer of NULL), the previous entry (or queue head) is made to point to the new entry.
 
 ```c
 /** alarm_mutex.c part 3 main */
@@ -315,7 +315,7 @@ int main (int argc, char *argv[])
          * (%64[^\n]), consisting of up to 64 characters
          * separated from the seconds by whitespace.
          */
-        if (sscanf (line, "%d %64[^\n]",
+        if (sscanf (line, "%d %64[^\n]", 
             &alarm->seconds, alarm->message) < 2) {
             fprintf (stderr, "Bad command\n");
             free (alarm);
@@ -342,7 +342,7 @@ int main (int argc, char *argv[])
             }
             /*
              * If we reached the end of the list, insert the new
-             * alarm there, ("next" is NULL, and "last" points
+             * alarm there. ("next" is NULL, and "last" points
              * to the link field of the last item, or to the
              * list header).
              */
@@ -365,24 +365,24 @@ int main (int argc, char *argv[])
 }
 ```
 
-This simple program has a few severe failings. Although it has the advantage, compared to `alarm_fork.c` or `alarm_thread.c`, of using fewer resources, it is less responsive. Once `alarm_thread` has accepted an alarm request from the queue, it sleeps until that alarm expires. When it fails to find an alarm request on the list, it sleeps for a second anyway, to allow main to accept another alarm command. During all this sleeping, it will fail to notice any alarm requests added to the head of the queue by main, until it returns from sleep.
+This simple program has a few severe failings. Although it has the advantage, compared to `alarm_fork.c` or `alarm_thread.c`, of using fewer resources, it is less responsive. Once `alarm_thread` has accepted an alarm request from the queue, it sleeps until that alarm expires. When it fails to find an alarm request on the list, it sleeps for a second anyway, to allow `main` to accept another alarm command. During all this sleeping, it will fail to notice any alarm requests added to the head of the queue by `main`, until it returns from `sleep`.
 
 This problem could be addressed in various ways. The simplest, of course, would be to go back to `alarm_thread.c`, where a thread was created for each alarm request. That wasn't so bad, since threads are relatively cheap. They're still not as cheap as the `alarm_t` data structure, however, and we'd like to make efficient programs-not just responsive programs. The best solution is to make use of condition variables for signaling changes in the state of shared data, so it shouldn't be a surprise that you'll be seeing one final version of the alarm program, `alarm_cond.c`, in Section 3.3.4.
 
 #### 3.2.2.1 Nonlocking mutex locks
-When you lock a mutex by calling `pthread_mutex_lock`, the calling thread will block if the mutex is already locked. Normally, that's what you want. But occasionally you want your code to take some alternate path if the mutex is locked. Your program may be able to do useful work instead of waiting. Pthreads provides the `pthread_mutex_trylock` function, which will return an error status (ebusy) instead of blocking if the mutex is already locked.
+When you lock a mutex by calling `pthread_mutex_lock`, the calling thread will block if the mutex is already locked. Normally, that's what you want. But occasionally you want your code to take some alternate path if the mutex is locked. Your program may be able to do useful work instead of waiting. Pthreads provides the `pthread_mutex_trylock` function, which will return an error status (`EBUSY`) instead of blocking if the mutex is already locked.
 
 When you use a nonblocking mutex lock, be careful to unlock the mutex only if `pthread_mutex_trylock` returned with success status. Only the thread that owns a mutex may unlock it. An erroneous call to `pthread_mutex_unlock` may return an error, or it may unlock the mutex while some other thread relies on having it locked-and that will probably cause your program to break in ways that may be very difficult to debug.
 
-The following program, trylock.c, uses `pthread_mutex_trylock` to occasionally report the value of a counter-but only when its access does not conflict with the counting thread.
+The following program, `trylock.c`, uses `pthread_mutex_trylock` to occasionally report the value of a counter-but only when its access does not conflict with the counting thread.
 
-This definition controls how long `counter_thread` holds the mutex while updating the counter. Making this number larger increases the chance that the `pthread_mutex_trylock` in `monitor_thread` will occasionally return EBUSY. 
+[5] This definition controls how long `counter_thread` holds the mutex while updating the `counter`. Making this number larger increases the chance that the `pthread_mutex_trylock` in `monitor_thread` will occasionally return `EBUSY`. 
 
-The `counter_thread` wakes up approximately each second, locks the mutex, and spins for a while, incrementing counter. The counter is therefore increased by SPIN each second.
+[15-40] The `counter_thread` wakes up approximately each second, locks the mutex, and spins for a while, incrementing counter. The counter is therefore increased by `SPIN` each second.
 
-The `monitor_thread` wakes up every three seconds, and tries to lock the mutex. If the attempt fails with ebusy, `monitor_thread` counts the failure and waits another three seconds. If the `pthread_mutex_trylock` succeeds, then `monitor_thread` prints the current value of counter (scaled by SPIN).
+[47-73] The `monitor_thread` wakes up every three seconds, and tries to lock the mutex. If the attempt fails with `EBUSY`, `monitor_thread` counts the failure and waits another three seconds. If the `pthread_mutex_trylock` succeeds, then `monitor_thread` prints the current value of `counter` (scaled by `SPIN`).
 
-On Solaris 2.5, call `thr_setconcurrency` to set the thread concurrency level to 2. This allows the `counter_thread` and `monitor_thread` to run concurrently on a uniprocessor. Otherwise, `monitor_thread` would not run until `counter_thread` terminated.
+[81-89] On Solaris 2.5, call `thr_setconcurrency` to set the thread concurrency level to 2. This allows the `counter_thread` and `monitor_thread` to run concurrently on a uniprocessor. Otherwise, `monitor_thread` would not run until `counter_thread` terminated.
 
 ```c
 /** trylock.c */
@@ -405,19 +405,19 @@ void *counter_thread (void *arg)
     int spin;
 
     /*
-     * Until end_time, increment the counter each second. Instead of
-     * just incrementing the counter, it sleeps for another second
-     * with the mutex locked, to give monitor_thread a reasonable
-     * chance of running.
+     * Until end_time, increment the counter each
+     * second. Instead of just incrementing the counter, it
+     * sleeps for another second with the mutex locked, to give
+     * monitor_thread a reasonable chance of running.
      */
     while (time (NULL) < end_time)
     {
-        status = pthread_mutex_lock (Smutex);
+        status = pthread_mutex_lock (&mutex);
         if (status != 0)
             err_abort (status, "Lock mutex");
         for (spin = 0; spin < SPIN; spin++)
             counter++;
-        status = pthread_mutex_unlock (Smutex);
+        status = pthread_mutex_unlock (&mutex);
         if (status != 0)
             err_abort (status, "Unlock mutex");
         sleep (1);
@@ -431,7 +431,7 @@ void *counter_thread (void *arg)
  * seconds, try to lock the mutex and read the counter. If the
  * trylock fails, skip this cycle.
  */
-void *monitor thread (void *arg)
+void *monitor_thread (void *arg)
 {
     int status;
     int misses = 0;
@@ -443,13 +443,13 @@ void *monitor thread (void *arg)
     while (time (NULL) < end_time)
     {
         sleep (3);
-        status = pthread_mutex_trylock (Smutex);
+        status = pthread_mutex_trylock (&mutex);
         if (status != EBUSY)
         {
             if (status != 0)
                 err_abort (status, "Trylock mutex");
             printf ("Counter is %ld\n", counter/SPIN);
-            status = pthread_mutex_unlock (smutex);
+            status = pthread_mutex_unlock (&mutex);
             if (status != 0)
                 err_abort (status, "Unlock mutex");
         } else
@@ -475,7 +475,7 @@ int main (int argc, char *argv[])
     thr_setconcurrency (2);
 #endif
 
-    end_time = time (NULL) + 60;       /* Run for 1 minute */
+    end_time = time (NULL) + 60;        /* Run for 1 minute */
     status = pthread_create (
         &counter_thread_id, NULL, counter_thread, NULL);
     if (status != 0)
@@ -505,7 +505,7 @@ By "atomic", we really mean only that other threads can't accidentally find inva
 
 When there is no way to enlist true atomicity in your cause, you need to create your own synchronization. Atomicity is nice, but synchronization will do just as well in most cases. So when you need to update an array element and the index variable atomically, just perform the operation while a mutex is locked.
 
-Whether or not the store and increment operations are performed indivisibly and noninterruptably by the hardware, you know that no cooperating thread can peek until you're done. The transaction is, for all practical purposes, "atomic." The key, of course, is the word "cooperating." Any thread that is sensitive to the invariant must use the same mutex before modifying or examining the state of the invariant.
+Whether or not the store and increment operations are performed indivisibly and noninterruptably by the hardware, you know that no cooperating thread can peek until you're done. The transaction is, for all practical purposes, "atomic". The key, of course, is the word "cooperating". Any thread that is sensitive to the invariant must use the same mutex before modifying or examining the state of the invariant.
 
 
 ### 3.2.4 Sizing a mutex to fit the job
@@ -524,7 +524,7 @@ These are the main design factors:
 
 In a complicated program it will usually take some experimentation to get the right balance. Your code will be simpler in most cases if you start with large mutexes and then work toward smaller mutexes as experience and performance data show where the heavy contention happens. Simple is good. Don't spend too much time optimizing until you know there's a problem.
 
-On the other hand, in cases where you can tell from the beginning that the algorithms will make heavy contention inevitable, don't oversimplify. Your job will be a lot easier if you start with the necessary mutexes and data structure design rather than adding them later. You will get it wrong sometimes, because, especially when you are working on your first major threaded project, your intuition will not always be correct. Wisdom, as they say, comes from experience, and experience comes from lack of wisdom.
+On the other hand, in cases where you can tell from the beginning that the algorithms will make heavy contention inevitable, don't oversimplify. Your job will be a lot easier if you start with the necessary mutexes and data structure design rather than adding them later. You will get it wrong sometimes, because, especially when you are working on your first major threaded project, your intuition will not always be correct. **Wisdom, as they say, comes from experience, and experience comes from lack of wisdom**(Forrest: I like this).
 
 ### 3.2.5 Using more than one mutex
 
@@ -542,13 +542,14 @@ The complications arise when data isn't completely independent. If you have some
 | --------------------------------- | --------------------------------- |
 | `pthread_mutex_lock (&mutex_a);` | `pthread_mutex_lock (&mutex_b);` |
 | `pthread_mutex_lock (&mutex_b);` | `pthread_mutex_lock (&mutex_a);` |
+
 <center>**TABLE 3.1** *Mutex deadlock*</center>
 
 Both of the threads shown in Table 3.1 may complete the first step about the same time. Even on a uniprocessor, a thread might complete the first step and then be timesliced (preempted by the system), allowing the second thread to complete its first step. Once this has happened, neither of them can ever complete the second step because each thread needs a mutex that is already locked by the other thread.
 
 Consider these two common solutions to this type of deadlock:
-- Fixed locking hierarchy: All code that needs both `mutex_a` and `mutex_b` must always lock `mutex_a` first and then `mutex_b`.
-- Try and back off: After locking the first mutex of some set (which can be allowed to block), use `pthread_mutex_trylock` to lock additional mutexes in the set. If an attempt fails, release all mutexes in the set and start again.
+- **Fixed locking hierarchy**: All code that needs both `mutex_a` and `mutex_b` must always lock `mutex_a` first and then `mutex_b`.
+- **Try and back off**: After locking the first mutex of some set (which can be allowed to block), use `pthread_mutex_trylock` to lock additional mutexes in the set. If an attempt fails, release all mutexes in the set and start again.
 
 There are any number of ways to define a fixed locking hierarchy. Sometimes there's an obvious hierarchical order to the mutexes anyway, for example, if one mutex controls a queue header and one controls an element on the queue, you'll probably have to have the queue header locked by the time you need to lock the queue element anyway.
 
@@ -558,22 +559,22 @@ To some extent, the order doesn't really matter as long as it is always the same
 
 If the code invariants permit you to unlock mutex 1 safely at this point, you would do better to avoid owning both mutexes at the same time. That is, unlock mutex 1, and then lock mutex 2. If there is a broken invariant that requires mutex 1 to be owned, then mutex 1 cannot be released until the invariant is restored. If this situation is possible, you should consider using a backoff (or "try and back off) algorithm.
 
-"Backoff means that you lock the first mutex normally, but any additional mutexes in the set that are required by the thread are locked conditionally by calling `pthread_mutex_trylock`. If `pthread_mutex_trylock` returns EBUSY, indicating that the mutex is already locked, you must unlock all of the mutexes in the set and start over.
+"Backoff means that you lock the first mutex normally, but any additional mutexes in the set that are required by the thread are locked conditionally by calling `pthread_mutex_trylock`. If `pthread_mutex_trylock` returns `EBUSY`, indicating that the mutex is already locked, you must unlock all of the mutexes in the set and start over.
 
 The backoff solution is less efficient than a fixed hierarchy. You may waste a lot of time trying and backing off. On the other hand, you don't need to define and follow strict locking hierarchy conventions, which makes backoff more flexible. You can use the two techniques in combination to minimize the cost of backing off. Follow some fixed hierarchy for well-defined areas of code, but apply a backoff algorithm where a function needs to be more flexible.
 
-The program below, backoff.c, demonstrates how to avoid mutex deadlocks by applying a backoff algorithm. The program creates two threads, one running function `lock_forward` and the other running function `lock_backward`. The two threads loop iterations times, each iteration attempting to lock all of three mutexes in sequence. The `lock_forward` thread locks mutex 0, then mutex 1, then mutex 2, while `lock_backward` locks the three mutexes in the opposite order. Without special precautions, this design will always deadlock quickly (except on a uniprocessor system with a sufficiently long timeslice that either thread can complete before the other has a chance to run).
+The program below, `backoff.c`, demonstrates how to avoid mutex deadlocks by applying a backoff algorithm. The program creates two threads, one running function `lock_forward` and the other running function `lock_backward`. The two threads loop iterations times, each iteration attempting to lock all of three mutexes in sequence. The `lock_forward` thread locks mutex 0, then mutex 1, then mutex 2, while `lock_backward` locks the three mutexes in the opposite order. Without special precautions, this design will always deadlock quickly (except on a uniprocessor system with a sufficiently long timeslice that either thread can complete before the other has a chance to run).
 
-You can see the deadlock by running the program as backoff 0. The first argument is used to set the backoff variable. If backoff is 0, the two threads will use `pthread_mutex_lock` to lock each mutex. Because the two threads are starting from opposite ends, they will crash in the middle, and the program will hang. When backoff is nonzero (which it is unless you specify an argument), the threads use `pthread_mutex_trylock`, which enables the backoff algorithm. When the mutex lock fails with ebusy, the thread will release all mutexes it currently owns, and start over.
+[17] You can see the deadlock by running the program as `backoff` 0. The first argument is used to set the `backoff` variable. If `backoff` is 0, the two threads will use `pthread_mutex_lock` to lock each mutex. Because the two threads are starting from opposite ends, they will crash in the middle, and the program will hang. When `backoff` is nonzero (which it is unless you specify an argument), the threads use `pthread_mutex_trylock`, which enables the backoff algorithm. When the mutex lock fails with `EBUSY`, the thread will release all mutexes it currently owns, and start over.
 
-It is possible that, on some systems, you may not see any mutex collisions, because one thread is always able to lock all mutexes before the other thread has a chance to lock any. You can resolve that problem by setting the `yield_flag` variable, which you do by running the program with a second argument, for example, backoff 1 1. When `yield_flag` is 0, which it is unless you specify a second argument, each thread's mutex locking loop may run uninterrupted, preventing a deadlock (at least, on a uniprocessor). When `yield_flag` has a value greater than 0, however, the threads will call `sched_yield` after locking each mutex, ensuring that the other thread has a chance to run. And if you set `yield_flag` to a value less than 0, the threads will sleep for one second after locking each mutex, to be really sure the other thread has a chance to run.
+[18] It is possible that, on some systems, you may not see any mutex collisions, because one thread is always able to lock all mutexes before the other thread has a chance to lock any. You can resolve that problem by setting the `yield_flag` variable, which you do by running the program with a second argument, for example, `backoff 1 1`. When `yield_flag` is 0, which it is unless you specify a second argument, each thread's mutex locking loop may run uninterrupted, preventing a deadlock (at least, on a uniprocessor). When `yield_flag` has a value greater than 0, however, the threads will call `sched_yield` after locking each mutex, ensuring that the other thread has a chance to run. And if you set `yield_flag` to a value less than 0, the threads will sleep for one second after locking each mutex, to be really sure the other thread has a chance to run.
 
-After locking all of the three mutexes, each thread reports success, and tells how many times it had to back off before succeeding. On a multiprocessor, or when you've set `yield_flag` to a nonzero value, you'll usually see a lot more nonzero backoff counts. The thread unlocks all three mutexes, in the reverse order of locking, which helps to avoid unnecessary backoffs in other threads. Calling `sched_yield` at the end of each iteration "mixes things up" a little so one thread doesn't always start each iteration first. The `sched_yield` function is described in Section 5.5.2.
+[72-77] After locking all of the three mutexes, each thread reports success, and tells how many times it had to back off before succeeding. On a multiprocessor, or when you've set `yield_flag` to a nonzero value, you'll usually see a lot more nonzero backoff counts. The thread unlocks all three mutexes, in the reverse order of locking, which helps to avoid unnecessary backoffs in other threads. Calling `sched_yield` at the end of each iteration "mixes things up" a little so one thread doesn't always start each iteration first. The `sched_yield` function is described in Section 5.5.2.
 
 ```c
-
 /** backoff.c */
 #include <pthread.h>
+#include <sched.h>
 #include "errors.h"
 
 #define ITERATIONS 10
@@ -585,10 +586,10 @@ pthread_mutex_t mutex[3] = {
     PTHREAD_MUTEX_INITIALIZER,
     PTHREAD_MUTEX_INITIALIZER,
     PTHREAD_MUTEX_INITIALIZER
-};
+    };
 
 int backoff = 1;        /* Whether to backoff or deadlock */
-int yield_flag =0;     /* 0: no yield, >0: yield, <0: sleep */
+int yield_flag = 0;     /* 0: no yield, >0: yield, <0: sleep */
 
 /*
  * This is a thread start routine that locks all mutexes in
@@ -604,7 +605,7 @@ void *lock_forward (void *arg)
         backoffs = 0;
         for (i = 0; i < 3; i++) {
             if (i == 0) {
-                status = pthread_mutex_lock (Smutex[i]);
+                status = pthread_mutex_lock (&mutex[i]);
                 if (status != 0)
                     err_abort (status, "First lock");
             } else {
@@ -617,7 +618,12 @@ void *lock_forward (void *arg)
                     DPRINTF ((
                         " [forward locker backing off at %d]\n",
                         i));
-                    for (; i >= 0; i-) {
+		    /*
+		     * Unlock from the PREVIOUS mutex (the last one we locked) 
+		     * back to the first. (The order isn't important, but
+		     * unlocking in reverse order seems clearer.)
+		     */
+                    for (i--; i >= 0; i--) {
                         status = pthread_mutex_unlock (&mutex[i]);
                         if (status != 0)
                             err_abort (status, "Backoff");
@@ -637,7 +643,7 @@ void *lock_forward (void *arg)
                     sched_yield ();
                 else
                     sleep (1);
-            }
+            }           
         }
         /*
          * Report that we got 'em, and unlock to try again.
@@ -679,7 +685,12 @@ void *lock_backward (void *arg)
                     DPRINTF ((
                         " [backward locker backing off at %d]\n",
                         i));
-                    for (; i < 3; i++) {
+		    /*
+		     * Unlock from the PREVIOUS mutex (the last one we locked) 
+		     * back to the first. (The order isn't important, but
+		     * unlocking in reverse order seems clearer.)
+		     */
+                    for (i++; i < 3; i++) {
                         status = pthread_mutex_unlock (&mutex[i]);
                         if (status != 0)
                             err_abort (status, "Backoff");
@@ -699,13 +710,13 @@ void *lock_backward (void *arg)
                     sched_yield ();
                 else
                     sleep (1);
-            }
+            }           
         }
         /*
          * Report that we got 'em, and unlock to try again.
          */
         printf (
-            "lock backward got all locks, %d backoffsXn", backoffs);
+            "lock backward got all locks, %d backoffs\n", backoffs);
         pthread_mutex_unlock (&mutex[0]);
         pthread_mutex_unlock (&mutex[1]);
         pthread_mutex_unlock (&mutex[2]);
@@ -714,7 +725,7 @@ void *lock_backward (void *arg)
     return NULL;
 }
 
-int main (int argc, char *argv[]) 
+int main (int argc, char *argv[])
 {
     pthread_t forward, backward;
     int status;
@@ -739,14 +750,15 @@ int main (int argc, char *argv[])
         backoff = atoi (argv[1]);
 
     /*
-     * If the second argument is absent, or zero, the two threads
-     * run "at speed." On some systems, especially uniprocessors,
-     * one thread may complete before the other has a chance to run,
-     * and you won't see a deadlock or backoffs. In that case, try
-     * running with the argument set to a positive number to cause
-     * the threads to call sched_yield() at each lock; or, to make
-     * it even more obvious, set to a negative number to cause the
-     * threads to call sleep(1) instead.
+     * If the second argument is absent, or zero, the two
+     * threads run "at speed." On some systems, especially
+     * uniprocessors, one thread may complete before the other
+     * has a chance to run, and you won't see a deadlock or
+     * backoffs. In that case, try running with the argument set
+     * to a positive number to cause the threads to call
+     * sched_yield() at each lock; or, to make it even more
+     * obvious, set to a negative number to cause the threads to
+     * call sleep(1) instead.
      */
     if (argc > 2)
         yield_flag = atoi (argv[2]);
@@ -757,13 +769,13 @@ int main (int argc, char *argv[])
     status = pthread_create (
         &backward, NULL, lock_backward, NULL);
     if (status != 0)
-        err_abort (status, "Create backward");
+        err_abort (status, "Create backward");  
     pthread_exit (NULL);
 }
 ```
-Whatever type of hierarchy you choose, document it, carefully, completely, and often. Document it in each function that uses any of the mutexes. Document it where the mutexes are denned. Document it where they are declared in a project header file. Document it in the project design notes. Write it on your whiteboard. And then tie a string around your finger to be sure that you do not forget.
+Whatever type of hierarchy you choose, document it, carefully, completely, and often. Document it in each function that uses any of the mutexes. Document it where the mutexes are defined. Document it where they are declared in a project header file. Document it in the project design notes. Write it on your whiteboard. And then tie a string around your finger to be sure that you do not forget.
 
-You are free to unlock the mutexes in whatever order makes the most sense. Unlocking mutexes cannot result in deadlock. In the next section, I will talk about a sort of "overlapping hierarchy" of mutexes, called a "lock chain," where the normal mode of operation is to lock one mutex, lock the next, unlock the first, and so on. If you use a "try and back off algorithm, however, you should always try to release the mutexes in reverse order. That is, if you lock mutex 1, mutex 2, and then mutex 3, you should unlock mutex 3, then mutex 2, and finally mutex 1. If you unlock mutex 1 and mutex 2 while mutex 3 is still locked, another thread may have to lock both mutex 1 and mutex 2 before finding it cannot lock the entire hierarchy, at which point it will have to unlock mutex 2 and mutex 1, and then retry. Unlocking in reverse order reduces the chance that another thread will need to back off.
+You are free to unlock the mutexes in whatever order makes the most sense. Unlocking mutexes cannot result in deadlock. In the next section, I will talk about a sort of "overlapping hierarchy" of mutexes, called a "lock chain", where the normal mode of operation is to lock one mutex, lock the next, unlock the first, and so on. If you use a "try and back off" algorithm, however, you should always try to release the mutexes in reverse order. That is, if you lock mutex 1, mutex 2, and then mutex 3, you should unlock mutex 3, then mutex 2, and finally mutex 1. If you unlock mutex 1 and mutex 2 while mutex 3 is still locked, another thread may have to lock both mutex 1 and mutex 2 before finding it cannot lock the entire hierarchy, at which point it will have to unlock mutex 2 and mutex 1, and then retry. Unlocking in reverse order reduces the chance that another thread will need to back off.
 
 #### 3.2.5.2 Lock chaining
 
@@ -797,19 +809,19 @@ If the thread is still running while another thread locks the mutex and inserts 
 
 > A condition variable wait always returns with the mutex locked.
 
-That's why condition variables exist. A condition variable is a "signaling mechanism" associated with a mutex and by extension is also associated with the shared data protected by the mutex. Waiting on a condition variable atomically releases the associated mutex and waits until another thread signals (to wake one waiter) or broadcasts (to wake all waiters) the condition variable. The mutex must always be locked when you wait on a condition variable and, when a thread wakes up from a condition variable wait, it always resumes with the mutex locked.
+That's why *condition variables* exist. A condition variable is a "signaling mechanism" associated with a mutex and by extension is also associated with the shared data protected by the mutex. *Waiting* on a condition variable atomically releases the associated mutex and waits until another thread *signals* (to wake one waiter) or *broadcasts* (to wake all waiters) the condition variable. The mutex must always be locked when you wait on a condition variable and, when a thread wakes up from a condition variable wait, it always resumes with the mutex locked.
 
-The shared data associated with a condition variable, for example, the queue "full" and "empty" conditions, are the predicates we talked about in Section 3.1. A condition variable is the mechanism your program uses to wait for a predicate to become true, and to communicate to other threads that it might be true. In other words, a condition variable allows threads using the queue to exchange information about the changes to the queue state.
+The shared data associated with a condition variable, for example, the queue "full" and "empty" conditions, are the *predicates* we talked about in Section 3.1. A condition variable is the mechanism your program uses to wait for a predicate to become true, and to communicate to other threads that it might be true. In other words, a condition variable allows threads using the queue to exchange information about the changes to the queue state.
 
-> Condition variables are for signaling, not for mutual exclusion.
+> Condition variables are for *signaling*, not for mutual exclusion.
 
 Condition variables do not provide mutual exclusion. You need a mutex to synchronize access to the shared data, including the predicate for which you wait. That is why you must specify a mutex when you wait on a condition variable. By making the unlock atomic with the wait, the Pthreads system ensures that no thread can change the predicate after you have unlocked the mutex but before your thread is waiting on the condition variable.
 
 Why isn't the mutex created as part of the condition variable? First, mutexes are used separately from any condition variable as often as they're used with condition variables. Second, it is common for one mutex to have more than one associated condition variable. For example, a queue may be "full" or "empty." Although you may have two condition variables to allow threads to wait for either condition, you must have one and only one mutex to synchronize all access to the queue header.
 
-A condition variable should be associated with a single predicate. If you try to share one condition variable between several predicates, or use several condition variables for a single predicate, you're risking deadlock or race problems. There's nothing wrong with doing either, as long as you're careful-but it is easy to confuse your program (computers aren't very smart) and it is usually not worth the risk. I will expound on the details later, but the rules are as follows: First, when you share a condition variable between multiple predicates, you must always broadcast, never signal; and second, signal is more efficient than *broadcast*.
+A condition variable should be associated with a single predicate. If you try to share one condition variable between several predicates, or use several condition variables for a single predicate, you're risking deadlock or race problems. There's nothing wrong with doing either, as long as you're careful-but it is easy to confuse your program (computers aren't very smart) and it is usually not worth the risk. I will expound on the details later, but the rules are as follows: First, when you share a condition variable between multiple predicates, you must always *broadcast*, never *signal;* and second, *signal* is more efficient than *broadcast*.
 
-Both the condition variable and the predicate are shared data in your program; they are used by multiple threads, possibly at the same time. Because you're thinking of the condition variable and predicate as being locked together, it is easy to remember that they're always controlled using the same mutex. It is possible (and legal, and often even reasonable) to signal or broadcast a condition variable without having the mutex locked, but it is safer to have it locked.
+Both the condition variable and the predicate are shared data in your program; they are used by multiple threads, possibly at the same time. Because you're thinking of the condition variable and predicate as being locked together, it is easy to remember that they're always controlled using the same mutex. It is possible (and legal, and often even reasonable) to *signal* or *broadcast* a condition variable without having the mutex locked, but it is safer to have it locked.
 
 Figure 3.4 is a timing diagram showing how three threads, thread 1, thread 2, and thread 3, interact with a condition variable. The rounded box represents the condition variable, and the three lines represent the actions of the three threads.
 
@@ -831,7 +843,7 @@ int pthread_cond_destroy (pthread_cond_t *cond);
 
 A condition variable is represented in your program by a variable of type `pthread_cond_t`. You should never make a copy of a condition variable, because the result of using a copied condition variable is undefined. It would be like telephoning a disconnected number and expecting an answer. One thread could, for example, wait on one copy of the condition variable, while another thread signaled or broadcast the other copy of the condition variable-the waiting thread would not be awakened. You can, however, freely pass pointers to a condition variable so that various functions and threads can use it for synchronization.
 
-Most of the time you'll probably declare condition variables using the extern or static storage class at file scope, that is, outside of any function. They should have normal (extern) storage class if they are used by other files, or static storage class if used only within the file that declares the variable. When you declare a static condition variable that has default attributes, you should use the `pthread_cond_initializer` initialization macro, as shown in the following example, `cond_static.c`.
+Most of the time you'll probably declare condition variables using the `extern` or `static` storage class at file scope, that is, outside of any function. They should have normal (`extern`) storage class if they are used by other files, or `static` storage class if used only within the file that declares the variable. When you declare a static condition variable that has default attributes, you should use the `PTHREAD_COND_INITIALIZER` initialization macro, as shown in the following example, `cond_static.c`.
 
 ```c
 /** cond_static.c */
@@ -845,9 +857,9 @@ Most of the time you'll probably declare condition variables using the extern or
  * attributes.
  */
 typedef struct my_struct_tag {
-    pthread_mutex_t     mutex;        /* Protects access to value */
-    pthread_cond_t      cond;         /* Signals change to value */
-    int                 value;        /* Access protected by mutex */
+    pthread_mutex_t     mutex;  /* Protects access to value */
+    pthread_cond_t      cond;   /* Signals change to value */
+    int                 value;  /* Access protected by mutex */
 } my_struct_t;
 
 my_struct_t data = {
@@ -863,7 +875,7 @@ int main (int argc, char *argv[])
 
 When you declare a condition variable, remember that a condition variable and the associated predicate are "locked together." You may save yourself (or your successor) some confusion by always declaring the condition variable and predicate together, if possible. I recommend that you try to encapsulate a set of invariants and predicates with its mutex and one or more condition variables as members in a structure, and carefully document the association.
 
-Sometimes you cannot initialize a condition variable statically; for example, when you use malloc to create a structure that contains a condition variable. Then you will need to call `pthread_cond_init` to initialize the condition variable dynamically, as shown in the following example, `cond_dynamic.c`. You can also dynamically initialize condition variables that you declare statically-but you must ensure that each condition variable is initialized before it is used, and that each is initialized only once. You may initialize it before creating any threads, for example, or by using `pthread_once` (Section 5.1). If you need to initialize a condition variable with nondefault attributes, you must use dynamic initialization (see Section 5.2.2).
+Sometimes you cannot initialize a condition variable statically; for example, when you use `malloc` to create a structure that contains a condition variable. Then you will need to call `pthread_cond_init` to initialize the condition variable dynamically, as shown in the following example, `cond_dynamic.c`. You can also dynamically initialize condition variables that you declare statically-but you must ensure that each condition variable is initialized before it is used, and that each is initialized only once. You may initialize it before creating any threads, for example, or by using `pthread_once` (Section 5.1). If you need to initialize a condition variable with nondefault attributes, you must use dynamic initialization (see Section 5.2.2).
 
 ```c
 /** cond_dynamic.c */
@@ -904,7 +916,7 @@ int main (int argc, char *argv[])
 }
 ```
 
-When you dynamically initialize a condition variable, you should destroy the condition variable when you no longer need it, by calling `pthread_cond_destroy`. You do not need to destroy a condition variable that was statically initialized using the `pthread_cond_initializer` macro.
+When you dynamically initialize a condition variable, you should destroy the condition variable when you no longer need it, by calling `pthread_cond_destroy`. You do not need to destroy a condition variable that was statically initialized using the `PTHREAD_COND_INITIALIZER` macro.
 
 It is safe to destroy a condition variable when you know that no threads can be blocked on the condition variable, and no additional threads will try to wait on, signal, or broadcast the condition variable. The best way to determine this is usually within a thread that has just successfully broadcast to unblock all waiters, when program logic ensures that no threads will try to use the condition variable later.
 
@@ -943,15 +955,15 @@ The main thread calls `pthread_cond_timedwait` to wait for up to two seconds (fr
 #include "errors.h"
 
 typedef struct my_struct_tag {
-    pthread_mutex_init      mutex;  /* Protects access to value */
-    pthread_cond_t          cond;   /* Signals change to value */
-    int                     value;  /* Access protected by mutex */
+    pthread_mutex_t     mutex;  /* Protects access to value */
+    pthread_cond_t      cond;   /* Signals change to value */
+    int                 value;  /* Access protected by mutex */
 } my_struct_t;
 
 my_struct_t data = {
     PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, 0};
 
-int hibernation = 1;                /* Default to 1 second */
+int hibernation = 1;            /* Default to 1 second */
 
 /*
  * Thread start routine. It will set the main thread's predicate
@@ -966,7 +978,7 @@ wait_thread (void *arg)
     status = pthread_mutex_lock (&data.mutex);
     if (status != 0)
         err_abort (status, "Lock mutex");
-    data.value = 1;                 /* Set predicate */
+    data.value = 1;             /* Set predicate */
     status = pthread_cond_signal (&data.cond);
     if (status != 0)
         err_abort (status, "Signal condition");
@@ -985,7 +997,7 @@ int main (int argc, char *argv[])
     /*
      * If an argument is specified, interpret it as the number
      * of seconds for wait_thread to sleep before signaling the
-     * condition variable. You can play with this to see the
+     * condition variable.  You can play with this to see the
      * condition wait below time out or wake normally.
      */
     if (argc > 1)
@@ -994,8 +1006,7 @@ int main (int argc, char *argv[])
     /*
      * Create wait_thread.
      */
-    status = pthread_create (
-        &wait_thread_id, NULL, wait_thread, NULL);
+    status = pthread_create (&wait_thread_id, NULL, wait_thread, NULL);
     if (status != 0)
         err_abort (status, "Create wait thread");
 
@@ -1011,7 +1022,7 @@ int main (int argc, char *argv[])
     if (status != 0)
         err_abort (status, "Lock mutex");
 
-    while (data, value == 0) {
+    while (data.value == 0) {
         status = pthread_cond_timedwait (
             &data.cond, &data.mutex, &timeout);
         if (status == ETIMEDOUT) {
@@ -1085,13 +1096,13 @@ Part 1 shows the declarations for `alarm_cond.c`. There are two additions to thi
  * been on the list.
  */
 typedef struct alarm_tag {
-    struct alarm_tag *link;
-    int seconds;
-    time_t time;            /* seconds from EPOCH */
-    char message[64];
+    struct alarm_tag    *link;
+    int                 seconds;
+    time_t              time;   /* seconds from EPOCH */
+    char                message[64];
 } alarm_t;
 
-pthread_mutex_t alarmjnutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t alarm_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t alarm_cond = PTHREAD_COND_INITIALIZER;
 alarm_t *alarm_list = NULL;
 time_t current_alarm = 0;
@@ -1111,10 +1122,11 @@ If `current_alarm` (the time of the next alarm expiration) is 0, then the `alarm
 void alarm_insert (alarm_t *alarm)
 {
     int status;
-    alarm t **last, *next;
+    alarm_t **last, *next;
+
     /*
      * LOCKING PROTOCOL:
-     *
+     * 
      * This routine requires that the caller have locked the
      * alarm_mutex!
      */
@@ -1128,35 +1140,36 @@ void alarm_insert (alarm_t *alarm)
         }
         last = &next->link;
         next = next->link;
-        /*
-         * If we reached the end of the list, insert the new alarm
-         * there. ("next" is NULL, and "last" points to the link
-         * field of the last item, or to the list header.)
-         */
-        if (next == NULL) {
-            *last = alarm;
-            alarm->link = NULL;
-        }
-#ifdef DEBUG
-        printf ("[list: ");
-        for (next = alarm_list; next != NULL; next = next->link)
-            printf ("%d(%d)[\"%s\"] ", next->time,
-                next->time - time (NULL), next->message);
-        printf ("]\n");
-#endif
-        /*
-         * Wake the alarm thread if it is not busy (that is, if
-         * current_alarm is 0, signifying that it's waiting for
-         * work), or if the new alarm comes before the one on
-         * which the alarm thread is waiting.
-         */
-        if (current_alarm == 0 || alarm->time < current_alarm) {
-            current_alarm = alarm->time;
-            status = pthread_cond_signal (&alarm_cond);
-            if (status != 0)
-                err_abort (status, "Signal cond");
-        }
     }
+    /*
+     * If we reached the end of the list, insert the new alarm
+     * there.  ("next" is NULL, and "last" points to the link
+     * field of the last item, or to the list header.)
+     */
+    if (next == NULL) {
+        *last = alarm;
+        alarm->link = NULL;
+    }
+#ifdef DEBUG
+    printf ("[list: ");
+    for (next = alarm_list; next != NULL; next = next->link)
+        printf ("%d(%d)[\"%s\"] ", next->time,
+            next->time - time (NULL), next->message);
+    printf ("]\n");
+#endif
+    /*
+     * Wake the alarm thread if it is not busy (that is, if
+     * current_alarm is 0, signifying that it's waiting for
+     * work), or if the new alarm comes before the one on
+     * which the alarm thread is waiting.
+     */
+    if (current_alarm == 0 || alarm->time < current_alarm) {
+        current_alarm = alarm->time;
+        status = pthread_cond_signal (&alarm_cond);
+        if (status != 0)
+            err_abort (status, "Signal cond");
+    }
+}
 ```
 Part 3 shows the `alarm_thread` function, the start function for the "alarm server" thread. The general structure of `alarm_thread` is very much like the `alarm_thread` in `alarm_mutex.c`. The differences are due to the addition of the condition variable.
 
@@ -1176,7 +1189,6 @@ If we remove from `alarm_list` an alarm that has already expired, just set the e
 
 ```c
 /** alarm_cond.c part 3 alarm_routine */
-
 /*
  * The alarm thread's start routine.
  */
@@ -1207,7 +1219,7 @@ void *alarm_thread (void *arg)
             status = pthread_cond_wait (&alarm_cond, &alarm_mutex);
             if (status != 0)
                 err_abort (status, "Wait on cond");
-        }
+            }
         alarm = alarm_list;
         alarm_list = alarm->link;
         now = time (NULL);
@@ -1215,14 +1227,14 @@ void *alarm_thread (void *arg)
         if (alarm->time > now) {
 #ifdef DEBUG
             printf ("[waiting: %d(%d)\"%s\"]\n", alarm->time,
-                    alarm->time - time (NULL), alarm->message);
+                alarm->time - time (NULL), alarm->message);
 #endif
             cond_time.tv_sec = alarm->time;
             cond_time.tv_nsec = 0;
             current_alarm = alarm->time;
             while (current_alarm == alarm->time) {
                 status = pthread_cond_timedwait (
-                        &alarm_cond, &alarm_mutex, &cond_time);
+                    &alarm_cond, &alarm_mutex, &cond_time);
                 if (status == ETIMEDOUT) {
                     expired = 1;
                     break;
@@ -1240,7 +1252,6 @@ void *alarm_thread (void *arg)
         }
     }
 }
-
 ```
 Part 4 shows the final section of `alarm_cond.c`, the main program. It is nearly identical to the main function from `alarm_mutex.c`.
 
@@ -1248,15 +1259,15 @@ Because the condition variable signal operation is built into the new `alarm_ins
 
 ```c
 /** alarm cond.c part 4 main */
-
 int main (int argc, char *argv[])
 {
     int status;
     char line[128];
     alarm_t *alarm;
     pthread_t thread;
+
     status = pthread_create (
-            &thread, NULL, alarm_thread, NULL);
+        &thread, NULL, alarm_thread, NULL);
     if (status != 0)
         err_abort (status, "Create alarm thread");
     while (1) {
@@ -1272,9 +1283,9 @@ int main (int argc, char *argv[])
          * (%64[^\n]), consisting of up to 64 characters
          * separated from the seconds by whitespace.
          */
-        if (sscanf (line, "%d %64[^\n]",
+        if (sscanf (line, "%d %64[^\n]", 
             &alarm->seconds, alarm->message) < 2) {
-            fprintf (stderr, "Bad commandSn");
+            fprintf (stderr, "Bad command\n");
             free (alarm);
         } else {
             status = pthread_mutex_lock (&alarm_mutex);
