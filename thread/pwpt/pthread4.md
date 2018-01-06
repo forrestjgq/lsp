@@ -1,19 +1,20 @@
 
 # 4 A few ways to use threads
 Lewis Carroll, Alice's Adventures in Wonderland;
-> "They were obliged to have him with them," the Mock Turtle said.
-> "No wise fish would go anywhere without a porpoise."
-> "Wouldn't it, really?" said Alice, in a tone of great surprise.
-> "Of course not," said the Mock Turtle. "Why, if a fish came to me,
-> and told me he was going on a journey, I should say 'With what porpoise?'"
+> "They were obliged to have him with them," the Mock Turtle said.  
+> "No wise fish would go anywhere without a porpoise."  
+> "Wouldn't it, really?" said Alice, in a tone of great surprise.  
+> "Of course not," said the Mock Turtle. "Why, if a fish came to me,  
+> and told me he was going on a journey, I should say 'With what porpoise?'"  
 
 During the introduction to this book, I mentioned some of the ways you can structure a threaded solution to a problem. There are infinite variations, but the primary models of threaded programming are shown in Table 4.1.
 
 |               |                                          |
 | ------------- | ---------------------------------------- |
 | Pipeline      | Each thread repeatedly performs the same operation on a sequence of data sets, passing each result to another thread for the next step. This is also known as an "assembly line." |
-| Work crew     | Each thread performs an operation on its own data. Threads in a work crew may all perform the same operation, or each a sep- arate operation, but they always proceed independently. |
+| Work crew     | Each thread performs an operation on its own data. Threads in a work crew may all perform the same operation, or each a separate operation, but they always proceed independently. |
 | Client/server | A client "contracts" with an independent server for each job. Often the "contract" is anonymous-a request is made through some interface that queues the work item. |
+|               |                                          |
 
 <center>**TABLE 4.1** *Thread programming models*</center>
 
@@ -32,9 +33,9 @@ Lewis Carroll, Alice's Adventures in Wonderland;
 
 In pipelining, a stream of "data items" is processed serially by an ordered set of threads (Figure 4.1). Each thread performs a specific operation on each item in sequence, passing the data on to the next thread in the pipeline.
 
-For example, the data might be a scanned image, and thread A might process an image array, thread B might search the processed data for a specific set of fea tures, and thread C might collect the serial stream of search results from thread B into a report. Or each thread might perform a single step in some sequence of modifications on the data.
+For example, the data might be a scanned image, and thread A might process an image array, thread B might search the processed data for a specific set of features, and thread C might collect the serial stream of search results from thread B into a report. Or each thread might perform a single step in some sequence of modifications on the data.
 
-The following program, called pipe.c, shows the pieces of a simple pipeline program. Each thread in the pipeline increments its input value by 1 and passes it to the next thread. The main program reads a series of "command lines" from stdin. A command line is either a number, which is fed into the beginning of the pipeline, or the character "=," which causes the program to read the next result from the end of the pipeline and print it to stdout.
+The following program, called `pipe.c`, shows the pieces of a simple pipeline program. Each thread in the pipeline increments its input value by 1 and passes it to the next thread. The main program reads a series of "command lines" from `stdin`. A command line is either a number, which is fed into the beginning of the pipeline, or the character "=," which causes the program to read the next result from the end of the pipeline and print it to `stdout`.
 
 ```mermaid
 graph LR;
@@ -56,27 +57,28 @@ graph LR;
 <center>**FIGURE 4.1** *Pipelining*</center>
 
 
-Each stage of a pipeline is represented by a variable of type staget. staget contains a mutex to synchronize access to the stage. The avail condition variable is used to signal a stage that data is ready for it to process, and each stage signals its own ready condition variable when it is ready for new data. The data member is the data passed from the previous stage, thread is the thread operating this stage, and next is a pointer to the following stage.
+[10-18] Each stage of a pipeline is represented by a variable of type `stage_t`. `stage_t` contains a `mutex` to synchronize access to the stage. The `avail` condition variable is used to signal a stage that data is `ready` for it to process, and each stage signals its own ready condition variable when it is ready for new data. The `data` member is the data passed from the previous stage, `thread` is the thread operating this stage, and `next` is a pointer to the following stage.
 
-The `pipe_t` structure describes a pipeline. It provides pointers to the first and last stage of a pipeline. The first stage, head, represents the first thread in the pipeline. The last stage, tail, is a special `stage_t` that has no thread-it is a place to store the final result of the pipeline.
+[24-30] The `pipe_t` structure describes a pipeline. It provides pointers to the first and last stage of a pipeline. The first stage, `head`, represents the first thread in the pipeline. The last stage, `tail`, is a special `stage_t` that has no thread-it is a place to store the final result of the pipeline.
 
 ```c
 /** pipe.c part 1 definitions */
 #include <pthread.h>
 #include "errors.h"
+
 /*
  * Internal structure describing a "stage" in the
  * pipeline. One for each thread, plus a "result
  * stage" where the final thread can stash the value.
  */
-typedef struct stage {
-    pthread_mutex_t      mutex;         /* Protect data */
-    pthread_cond_t       avail;         /* Data available */
-    pthread_cond_t       ready;         /* Ready for data */
-    int                  data_ready;    /* Data present */
-    long                 data;          /* Data to process */
-    pthread_t            thread;        /* Thread for stage */
-    struct stage_tag     *next;         /* Next stage */
+typedef struct stage_tag {
+    pthread_mutex_t     mutex;          /* Protect data */
+    pthread_cond_t      avail;          /* Data available */
+    pthread_cond_t      ready;          /* Ready for data */
+    int                 data_ready;     /* Data present */
+    long                data;           /* Data to process */
+    pthread_t           thread;         /* Thread for stage */
+    struct stage_tag    *next;          /* Next stage */
 } stage_t;
 
 /*
@@ -84,18 +86,18 @@ typedef struct stage {
  * pipeline.
  */
 typedef struct pipe_tag {
-    pthread_mutex_t   mutex;             /* Mutex to protect pipe */
-    stage_t           *head;             /* First stage */
-    stage_t           *tail;             /* Final stage */
-    int               stages;            /* Number of stages */
-    int               active;            /* Active data elements */
+    pthread_mutex_t     mutex;          /* Mutex to protect pipe */
+    stage_t             *head;          /* First stage */
+    stage_t             *tail;          /* Final stage */
+    int                 stages;         /* Number of stages */
+    int                 active;         /* Active data elements */
 } pipe_t;
 ```
 Part 2 shows `pipe_send`, a utility function used to start data along a pipeline, and also called by each stage to pass data to the next stage.
 
-It begins by waiting on the specified pipeline stage's ready condition variable until it can accept new data.
+[18-24] It begins by waiting on the specified pipeline stage's `ready` condition variable until it can accept new data.
 
-Store the new data value, and then tell the stage that data is available.
+[29-31] Store the new data value, and then tell the stage that data is available.
 
 ```c
 /** pipe.c part 2 pipe_send */
@@ -139,9 +141,9 @@ int pipe_send (stage_t *stage, long data)
 ```
 Part 3 shows `pipe_stage`, the start function for each thread in the pipeline. The thread's argument is a pointer to its `stage_t` structure.
 
-The thread loops forever, processing data. Because the mutex is locked outside the loop, the thread appears to have the pipeline stage's mutex locked all the time. However, it spends most of its time waiting for new data, on the avail condition variable. Remember that a thread automatically unlocks the mutex associated with a condition variable, while waiting on that condition variable. In reality, therefore, the thread spends most of its time with mutex unlocked.
+[17-28] The thread loops forever, processing data. Because the mutex is locked outside the loop, the thread appears to have the pipeline stage's `mutex` locked all the time. However, it spends most of its time waiting for new data, on the `avail` condition variable. Remember that a thread automatically unlocks the mutex associated with a condition variable, while waiting on that condition variable. In reality, therefore, the thread spends most of its time with `mutex` unlocked.
 
-When given data, the thread increases its own data value by one, and passes the result to the next stage. The thread then records that the stage no longer has data by clearing the `data_ready` flag, and signals the ready condition variable to wake any thread that might be waiting for this pipeline stage.
+[23-27] When given data, the thread increases its own data value by one, and passes the result to the next stage. The thread then records that the stage no longer has data by clearing the `data_ready` flag, and signals the `ready` condition variable to wake any thread that might be waiting for this pipeline stage.
 
 ```c
 /** pipe.c part 3 pipe_stage */
@@ -167,7 +169,7 @@ void *pipe_stage (void *arg)
                 err_abort (status, "Wait for previous stage");
         }
         pipe_send (next_stage, stage->data + 1);
-        stage->data_ready =0;
+        stage->data_ready = 0;
         status = pthread_cond_signal (&stage->ready);
         if (status != 0)
             err_abort (status, "Wake next stage");
@@ -183,11 +185,11 @@ void *pipe_stage (void *arg)
 ```
 Part 4 shows `pipe_create`, the function that creates a pipeline. It can create a pipeline of any number of stages, linking them together in a list.
 
-For each stage, it allocates a new `stage_t` structure and initializes the members. Notice that one additional "stage" is allocated and initialized to hold the final result of the pipeline.
+[19-35] For each stage, it allocates a new `stage_t` structure and initializes the members. Notice that one additional "stage" is allocated and initialized to hold the final result of the pipeline.
 
-The link member of the final stage is set to NULL to terminate the list, and the pipeline's tail is set to point at the final stage. The tail pointer allows `pipe_result` to easily find the final product of the pipeline, which is stored into the final stage.
+[37-38] The `link` member of the final stage is set to `NULL` to terminate the list, and the pipeline's `tail` is set to point at the final stage. The `tail` pointer allows `pipe_result` to easily find the final product of the pipeline, which is stored into the final stage.
 
-After all the stage data is initialized, `pipe_create` creates a thread for each stage. The extra "final stage" does not get a thread-the termination condition of the for loop is that the current stage's next link is not NULL, which means that it will not process the final stage.
+[53-60] After all the stage data is initialized, `pipe_create` creates a thread for each stage. The extra "final stage" does not get a thread-the termination condition of the for loop is that the current stage's `next` link is not `NULL`, which means that it will not process the final stage.
 
 ```c
 /* pipe.c part 4 pipe_create */
@@ -226,8 +228,8 @@ int pipe_create (pipe_t *pipe, int stages)
         link = &new_stage->next;
     }
 
-    *link = (stage_t*)NULL;             /* Terminate list */
-    pipe->tail = new_stage;             /* Record the tail */
+    *link = (stage_t*)NULL;     /* Terminate list */
+    pipe->tail = new_stage;     /* Record the tail */
 
     /*
      * Create the threads for the pipe stages only after all
@@ -236,7 +238,7 @@ int pipe_create (pipe_t *pipe, int stages)
      * a receptacle for the final pipeline value.
      *
      * At this point, proper cleanup on an error would take up
-     * more space than worthwhile in a "simple example," so
+     * more space than worthwhile in a "simple example", so
      * instead of cancelling and detaching all the threads
      * already created, plus the synchronization object and
      * memory cleanup done for earlier errors, it will simply
@@ -255,11 +257,11 @@ int pipe_create (pipe_t *pipe, int stages)
 ```
 Part 5 shows `pipe_start` and `pipe_result`. The `pipe_start` function pushes an item of data into the beginning of the pipeline and then returns immediately without waiting for a result. The `pipe_result` function allows the caller to wait for the final result, whenever the result might be needed.
 
-The `pipe_start` function sends data to the first stage of the pipeline. The function increments a count of "active" items in the pipeline, which allows `pipe_result` to detect that there are no more active items to collect, and to return immediately instead of blocking. You would not always want a pipeline to behave this way-it makes sense for this example because a single thread alternately "feeds" and "reads" the pipeline, and the application would hang forever if the user inadvertently reads one more item than had been fed.
+[10-23] The `pipe_start` function sends data to the first stage of the pipeline. The function increments a count of "active" items in the pipeline, which allows `pipe_result` to detect that there are no more active items to collect, and to return immediately instead of blocking. You would not always want a pipeline to behave this way-it makes sense for this example because a single thread alternately "feeds" and "reads" the pipeline, and the application would hang forever if the user inadvertently reads one more item than had been fed.
 
-The `pipe_result` function first checks whether there is an active item in the pipeline. If not, it returns with a status of 0, after unlocking the pipeline mutex.
+[29-48] The `pipe_result` function first checks whether there is an active item in the pipeline. If not, it returns with a status of 0, after unlocking the pipeline mutex.
 
-If there is another item in the pipeline, `pipe_result` locks the tail (final) stage, and waits for it to receive data. It copies the data and then resets the stage so it can receive the next item of data. Remember that the final stage does not have a thread, and cannot reset itself.
+[50-56] If there is another item in the pipeline, `pipe_result` locks the `tail` (final) stage, and waits for it to receive data. It copies the data and then resets the stage so it can receive the next item of data. Remember that the final stage does not have a thread, and cannot reset itself.
 
 ```c
 /* pipe.c part 5 pipe_start,pipe_result */
@@ -303,7 +305,7 @@ int pipe_result (pipe_t *pipe, long *result)
     if (pipe->active <= 0)
         empty = 1;
     else
-        pipe->active-;
+        pipe->active--;
 
     status = pthread_mutex_unlock (&pipe->mutex);
     if (status != 0)
@@ -317,7 +319,7 @@ int pipe_result (pipe_t *pipe, long *result)
     *result = tail->data;
     tail->data_ready = 0;
     pthread_cond_signal (&tail->ready);
-    pthread_mutex_unlock (&tail->mutex);
+    pthread_mutex_unlock (&tail->mutex);    
     return 1;
 }
 ```
@@ -409,27 +411,30 @@ The allowed size of a file name and path name may vary depending on the file sys
 #include "errors.h"
 
 #define CREW_SIZE       4
+
 /*
  * Queued items of work for the crew. One is queued by
- * crew start, and each worker may queue additional items.
+ * crew_start, and each worker may queue additional items.
  */
 typedef struct work_tag {
-    struct work_tag     *next;          /* Next work item */ 
-    char                *path;          /* Directory or file */
+    struct work_tag     *next;          /* Next work item */
+    char                *path; /* Directory or file */
     char                *string;        /* Search string */
-} work t, *work_p;
+} work_t, *work_p;
+
 /*
  * One of these is initialized for each worker thread in the
  * crew. It contains the "identity" of each worker.
  */
 typedef struct worker_tag {
-    int             index;              /* Thread's index */
-    pthread_t       thread;             /* Thread for stage */
-    struct crew_tag *crew;              /* Pointer to crew */
+    int                 index;          /* Thread's index */
+    pthread_t           thread;         /* Thread for stage */
+    struct crew_tag     *crew;          /* Pointer to crew */
 } worker_t, *worker_p;
+
 /*
- * The external "handle" for a work crew. Contains the 
- * crew synchronization state and stage area.
+ * The external "handle" for a work crew. Contains the
+ * crew synchronization state and staging area.
  */
 typedef struct crew_tag {
     int                 crew_size;      /* Size of array */
@@ -439,10 +444,10 @@ typedef struct crew_tag {
     pthread_mutex_t     mutex;          /* Mutex for crew data */
     pthread_cond_t      done;           /* Wait for crew done */
     pthread_cond_t      go;             /* Wait for work */
-} crew_t, *crew p;
+} crew_t, *crew_p;
 
-size_t path_max;                        /* Filepath length */
-size_t name_max;                        /* Name length */
+size_t  path_max;                       /* Filepath length */
+size_t  name_max;                       /* Name length */
 ```
 Part 2 shows `worker_routine`, the start function for crew threads. The outer loop repeats processing until the thread is told to terminate.
 
@@ -490,10 +495,10 @@ void *worker_routine (void *arg)
      * it as a buffer.
      */
     entry = (struct dirent*)malloc (
-            sizeof (struct dirent) + name_max);
+        sizeof (struct dirent) + name_max);
     if (entry == NULL)
         errno_abort ("Allocating dirent");
-
+    
     status = pthread_mutex_lock (&crew->mutex);
     if (status != 0)
         err_abort (status, "Lock crew mutex");
@@ -502,7 +507,7 @@ void *worker_routine (void *arg)
      * There won't be any work when the crew is created, so wait
      * until something's put on the queue.
      */
-    while (crew->work_count ==0) {
+    while (crew->work_count == 0) {
         status = pthread_cond_wait (&crew->go, &crew->mutex);
         if (status != 0)
             err_abort (status, "Wait for go");
@@ -529,7 +534,7 @@ void *worker_routine (void *arg)
             err_abort (status, "Lock crew mutex");
 
         DPRINTF (("Crew %d top: first is %#lx, count is %d\n",
-            mine->index, crew->first, crew->work_count));
+                  mine->index, crew->first, crew->work_count));
         while (crew->first == NULL) {
             status = pthread_cond_wait (&crew->go, &crew->mutex);
             if (status != 0)
@@ -537,10 +542,10 @@ void *worker_routine (void *arg)
         }
 
         DPRINTF (("Crew %d woke: %#lx, %d\n",
-            mine->index, crew->first, crew->work_count));
+                  mine->index, crew->first, crew->work_count));
 
         /*
-         * Remove and process a work item.
+         * Remove and process a work item
          */
         work = crew->first;
         crew->first = work->next;
@@ -548,7 +553,7 @@ void *worker_routine (void *arg)
             crew->last = NULL;
 
         DPRINTF (("Crew %d took %#lx, leaves first %#lx, last %#lx\n",
-            mine->index, work, crew->first, crew->last));
+                  mine->index, work, crew->first, crew->last));
 
         status = pthread_mutex_unlock (&crew->mutex);
         if (status != 0)
@@ -565,7 +570,7 @@ void *worker_routine (void *arg)
                 "Thread %d: %s is a link, skipping.\n",
                 mine->index,
                 work->path);
-        else if (S ISDIR (filestat.st_mode)) {
+        else if (S_ISDIR (filestat.st_mode)) {
             DIR *directory;
             struct dirent *result;
 
@@ -581,9 +586,9 @@ void *worker_routine (void *arg)
                     errno, strerror (errno));
                 continue;
             }
-
+            
             while (1) {
-                status = readdir_r (directory, entry, Sresult);
+                status = readdir_r (directory, entry, &result);
                 if (status != 0) {
                     fprintf (
                         stderr,
@@ -593,8 +598,8 @@ void *worker_routine (void *arg)
                     break;
                 }
                 if (result == NULL)
-                    break; /* End of directory */
-
+                    break;              /* End of directory */
+                
                 /*
                  * Ignore "." and ".." entries.
                  */
@@ -613,7 +618,7 @@ void *worker_routine (void *arg)
                 strcat (new_work->path, entry->d_name);
                 new_work->string = work->string;
                 new_work->next = NULL;
-                status = pthread_mutex_lock (screw->mutex);
+                status = pthread_mutex_lock (&crew->mutex);
                 if (status != 0)
                     err_abort (status, "Lock mutex");
                 if (crew->first == NULL) {
@@ -625,7 +630,7 @@ void *worker_routine (void *arg)
                 }
                 crew->work_count++;
                 DPRINTF ((
-                    "Crew %d: add %#lx, first %#lx, last %#lx, %d\n",
+                    "Crew %d: add work %#lx, first %#lx, last %#lx, %d\n",
                     mine->index, new_work, crew->first,
                     crew->last, crew->work_count));
                 status = pthread_cond_signal (&crew->go);
@@ -633,7 +638,7 @@ void *worker_routine (void *arg)
                 if (status != 0)
                     err_abort (status, "Unlock mutex");
             }
-
+            
             closedir (directory);
         } else if (S_ISREG (filestat.st_mode)) {
             FILE *search;
@@ -668,9 +673,14 @@ void *worker_routine (void *arg)
                     }
                     search_ptr = strstr (buffer, work->string);
                     if (search_ptr != NULL) {
+                        flockfile (stdout);
                         printf (
                             "Thread %d found \"%s\" in %s\n",
                             mine->index, work->string, work->path);
+#if 0
+                        printf ("%s\n", buffer);
+#endif
+                        funlockfile (stdout);
                         break;
                     }
                 }
@@ -685,9 +695,9 @@ void *worker_routine (void *arg)
                 filestat.st_mode & S_IFMT,
                 (S_ISFIFO (filestat.st_mode) ? "FIFO"
                  : (S_ISCHR (filestat.st_mode) ? "CHR"
-                     : (S_ISBLK (filestat.st_mode) ? "BLK"
-                         : (S_ISSOCK (filestat.st_mode) ? "SOCK"
-                             : "unknown")))));
+                    : (S_ISBLK (filestat.st_mode) ? "BLK"
+                       : (S_ISSOCK (filestat.st_mode) ? "SOCK"
+                          : "unknown")))));
 
         free (work->path);              /* Free path buffer */
         free (work);                    /* We're done with this */
@@ -705,12 +715,12 @@ void *worker_routine (void *arg)
         if (status != 0)
             err_abort (status, "Lock crew mutex");
 
-        crew->work_count-;
+        crew->work_count--;
         DPRINTF (("Crew %d decremented work to %d\n", mine->index,
-                crew->work_count));
+                  crew->work_count));
         if (crew->work_count <= 0) {
             DPRINTF (("Crew thread %d done\n", mine->index));
-            status = pthread cond broadcast (&crew->done);
+            status = pthread_cond_broadcast (&crew->done);
             if (status != 0)
                 err_abort (status, "Wake waiters");
             status = pthread_mutex_unlock (&crew->mutex);
@@ -748,7 +758,7 @@ int crew_create (crew_t *crew, int crew_size)
     int status;
 
     /*
-     * We won't create more than CREW_SIZE members.
+     * We won't create more than CREW_SIZE members
      */
     if (crew_size > CREW_SIZE)
         return EINVAL;
@@ -759,7 +769,7 @@ int crew_create (crew_t *crew, int crew_size)
     crew->last = NULL;
 
     /*
-     * Initialize synchronization objects.
+     * Initialize synchronization objects
      */
     status = pthread_mutex_init (&crew->mutex, NULL);
     if (status != 0)
@@ -832,7 +842,7 @@ int crew_start (
     path_max = pathconf (filepath, _PC_PATH_MAX);
     if (path_max == -1) {
         if (errno == 0)
-            path_max = 1024;        /* "No limit" */
+            path_max = 1024;             /* "No limit" */
         else
             errno_abort ("Unable to get PATH_MAX");
     }
@@ -840,15 +850,15 @@ int crew_start (
     name_max = pathconf (filepath, _PC_NAME_MAX);
     if (name_max == -1) {
         if (errno == 0)
-            name_max = 256; /* "No limit" */
+            name_max = 256;             /* "No limit" */
         else
             errno_abort ("Unable to get NAME_MAX");
     }
     DPRINTF ((
         "PATH_MAX for %s is %ld, NAME_MAX is %ld\n",
         filepath, path_max, name_max));
-    path_max++;             /* Add null byte */
-    name_max++;             /* Add null byte */
+    path_max++;                         /* Add null byte */
+    name_max++;                         /* Add null byte */
     request = (work_p)malloc (sizeof (work_t));
     if (request == NULL)
         errno_abort ("Unable to allocate request");
@@ -912,19 +922,19 @@ int main (int argc, char *argv[])
     }
 
 #ifdef sun
-        /*
-         * On Solaris 2.5, threads are not timesliced. To ensure
-         * that our threads can run concurrently, we need to
-         * increase the concurrency level to CREW_SIZE.
-         */
+    /*
+     * On Solaris 2.5, threads are not timesliced. To ensure
+     * that our threads can run concurrently, we need to
+     * increase the concurrency level to CREW_SIZE.
+     */
     DPRINTF (("Setting concurrency level to %d\n", CREW_SIZE));
     thr_setconcurrency (CREW_SIZE);
 #endif
     status = crew_create (&my_crew, CREW_SIZE);
     if (status != 0)
-        err abort (status, "Create crew");
+        err_abort (status, "Create crew");
 
-    status = crew_start (&my_crew, argv[2], argv[l]);
+    status = crew_start (&my_crew, argv[2], argv[1]);
     if (status != 0)
         err_abort (status, "Start crew");
 
@@ -973,34 +983,34 @@ The main program; and client threads coordinate their shutdown using these synch
 #include <math.h>
 #include "errors.h"
 
-#define CLIENT_THREADS      4  /* Number of clients */
+#define CLIENT_THREADS  4               /* Number of clients */
 
-#define REQ_READ            1  /* Read with prompt */ 
-#define REQ WRITE           2  /* Write */
-#define REQ_QUIT            3  /* Quit server */
+#define REQ_READ        1               /* Read with prompt */
+#define REQ_WRITE       2               /* Write */
+#define REQ_QUIT        3               /* Quit server */
 
 /*
- * Internal to server "package" - one for each request.
+ * Internal to server "package" -- one for each request.
  */
 typedef struct request_tag {
-    struct  request_tag *next;              /* Link to next */
-    int                 operation;          /* Function code */
-    int                 synchronous;        /* Nonzero if synchronous */
-    int                 done_flag;          /* Predicate for wait */
-    pthread_cond_t      done;               /* Wait for completion */
-    char                prompt[32];         /* Prompt string for reads */
-    char                text[128];          /* Read/write text */
+    struct request_tag  *next;          /* Link to next */
+    int                 operation;      /* Function code */
+    int                 synchronous;    /* Non-zero if synchronous */
+    int                 done_flag;      /* Predicate for wait */
+    pthread_cond_t      done;           /* Wait for completion */
+    char                prompt[32];     /* Prompt string for reads */
+    char                text[128];      /* Read/write text */
 } request_t;
 
 /*
  * Static context for the server
  */
 typedef struct tty_server_tag {
-    request_t *first;
-    request_t *last;
-    int running;
-    pthread_mutex_t mutex;
-    pthread_cond_t request;
+    request_t           *first;
+    request_t           *last;
+    int                 running;
+    pthread_mutex_t     mutex;
+    pthread_cond_t      request;
 } tty_server_t;
 
 tty_server_t tty_server = {
@@ -1070,7 +1080,6 @@ void *tty_server_routine (void *arg)
         /*
          * Process the data
          */
-
         operation = request->operation;
         switch (operation) {
             case REQ_QUIT:
@@ -1081,13 +1090,13 @@ void *tty_server_routine (void *arg)
                 if (fgets (request->text, 128, stdin) == NULL)
                     request->text[0] = '\0';
                 /*
-                 * Because fgets returns the newline, and we don't
-                 * want it, we look for it, and turn it into a null
-                 * (truncating the input) if found. It should be the
-                 * last character, if it is there.
+                 * Because fgets returns the newline, and we don't want it,
+                 * we look for it, and turn it into a null (truncating the
+                 * input) if found. It should be the last character, if it is
+                 * there.
                  */
                 len = strlen (request->text);
-                if (len > 0 && request->text[len-l] == '\n')
+                if (len > 0 && request->text[len-1] == '\n')
                     request->text[len-1] = '\0';
                 break;
             case REQ_WRITE:
@@ -1225,7 +1234,7 @@ void tty_server_request (
             if (strlen (request->text) > 0)
                 strcpy (string, request->text);
             else
-                string[0] = '\0' ;
+                string[0] = '\0';
         }
         status = pthread_cond_destroy (&request->done);
         if (status != 0)
@@ -1246,7 +1255,7 @@ Decrease the count of client threads, and wake the main thread if this is the la
 ```c
 /*server.c part 4 client_routine*/
 /*
- * Client routine - multiple copies will request server.
+ * Client routine -- multiple copies will request server.
  */
 void *client_routine (void *arg)
 {
@@ -1277,7 +1286,7 @@ void *client_routine (void *arg)
             err_abort (status, "Signal clients done");
     }
     status = pthread_mutex_unlock (&client_mutex);
-    if (status != 0) ~
+    if (status != 0)
         err_abort (status, "Unlock client mutex");
     return NULL;
 }
@@ -1312,8 +1321,8 @@ int main (int argc, char *argv[])
      * Create CLIENT_THREADS clients.
      */
     client_threads = CLIENT_THREADS;
-    for (count = 0; count < client_threads; count++) {
-        status = pthread_create (Sthread, NULL,
+    for (count = 0; count < CLIENT_THREADS; count++) {
+        status = pthread_create (&thread, NULL,
             client_routine, (void*)count);
         if (status != 0)
             err_abort (status, "Create client thread");
@@ -1334,3 +1343,5 @@ int main (int argc, char *argv[])
     return 0;
 }
 ```
+
+
