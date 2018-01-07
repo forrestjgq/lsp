@@ -323,7 +323,7 @@ int pipe_result (pipe_t *pipe, long *result)
     return 1;
 }
 ```
-Part 6 shows the main program that drives the pipeline. It creates a pipeline, and then loops reading lines from stdin. If the line is a single "=" character, it pulls a result from the pipeline and prints it. Otherwise, it converts the line to an integer value, which it feeds into the pipeline.
+Part 6 shows the main program that drives the pipeline. It creates a pipeline, and then loops reading lines from `stdin`. If the line is a single "=" character, it pulls a result from the pipeline and prints it. Otherwise, it converts the line to an integer value, which it feeds into the pipeline.
 
 ```c
 /*  pipe.c part 6 main  */
@@ -362,13 +362,13 @@ int main (int argc, char *argv[])
 ## 4.2 Work crew
 
 Lewis Carroll, Alice's Adventures in Wonderland:
-> The twelve jurors were all writing very busily on slates.
-> "What are they doing?" Alice whispered to the Gryphon.
-> "They ca'n't have anything to put down yet, before the trial's begun."
-> "They're putting down their names," the Gryphon whispered in reply,
-> "for fear they should forget them before the end of the trial."
+> The twelve jurors were all writing very busily on slates.  
+> "What are they doing?" Alice whispered to the Gryphon.  
+> "They ca'n't have anything to put down yet, before the trial's begun."  
+> "They're putting down their names," the Gryphon whispered in reply,  
+> "for fear they should forget them before the end of the trial."  
 
-In a work crew, data is processed independently by a set of threads {Figure 4.2). A "parallel decomposition" of a loop generally falls into this category. A set of threads may be created, for example, each directed to process some set of rows or columns of an array. A single set of data is split between the threads, and the result is a single (filtered) set of data. Because all the threads in the work crew, in this model, are performing the same operation on different data, it is often known as SIMD parallel processing, for "single instruction, multiple data." The original use of SIMD was in an entirely different form of parallelism, and doesn't literally apply to threads-but the concept is similar.
+In a work crew, data is processed independently by a set of threads (Figure 4.2). A "parallel decomposition" of a loop generally falls into this category. A set of threads may be created, for example, each directed to process some set of rows or columns of an array. A single set of data is split between the threads, and the result is a single (filtered) set of data. Because all the threads in the work crew, in this model, are performing the same operation on different data, it is often known as SIMD parallel processing, for "single instruction, multiple data." The original use of SIMD was in an entirely different form of parallelism, and doesn't literally apply to threads-but the concept is similar.
 
 
 ```mermaid
@@ -392,15 +392,15 @@ The following program, called `crew.c`, shows a simple work crew. Run the progra
 
 Part 1 shows the header files and definitions used by the program.
 
-The symbol `CREW_SIZE` determines how many threads are created for each work crew.
+[8] The symbol `CREW_SIZE` determines how many threads are created for each work crew.
 
-Each item of work is described by a `work_t` structure. This structure has a pointer to the next work item (set to null to indicate the end of the list), a pointer to the file path described by the work item, and a pointer to the string for which the program is searching. As currently constructed, all work items point to the same search string.
+[14-18] Each item of work is described by a `work_t` structure. This structure has a pointer to the next work item (set to `NULL` to indicate the end of the list), a pointer to the file path described by the work item, and a pointer to the string for which the program is searching. As currently constructed, all work items point to the same search string.
 
-Each member of a work crew has a `worker_t` structure. This structure contains the index of the crew member in the crew vector, the thread identifier of the crew member (thread), and a pointer to the `crew_t` structure (crew).
+[24-28] Each member of a work crew has a `worker_t` structure. This structure contains the `index` of the crew member in the crew vector, the thread identifier of the crew member (`thread`), and a pointer to the `crew_t` structure (`crew`).
 
-The `crew_t` structure describes the work crew state. It records the number of members in the work crew (`crew_size`) and an array of `worker_t` structures (crew). It also has a counter of how many work items remain to be processed (`work_count`) and a list of outstanding work items (first points to the earliest item, and last to the latest). Finally, it contains the various Pthreads synchronization objects: a mutex to control access, a condition variable (done) to wait for the work crew to finish a task, and a condition variable on which crew members wait to receive new work (go).
+[34-42] The `crew_t` structure describes the work crew state. It records the number of members in the work crew (`crew_size`) and an array of `worker_t` structures (`crew`). It also has a counter of how many work items remain to be processed (`work_count`) and a list of outstanding work items (`first` points to the earliest item, and `last` to the latest). Finally, it contains the various Pthreads synchronization objects: a mutex to control access, a condition variable (`done`) to wait for the work crew to finish a task, and a condition variable on which crew members wait to receive new work (`go`).
 
-The allowed size of a file name and path name may vary depending on the file system to which the path leads. When a crew is started, the program calculates the allowable file name and path length for the specified file path by calling pathconf, and stores the values in `path_max` and `name_max`, respectively, for later use.
+[44-45] The allowed size of a file name and path name may vary depending on the file system to which the path leads. When a crew is started, the program calculates the allowable file name and path length for the specified file path by calling `pathconf`, and stores the values in `path_max` and `name_max`, respectively, for later use.
 
 ```c
 /* crew.c */
@@ -451,27 +451,27 @@ size_t  name_max;                       /* Name length */
 ```
 Part 2 shows `worker_routine`, the start function for crew threads. The outer loop repeats processing until the thread is told to terminate.
 
-POSIX is a little ambiguous about the actual size of the struct dirent type. The actual requirement for `readdir_r` is that you pass the address of a buffer large enough to contain a struct dirent with a name member of at least `NAME_MAX` bytes. To ensure that we have enough space, allocate a buffer the size of the system's struct dirent plus the maximum size necessary for a file name on the file system we're using. This may be bigger than necessary, but it surely won't be too small.
+[21-24] POSIX is a little ambiguous about the actual size of the `struct dirent` type. The actual requirement for `readdir_r` is that you pass the address of a buffer large enough to contain a `struct dirent` with a name member of at least `NAME_MAX` bytes. To ensure that we have enough space, allocate a buffer the size of the system's `struct dirent` plus the maximum size necessary for a file name on the file system we're using. This may be bigger than necessary, but it surely won't be too small.
 
-This condition variable loop blocks each new crew member until work is made available.
+[34-38] This condition variable loop blocks each new crew member until work is made available.
 
-This wait is a little different. While the work list is empty, wait for more work. The crew members never terminate-once they're all done with the current assignment, they're ready for a new assignment. (This example doesn't take advantage of that capability-the process will terminate once the single search command has completed.)
+[62-66] This wait is a little different. While the work list is empty, wait for more work. The crew members never terminate-once they're all done with the current assignment, they're ready for a new assignment. (This example doesn't take advantage of that capability-the process will terminate once the single search command has completed.)
 
-Remove the first work item from the queue. If the queue becomes empty, also clear the pointer to the last entry, `crew-\>last`.
+[74-76] Remove the first work item from the queue. If the queue becomes empty, also clear the pointer to the last entry, `crew->last`.
 
-Unlock the work crew mutex, so that the bulk of the crew's work can proceed concurrently.
+[82-84] Unlock the work crew mutex, so that the bulk of the crew's work can proceed concurrently.
 
-Determine what sort of file we've got in the work item's path string. We use lstat, which will return information for a symbolic link, rather than stat, which would return information for the file to which the link pointed. By not following symbolic links, we reduce the amount of work in this example, and, especially, avoid following links into other file systems where our namejmax and `path_max` sizes may not be sufficient.
+[90] Determine what sort of file we've got in the work item's path string. We use `lstat`, which will return information for a symbolic link, rather than `stat`, which would return information for the file to which the link pointed. By not following symbolic links, we reduce the amount of work in this example, and, especially, avoid following links into other file systems where our `name_max` and `path_max` sizes may not be sufficient.
 
-If the file is a link, report the name, but do nothing else with it. Note that each message includes the thread's work crew index (`mine-\>index`), so that you can easily see "concurrency at work" within the example.
+[92-96] If the file is a link, report the name, but do nothing else with it. Note that each message includes the thread's work crew index (`mine->index`), so that you can easily see "concurrency at work" within the example.
 
-If the file is a directory, open it with `opendir`. Find all entries in the directory by repeatedly calling `readdir_r`. Each directory entry is entered as a new work item.
+[97-166] If the file is a directory, open it with `opendir`. Find all entries in the directory by repeatedly calling `readdir_r`. Each directory entry is entered as a new work item.
 
-If the file is a regular file, open it and read all text, looking for the search string. If we find it, write a message and exit the search loop.
+[167-207] If the file is a regular file, open it and read all text, looking for the search string. If we find it, write a message and exit the search loop.
 
-If the file is of any other type, write a message attempting to identify the type.
+[208-219] If the file is of any other type, write a message attempting to identify the type.
 
-Relock the work crew mutex, and report that another work item is done. If the count reaches 0, then the crew has completed the assignment, and we broadcast to awaken any threads waiting to issue a new assignment. Note that the work count is decreased only after the work item is fully processed-the count will never reach 0 if any crew member is still busy (and might queue additional directory entries).
+[233-253] Relock the work crew mutex, and report that another work item is done. If the count reaches 0, then the crew has completed the assignment, and we broadcast to awaken any threads waiting to issue a new assignment. Note that the work count is decreased only after the work item is fully processed-the count will never reach 0 if any crew member is still busy (and might queue additional directory entries).
 
 ```c
 /* crew.c part 2 worker_routine */
@@ -741,11 +741,11 @@ void *worker_routine (void *arg)
 ```
 Part 3 shows `crew_create`, the function used to create a new work crew. This simple example does not provide a way to destroy a work crew, because that is not necessary-the work crew would be destroyed only when the main program was prepared to exit, and process exit will destroy all threads and process data.
 
-The `crew_create` function begins by checking the `crew_size` argument. The size of the crew is not allowed to exceed the size of the crew array in crewt. If the requested size is acceptable, copy it into the structure.
+[13-16] The `crew_create` function begins by checking the `crew_size` argument. The size of the crew is not allowed to exceed the size of the crew array in `crew_t`. If the requested size is acceptable, copy it into the structure.
 
-Start with no work and an empty work queue. Initialize the crew's synchronization objects.
+[17-32] Start with no work and an empty work queue. Initialize the crew's synchronization objects.
 
-Then, for each crew member, initialize the member's `worker_t` data. The index of the member within the crew array is recorded, and a pointer back to the `crew_t`. Then the crew member thread is created, with a pointer to the member's workert as its argument.
+[37-44] Then, for each crew member, initialize the member's `worker_t` data. The index of the member within the crew array is recorded, and a pointer back to the `crew_t`. Then the crew member thread is created, with a pointer to the member's `worker_t` as its argument.
 
 ```c
 /* crew.c part 3 crew_create */
@@ -797,17 +797,17 @@ int crew_create (crew_t *crew, int crew_size)
 ```
 Part 4 shows the `crew_start` function, which is called to assign a new path name and search string to the work crew. The function is synchronous-that is, after assigning the task it waits for the crew members to complete the task before returning to the caller. The `crew_start` function assumes that the `crew_t` structure has been previously created by calling `crew_create`, shown in part 3, but does not attempt to validate the structure.
 
-Wait for the crew members to finish any previously assigned work. Although `crew_start` is synchronous, the crew may be processing a task assigned by another thread. On creation, the crew's `work_count` is set to 0, so the first call to crew start will not need to wait.
+[21-27] Wait for the crew members to finish any previously assigned work. Although `crew_start` is synchronous, the crew may be processing a task assigned by another thread. On creation, the crew's `work_count` is set to 0, so the first call to `crew_start` will not need to wait.
 
-Get the proper values of `path_max` and `name_max` for the file system specified by the file path we'll be reading. The pathconf function may return a value of-1 without setting errno, if the requested value for the file system is "unlimited." To detect this, we need to clear errno before making the call. If pathconf returns -1 without setting errno, assume reasonable values.
+[29-44] Get the proper values of `path_max` and `name_max` for the file system specified by the file path we'll be reading. The `pathconf` function may return a value of -1 without setting `errno`, if the requested value for the file system is "unlimited." To detect this, we need to clear `errno` before making the call. If `pathconf` returns -1 without setting `errno`, assume reasonable values.
 
-The values returned by pathconf don't include the terminating null character of a string-so add one character to both.
+[48-49] The values returned by `pathconf` don't include the terminating null character of a string-so add one character to both.
 
-Allocate a work queue entry (`work_t`) and fill it in. Add it to the end of the request queue.
+[50-68] Allocate a work queue entry (`work_t`) and fill it in. Add it to the end of the request queue.
 
-We've queued a single work request, so awaken one of the waiting work crew members by signaling the condition variable. If the attempt fails, free the work request, clear the work queue, and return with the error.
+[69-76] We've queued a single work request, so awaken one of the waiting work crew members by signaling the condition variable. If the attempt fails, free the work request, clear the work queue, and return with the error.
 
-Wait for the crew to complete the task. The crew members handle all output, so when they're done we simply return to the caller.
+[77-81] Wait for the crew to complete the task. The crew members handle all output, so when they're done we simply return to the caller.
 
 ```c
 /*crew.c part 4 crew_start*/
@@ -899,11 +899,11 @@ int crew_start (
 ```
 Part 5 shows the initial thread (`main`) for the little work crew sample.
 
-The program requires three arguments-the program name, a string for which to search, and a path name. For example, "crew butenhof ~"
+[11-14] The program requires three arguments-the program name, a string for which to search, and a path name. For example, "crew butenhof ~"
 
-On a Solaris system, call `thr_setconcurrency` to ensure that at least one LWP (kernel execution context) is created for each crew member. The program will work without this call, but, on a uniprocessor, you would not see any concurrency. See Section 5.6.3 for more information on "many to few" scheduling models, and Section 10.1.3 for information on "set concurrency" functions.
+[16-24] On a Solaris system, call `thr_setconcurrency` to ensure that at least one LWP (kernel execution context) is created for each crew member. The program will work without this call, but, on a uniprocessor, you would not see any concurrency. See Section 5.6.3 for more information on "many to few" scheduling models, and Section 10.1.3 for information on "set concurrency" functions.
 
-Create a work crew, and assign to it the concurrent file search.
+[25-31] Create a work crew, and assign to it the concurrent file search.
 
 ```c
 /* crew.c part 5 main */
