@@ -963,19 +963,19 @@ graph TD;
 ```
 <center>**FIGURE 4.3** *Client/Server*</center>
 
-If a set of threads all need to read input from stdin, it might be confusing for them to each issue independent prompt-and-read operations. Imagine that two threads each writes its prompt using printf, and then each reads the response using gets-you would have no way of knowing to which thread you were responding. If one thread asks "OK to send mail?" and the other asks "OK to delete root directory?" you'd probably like to know which thread will receive your response. Of course there are ways to keep the prompt and response "connected" without introducing a server thread; for example, by using the flockfile and funlockfile functions to lock both stdin and stdout around the prompt-and-read sequences, but a server thread is more interesting-and certainly more relevant to this section.
+If a set of threads all need to read input from `stdin`, it might be confusing for them to each issue independent prompt-and-read operations. Imagine that two threads each writes its prompt using `printf`, and then each reads the response using `gets`-you would have no way of knowing to which thread you were responding. If one thread asks "OK to send mail?" and the other asks "OK to delete root directory?" you'd probably like to know which thread will receive your response. Of course there are ways to keep the prompt and response "connected" without introducing a server thread; for example, by using the `flockfile` and `funlockfile` functions to lock both `stdin` and `stdout` around the prompt-and-read sequences, but a server thread is more interesting-and certainly more relevant to this section.
 
-In the following program, server, c, each of four threads will repeatedly read, and then echo, input lines. When the program is run you should see the threads prompt in varying orders, and another thread may prompt before the echo. But you'll never see a prompt or an echo between the prompt and read performed by the "prompt server."
+In the following program, `server.c`, each of four threads will repeatedly read, and then echo, input lines. When the program is run you should see the threads prompt in varying orders, and another thread may prompt before the echo. But you'll never see a prompt or an echo between the prompt and read performed by the "prompt server."
 
-These symbols define the commands that can be sent to the "prompt server." It can be asked to read input, write output, or quit.
+[8-10] These symbols define the commands that can be sent to the "prompt server." It can be asked to *read* input, *write* output, or quit.
 
-The `request_t` structure defines each request to the server. The outstanding requests are linked in a list using the next member. The operation member contains one of the request codes (read, write, or quit). The synchronous member is nonzero if the client wishes to wait for the operation to be completed (synchronous), or 0 if it does not wish to wait (asynchronous).
+[15-23] The `request_t` structure defines each request to the server. The outstanding requests are linked in a list using the `next` member. The `operation` member contains one of the request codes (read, write, or quit). The `synchronous` member is nonzero if the client wishes to wait for the operation to be completed (synchronous), or 0 if it does not wish to wait (asynchronous).
 
-The `tty_server_t` structure provides the context for the server thread. It has the synchronization objects (mutex and request), a flag denoting whether the server is running, and a list of requests that have been made and not yet processed (first and last).
+[28-34] The `tty_server_t` structure provides the context for the server thread. It has the synchronization objects (`mutex` and `request`), a flag denoting whether the server is `running`, and a list of requests that have been made and not yet processed (`first` and `last`).
 
-This program has a single server, and the control structure (`tty_server`) is statically allocated and initialized here. The list of requests is empty, and the server is not running. The mutex and condition variable are statically initialized.
+[36-38] This program has a single server, and the control structure (`tty_server`) is statically allocated and initialized here. The list of requests is empty, and the server is not running. The mutex and condition variable are statically initialized.
 
-The main program; and client threads coordinate their shutdown using these synchronization objects (`client_mutex` and `clients_done`) rather than using pthread join.
+[44-46] The main program; and client threads coordinate their shutdown using these synchronization objects (`client_mutex` and `clients_done`) rather than using pthread join.
 
 ```c
 /* server.c part 1 definitions */
@@ -1027,15 +1027,15 @@ pthread_cond_t clients_done = PTHREAD_COND_INITIALIZER;
 ```
 Part 2 shows the server thread function, `tty_server_routine`. It loops, processing requests continuously until asked to quit.
 
-The server waits for a request to appear using the request condition variable.
+[26-31] The server waits for a request to appear using the `request` condition variable.
 
-Remove the first request from the queue-if the queue is now empty, also clear the pointer to the last entry (`tty_server. last`).
+[32-34] Remove the first request from the queue-if the queue is now empty, also clear the pointer to the last entry (`tty_server.last`).
 
-The switch statement performs the requested work, depending on the operation given in the request packet, reqquit tells the server to shut down. `REQ_READ` tells the server to read, with an optional prompt string. `REQ_WRITE` tells the server to write a string.
+[44-67] The switch statement performs the requested work, depending on the `operation` given in the request packet, `REQ_QUIT` tells the server to shut down. `REQ_READ` tells the server to read, with an optional prompt string. `REQ_WRITE` tells the server to write a string.
 
-If a request is marked "synchronous" (synchronous flag is nonzero), the server sets `done_flag` and signals the done condition variable. When the request is synchronous, the client is responsible for freeing the request packet. If the request was asynchronous, the server frees request on completion.
+[68-80] If a request is marked "synchronous" (`synchronous` flag is nonzero), the server sets `done_flag` and signals the `done` condition variable. When the request is synchronous, the client is responsible for freeing the `request` packet. If the request was asynchronous, the server frees `request` on completion.
 
-If the request was `REQ_QUIT`, terminate the server thread by breaking out of the while loop, to the return statement.
+[81-82] If the request was `REQ_QUIT`, terminate the server thread by breaking out of the `while` loop, to the return statement.
 
 ```c
 /* server.c part 2 tty_server_routine */
@@ -1124,15 +1124,15 @@ void *tty_server_routine (void *arg)
     return NULL;
 }
 ```
-Part 3 shows the function that is called to initiate a request to the tty server thread. The caller specifies the desired operation (`REQ_QUIT`, `REQ_READ`, or `REQ_WRITE`), whether the operation is synchronous or not (`sync`), an optional prompt string (`prompt`) for `REQ_READ` operations, and the pointer to a string (input for `REQ_WRITE`, or a buffer to return the result of an `REQ_READ` operation).
+Part 3 shows the function that is called to initiate a request to the tty server thread. The caller specifies the desired `operation` (`REQ_QUIT`, `REQ_READ`, or `REQ_WRITE`), whether the operation is synchronous or not (`sync`), an optional prompt string (`prompt`) for `REQ_READ` operations, and the pointer to a string (input for `REQ_WRITE`, or a buffer to return the result of an `REQ_READ` operation).
 
-If a tty server thread is not already running, start one. A temporary thread attributes object (`detached_attr`) is created, and the *detachstate* attribute is set to `pthread_create_detached`. Thread attributes will be explained later in Section 5.2.3. In this case, we are just saying that we will not need to use the thread identifier after creation.
+[17-41] If a tty server thread is not already running, start one. A temporary thread attributes object (`detached_attr`) is created, and the *detachstate* attribute is set to `PTHREAD_CREATE_DETACHED`. Thread attributes will be explained later in Section 5.2.3. In this case, we are just saying that we will not need to use the thread identifier after creation.
 
-Allocate and initialize a server request (`reguest_t`) packet. If the request is synchronous, initialize the condition variable (done) in the request packet-otherwise the condition variable isn't used. The new request is linked onto the request queue.
+[46-77] Allocate and initialize a server request (`reguest_t`) packet. If the request is synchronous, initialize the condition variable (`done`) in the request packet-otherwise the condition variable isn't used. The new request is linked onto the request queue.
 
-Wake the server thread to handle the queued request.
+[82-84] Wake the server thread to handle the queued request.
 
-If the request is synchronous, wait for the server to set `done_flag` and signal the done condition variable. If the operation is `REQ_READ`, copy the result string into the output buffer. Finally, destroy the condition variable, and free the request packet.
+[89-106] If the request is synchronous, wait for the server to set `done_flag` and signal the `done` condition variable. If the operation is `REQ_READ`, copy the result string into the output buffer. Finally, destroy the condition variable, and `free` the request packet.
 
 ```c
 /*server.c part 3 tty_server_request*/
@@ -1248,9 +1248,9 @@ void tty_server_request (
 ```
 Part 4 shows the thread start function for the client threads, which repeatedly queue tty operation requests to the server.
 
-Read a line through the tty server. If the resulting string is empty, break out of the loop and terminate. Otherwise, loop four times printing the result string, at one-second intervals. Why four? It just "mixes things up" a little.
+[13-23] Read a line through the tty server. If the resulting string is empty, break out of the loop and terminate. Otherwise, loop four times printing the result string, at one-second intervals. Why four? It just "mixes things up" a little.
 
-Decrease the count of client threads, and wake the main thread if this is the last client thread to terminate.
+[27-32] Decrease the count of client threads, and wake the main thread if this is the last client thread to terminate.
 
 ```c
 /*server.c part 4 client_routine*/
@@ -1293,11 +1293,11 @@ void *client_routine (void *arg)
 ```
 Part 5 shows the main program for `server.c`. It creates a set of client threads to utilize the tty server, and waits for them.
 
-On a Solaris system, set the concurrency level to the number of client threads by calling `thr_setconcurrency`. Because all the client threads will spend some of their time blocked on condition variables, we don't really need to increase the concurrency level for this program-however, it will provide less predictable execution behavior.
+[8-16] On a Solaris system, set the concurrency level to the number of client threads by calling `thr_setconcurrency`. Because all the client threads will spend some of their time blocked on condition variables, we don't really need to increase the concurrency level for this program-however, it will provide less predictable execution behavior.
 
-Create the client threads.
+[21-27] Create the client threads.
 
-This construct is much like `pthread_join`, except that it completes only when all of the client threads have terminated. As I have said elsewhere, `pthread_join` is nothing magical, and there is no reason to use it to detect thread termination unless it does exactly what you want. Joining multiple threads in a loop with `pthread_join` is rarely exactly what you want, and a "multiple join" like that shown here is easy to construct.
+[28-36] This construct is much like `pthread_join`, except that it completes only when all of the client threads have terminated. As I have said elsewhere, `pthread_join` is nothing magical, and there is no reason to use it to detect thread termination unless it does exactly what you want. Joining multiple threads in a loop with `pthread_join` is rarely exactly what you want, and a "multiple join" like that shown here is easy to construct.
 
 ```c
 /* server.c part 5 main */
