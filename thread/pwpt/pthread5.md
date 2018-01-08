@@ -28,7 +28,7 @@ Lewis Carroll, The Hunting of the Snark:
 ```c
 pthread_once_t once_control = PTHREAD_ONCE_INIT;
 int pthread_once (pthread_once_t *once_control,
-void (*init_routine) (void));
+    void (*init_routine) (void));
 ```
 
 Some things need to be done once and only once, no matter what. When you are Initializing an application, it is often easiest to do all that from main, before calling anything else that might depend on the initialization-and, in particular, before creating any threads that might depend on having initialized mutexes, created thread-specific data keys, and so forth.
@@ -37,19 +37,19 @@ If you are writing a library, you usually don't have that luxury. But you must s
 
 In traditional sequential programming, one-time initialization is often managed by a boolean variable. A control variable is statically initialized to 0, and any code that depends on the initialization can test the variable. If the value is still 0 it can perform the initialization and then set the variable to 1. Later checks will skip the initialization.
 
-When you are using multiple threads, it is not that easy. If more than one thread executes the initialization sequence concurrently, two threads may both find initializer to be 0, and both perform the initialization, which, presumably, should have been performed only once. The state of initialization is a shared invariant that must be protected by a mutex.
+When you are using multiple threads, it is not that easy. If more than one thread executes the initialization sequence concurrently, two threads may both find `initializer` to be 0, and both perform the initialization, which, presumably, should have been performed only once. The state of initialization is a shared invariant that must be protected by a mutex.
 
 You can code your own one-time initialization using a boolean variable and a statically initialized mutex. In many cases this will be more convenient than `pthread_once`, and it will always be more efficient. The main reason for `pthread_once` is that you were not originally allowed to statically initialize a mutex. Thus, to use a mutex, you had to first call `pthread_mutex_init`. You must initialize a mutex only once, so the initialization call must be made in one-time initialization code. The `pthread_once` function solved this recursive problem. When static initialization of mutexes was added to the standard, `pthread_once` was retained as a convenience function. If it's convenient, use it, but remember that you don't have to use it.
 
-First, you declare a control variable of type `pthread_once_t`. The control variable must be statically initialized using the `PTHREAD_ONCE_init` macro, as shown in the following program, called once.c. You must also create a function containing the code to perform all initialization that is to be associated with the control variable. Now, at any time, a thread may call `pthread_once`, specifying a pointer to the control variable and a pointer to the associated initialization function.
+First, you declare a control variable of type `pthread_once_t`. The control variable must be statically initialized using the `PTHREAD_ONCE_INIT` macro, as shown in the following program, called `once.c`. You must also create a function containing the code to perform all initialization that is to be associated with the control variable. Now, at any time, a thread may call `pthread_once`, specifying a pointer to the control variable and a pointer to the associated initialization function.
 
 The `pthread_once` function first checks the control variable to determine whether the initialization has already completed. If so, `pthread_once` simply returns. If initialization has not yet been started, `pthread_once` calls the initialization function (with no arguments), and then records that initialization has been completed. If a thread calls `pthread_once` while initialization is in progress in another thread, the calling thread will wait until that other thread completes initialization, and then return. In other words, when any call to `pthread_once` returns successfully, the caller can be certain that all states initialized by the associated initialization function are ready to go.
 
-The function `once_init_routine` initializes the mutex when called-the use of `pthread_once` ensures that it will be called exactly one time.
+[14-20] The function `once_init_routine` initializes the `mutex` when called-the use of `pthread_once` ensures that it will be called exactly one time.
 
-The thread function `thread_routine` calls `pthread_once` before using mutex, to ensure that it exists even if it had not already been created by main.
+[30] The thread function `thread_routine` calls `pthread_once` before using `mutex`, to ensure that it exists even if it had not already been created by `main`.
 
-The main program also calls `pthread_once` before using mutex, so that the program will execute correctly regardless of when `thread_routine` runs. Notice that, while I normally stress that all shared data must be initialized before creating any thread that uses it, in this case, the only critical shared data is really the `once_block`-it is irrelevant that the mutex is not initialized, because the use of `pthread_once` ensures proper synchronization.
+[52] The main program also calls `pthread_once` before using `mutex`, so that the program will execute correctly regardless of when `thread_routine` runs. Notice that, while I normally stress that all shared data must be initialized before creating any thread that uses it, in this case, the only critical shared data is really the `once_block`-it is irrelevant that the `mutex` is not initialized, because the use of `pthread_once` ensures proper synchronization.
 
 ```c
 /*  once.c  */
@@ -126,13 +126,13 @@ Lewis Carroll, The Hunting of the Snark:
 > Distinguishing those that have feathers, and bite,  
 > From those that have whiskers, and scratch.  
 
-So far, when we created threads, or dynamically initialized mutexes and condition variables, we have usually used the pointer value NULL as the second argument. That argument is actually a pointer to an attributes object. The value NULL indicates that Pthreads should assume the default value for all attributes- just as it does when statically initializing a mutex or condition variable.
+So far, when we created threads, or dynamically initialized mutexes and condition variables, we have usually used the pointer value `NULL` as the second argument. That argument is actually a pointer to an attributes object. The value `NULL` indicates that Pthreads should assume the default value for all attributes-just as it does when statically initializing a mutex or condition variable.
 
 An attributes object is an extended argument list provided when you initialize an object. It allows the main interfaces (for example, `pthread_create`) to be relatively simple, while allowing "expert" capability when you need it. Later POSIX standards will be able to add options without requiring source changes to existing code. In addition to standard attributes provided by Pthreads, an implementation can provide specialized options without creating nonstandard parameters.
 
-You can think of an attributes object as a private structure. You read or write the "members" of the structure by calling special functions, rather than by accessing public member names. For example, you read the stacksize attribute from a thread attributes object by calling `pthread_attr_getstacksize`, or write it by calling `pthread_attr_setstacksize`.
+You can think of an attributes object as a private structure. You read or write the "members" of the structure by calling special functions, rather than by accessing public member names. For example, you read the *stacksize* attribute from a thread attributes object by calling `pthread_attr_getstacksize`, or write it by calling `pthread_attr_setstacksize`.
 
-In a simple implementation of Pthreads the type `pthread_attr_t` might be a typedef struct and the get and set functions might be macros to read or write members of the variable. Another implementation might allocate memory when you initialize an attributes object, and it may implement the get and set operations as real functions that perform validity checking.
+In a simple implementation of Pthreads the type `pthread_attr_t` might be a `typedef struct` and the get and set functions might be macros to read or write members of the variable. Another implementation might allocate memory when you initialize an attributes object, and it may implement the get and set operations as real functions that perform validity checking.
 
 Threads, mutexes, and condition variables each have their own special attributes object type. Respectively, the types are `pthread_attr_t`, `pthread_mutexattr_t`, and `pthread_condattr_t`.
 
@@ -150,18 +150,18 @@ int pthread_mutexattr_setpshared (
 #endif
 ```
 
-Pthreads defines the following attributes for mutex creation: pshared, protocol, and prioceiltng. No system is required to implement any of these attributes, however, so check the system documentation before using them.
+Pthreads defines the following attributes for mutex creation: *pshared*, *protocol*, and *prioceiling*. No system is required to implement any of these attributes, however, so check the system documentation before using them.
 
-You initialize a mutex attributes object by calling `pthread_mutexattr_init`, specifying a pointer to a variable of type `pthread_mutexattr_t`, as in `mutex_attr.c`, shown next. You use that attributes object by passing its address to `pthread_mutex_init` instead of the NULL value we've been using so far.
+You initialize a mutex attributes object by calling `pthread_mutexattr_init`, specifying a pointer to a variable of type `pthread_mutexattr_t`, as in `mutex_attr.c`, shown next. You use that attributes object by passing its address to `pthread_mutex_init` instead of the `NULL` value we've been using so far.
 
-If your system provides the `_posix_thread_process_shared` option, then it supports the pshared attribute, which you can set by calling the function `pthread_mutexattr_setpshared`. If you set the pshared attribute to the value `PTHREAD_PROCESS_SHARED`, you can use the mutex to synchronize threads within separate processes that have access to the memory where the mutex (`pthread_mutex_t`) is initialized. The default value for this attribute is `pthread_process_PRIVATE`.
+If your system provides the `_POSIX_THREAD_PROCESS_SHARED` option, then it supports the *pshared* attribute, which you can set by calling the function `pthread_mutexattr_setpshared`. If you set the *pshared* attribute to the value `PTHREAD_PROCESS_SHARED`, you can use the mutex to synchronize threads within separate processes that have access to the memory where the mutex (`pthread_mutex_t`) is initialized. The default value for this attribute is `PTHREAD_PROCESS_PRIVATE`.
 
-The `mutex_attr.c` program shows how to set a mutex attributes object to create a mutex using the pshared attribute. This example uses the default value. `pthread_process_private`, to avoid the additional complexity of creating shared memory and forking a process. The other mutex attributes, protocol and prioceiling, will be discussed later in Section 5.5.5.
+The `mutex_attr.c` program shows how to set a mutex attributes object to create a mutex using the pshared attribute. This example uses the default value. `PTHREAD_PROCESS_PRIVATE`, to avoid the additional complexity of creating shared memory and forking a process. The other mutex attributes, *protocol* and *prioceiling*, will be discussed later in Section 5.5.5.
 
 ```c
 /*  mutex_attr.c  */
 #include <pthread.h>
-linclude "errors.h"
+#include "errors.h"
 
 pthread_mutex_t mutex;
 
@@ -199,14 +199,14 @@ int pthread_condattr_setpshared (
 #endif
 ```
 
-Pthreads defines only one attribute for condition variable creation, pshared. No system is required to implement this attribute, so check the system documentation before using it. You initialize a condition variable attributes object using `pthread_condattr_init`, specifying a pointer to a variable of type `pthread_condattr_t`, as in `cond_attr.c`, shown next. You use that attributes object by passing its address to `pthread_cond_init` instead of the null value we've been using so far.
+Pthreads defines only one attribute for condition variable creation, `pshared`. No system is required to implement this attribute, so check the system documentation before using it. You initialize a condition variable attributes object using `pthread_condattr_init`, specifying a pointer to a variable of type `pthread_condattr_t`, as in `cond_attr.c`, shown next. You use that attributes object by passing its address to `pthread_cond_init` instead of the `NULL` value we've been using so far.
 
-If your system defines `_posix_thread_process_shared` then it supports the pshared attribute. You set the pshared attribute by calling the function `pthread_condattr_setpshared`. If you set the pshared attribute to the value `PTHREAD_process_shared`, the condition variable can be used by threads in separate processes that have access to the memory where the condition variable (`pthread_cond_t`) is initialized. The default value for this attribute is `pthread_process_PRIVATE`.
+If your system defines `_POSIX_THREAD_PROCESS_SHARED` then it supports the *pshared* attribute. You set the *pshared* attribute by calling the function `pthread_condattr_setpshared`. If you set the *pshared* attribute to the value `PTHREAD_PROCESS_SHARED`, the condition variable can be used by threads in separate processes that have access to the memory where the condition variable (`pthread_cond_t`) is initialized. The default value for this attribute is `PTHREAD_PROCESS_PRIVATE`.
 
-The `cond_attr.c` program shows how to set a condition variable attributes object to create a condition variable using the pshared attribute. This example uses the default value, `pthread_process_private`, to avoid the additional complexity of creating shared memory and forking a process.
+The `cond_attr.c` program shows how to set a condition variable attributes object to create a condition variable using the *pshared* attribute. This example uses the default value, `PTHREAD_PROCESS_PRIVATE`, to avoid the additional complexity of creating shared memory and forking a process.
 
 ```c
-/*  cond_attr. c  */
+/*  cond_attr.c  */
 #include <pthread.h>
 #include "errors.h"
 
@@ -226,13 +226,13 @@ int main (int argc, char *argv[])
     if (status != 0)
         err_abort (status, "Set pshared");
 #endif
-    status = pthread_cond_init (Scond, &cond_attr);
+    status = pthread_cond_init (&cond, &cond_attr);
     if (status != 0)
         err_abort (status, "Init cond");
     return 0;
 }
 ```
-To make use of a `pthread_process_shared` condition variable, you must also use a `pthread_PROCESS_shared` mutex. That's because two threads that synchronize using a condition variable must also use the same mutex. Waiting for a condition variable automatically unlocks, and then locks, the associated mutex. So if the mutex isn't also created with `pthread_process_SHARED`, the synchronization won't work.
+To make use of a `PTHREAD_PROCESS_SHARED` condition variable, you must also use a `PTHREAD_PROCESS_SHARED` mutex. That's because two threads that synchronize using a condition variable must also use the same mutex. Waiting for a condition variable automatically unlocks, and then locks, the associated mutex. So if the mutex isn't also created with `PTHREAD_PROCESS_SHARED`, the synchronization won't work.
 
 ### 5.2.3 Thread attributes
 ```c
@@ -257,29 +257,29 @@ int pthread_attr_setstackaddr (
 #endif
 ```
 
-POSIX defines the following attributes for thread creation: detachstate, stacksize, stackaddr, scope, inheritsched, schedpolicy, and schedparam. Some systems won't support all of these attributes, so you need to check the system documentation before using them. You initialize a thread attributes object using `pthread_attr_init`, specifying a pointer to a variable of type `pthread_attr_t`, as in the program `thread_attr.c`, shown later. You use the attributes object you've created by passing its address as the second argument to `pthread_create` instead of the null value we've been using so far.
+POSIX defines the following attributes for thread creation: *detachstate*, *stacksize*, *stackaddr*, *scope*, *inheritsched*, *schedpolicy*, and *schedparam*. Some systems won't support all of these attributes, so you need to check the system documentation before using them. You initialize a thread attributes object using `pthread_attr_init`, specifying a pointer to a variable of type `pthread_attr_t`, as in the program `thread_attr.c`, shown later. You use the attributes object you've created by passing its address as the second argument to `pthread_create` instead of the `NULL` value we've been using so far.
 
-All Pthreads systems support the detachstate attribute. The value of this attribute can be either `pthread_create_joinable` or `pthread_create_detached`. By default, threads are created joinable, which means that the thread identification created by `pthread_create` can be used to join with the thread and retrieve its return value, or to cancel it. If you set the detachstate attribute to `pthread_create_detached`, the identification of threads created using that attributes object can't be used. It also means that when the thread terminates, any resources it used can immediately be reclaimed by the system.
+All Pthreads systems support the *detachstate* attribute. The value of this attribute can be either `PTHREAD_CREATE_JOINABLE` or `PTHREAD_CREATE_DETACHED`. By default, threads are created *joinable*, which means that the thread identification created by `pthread_create` can be used to join with the thread and retrieve its return value, or to cancel it. If you set the *detachstate* attribute to `PTHREAD_CREATE_DETACHED`, the identification of threads created using that attributes object can't be used. It also means that when the thread terminates, any resources it used can immediately be reclaimed by the system.
 
 When you create threads that you know you won't need to cancel, or join with, you should create them detached. Remember that, in many cases, even if you want to know when a thread terminates, or receive some return value from it, you may not need to use `pthread_join`. If you provide your own notification mechanism, for example, using a condition variable, you can still create your threads detached.
 
 > Setting the size of a stack is not very portable.
 
-If your system defines the symbol `_posix_thread_attr_Stacksize`, then you can set the stacksize attribute to specify the minimum size for the stack of a thread created using the attributes object. Most systems will support this option, but you should use it with caution because stack size isn't portable. The amount of stack space you'll need depends on the calling standards and data formats used by each system.
+If your system defines the symbol `_POSIX_THREAD_ATTR_STACKSIZE`, then you can set the *stacksize* attribute to specify the minimum size for the stack of a thread created using the attributes object. Most systems will support this option, but you should use it with caution because stack size isn't portable. The amount of stack space you'll need depends on the calling standards and data formats used by each system.
 
-Pthreads defines the symbol `pthread_stack_min` as the minimum stack size required for a thread: If you really need to specify a stack size, you might be best off calculating your requirements in terms of the minimum required by the implementation. Or, you could base your requirements on the default stacksize attribute selected by the implementation-for example, twice the default, or half the default. The program `thread_attr.c` shows how to read the default stacksize attribute value of an initialized attribute by calling `pthread_attr_getstacksize`.
+Pthreads defines the symbol `PTHREAD_STACK_MIN` as the minimum stack size required for a thread: If you really need to specify a stack size, you might be best off calculating your requirements in terms of the minimum required by the implementation. Or, you could base your requirements on the default *stacksize* attribute selected by the implementation-for example, twice the default, or half the default. The program `thread_attr.c` shows how to read the default *stacksize* attribute value of an initialized attribute by calling `pthread_attr_getstacksize`.
 
 > Setting the address of a stack is less portable!
 
-If your system defines the symbol `_posix_thread_attr_stackaddr`, then you can set the stackaddr attribute to specify a region of memory to be used as a stack by any thread created using this attributes object. The stack must be at least as large as `pthread_stack_min`. You may need to specify an area of memory with an address that's aligned to some required granularity. On a machine where the stack grows downward from higher addresses to lower addresses, the address you specify should be the highest address in the stack, not the lowest. If the stack grows up, you need to specify the lowest address.
+If your system defines the symbol `_POSIX_THREAD_ATTR_STACKADDR`, then you can set the *stackaddr* attribute to specify a region of memory to be used as a stack by any thread created using this attributes object. The stack must be at least as large as `PTHREAD_STACK_MIN`. You may need to specify an area of memory with an address that's aligned to some required granularity. On a machine where the stack grows downward from higher addresses to lower addresses, the address you specify should be the highest address in the stack, not the lowest. If the stack grows up, you need to specify the lowest address.
 
 You also need to be aware of whether the machine increments (or decrements) the stack before or after writing a new value-this determines whether the address you specify should be "inside" or "outside" the stack you've allocated. The system can't tell whether you allocated enough space, or specified the right address, so it has to trust you. If you get it wrong, undesirable things will occur.
 
-Use the stackaddr attribute only with great caution, and beware that it may well be the least portable aspect of Pthreads. While a reasonable value for the stacksize attribute will probably work on a wide range of machines, it is little more than a wild coincidence if any particular value of the stackaddr attribute works on any two machines. Also, you must remember that you can create only one thread with any value of the stackaddr attribute. If you create two concurrent threads with the same stackaddr attribute value, the threads will run on the same stack. (That would be bad.)
+Use the *stackaddr* attribute only with great caution, and beware that it may well be the least portable aspect of Pthreads. While a reasonable value for the *stacksize* attribute will probably work on a wide range of machines, it is little more than a wild coincidence if any particular value of the *stackaddr* attribute works on any two machines. Also, you must remember that you can create only one thread with any value of the *stackaddr* attribute. If you create two concurrent threads with the same *stackaddr* attribute value, the threads will run on the same stack. (That would be bad.)
 
-The `thread_attr.c` program that follows shows some of these attributes in action, with proper conditionalization to avoid using the stacksize attribute if it is not supported by your system. If stacksize is supported (and it will be on most UNIX systems), the program will print the default and minimum stack size, and set stacksize to a value twice the minimum. The code also creates the thread detached, which means no thread can join with it to determine when it completes. Instead, main exits by calling `pthread_exit`, which means that the process will terminate when the last thread exits.
+The `thread_attr.c` program that follows shows some of these attributes in action, with proper conditionalization to avoid using the *stacksize* attribute if it is not supported by your system. If *stacksize* is supported (and it will be on most UNIX systems), the program will print the default and minimum stack size, and set *stacksize* to a value twice the minimum. The code also creates the thread detached, which means no thread can join with it to determine when it completes. Instead, main exits by calling `pthread_exit`, which means that the process will terminate when the last thread exits.
 
-This example does not include the priority scheduling attributes, which are discussed (and demonstrated) in Section 5.5.2. It also does not demonstrate use of the stackaddr attribute-as I said, there is no way to use stackaddr in any remotely portable way and, although I have mentioned it for completeness, I strongly discourage use of stackaddr in any program.
+This example does not include the priority scheduling attributes, which are discussed (and demonstrated) in Section 5.5.2. It also does not demonstrate use of the *stackaddr* attribute-as I said, there is no way to use *stackaddr* in any remotely portable way and, although I have mentioned it for completeness, I strongly discourage use of *stackaddr* in any program.
 
 ```c
 /*  thread_attr.c  */
@@ -300,7 +300,6 @@ int main (int argc, char *argv[])
 {
     pthread_t thread_id;
     pthread_attr_t thread_attr;
-    struct sched_param thread_param;
     size_t stack_size;
     int status;
 
@@ -322,7 +321,7 @@ int main (int argc, char *argv[])
      *
      * Note that the standard does not specify the default stack
      * size, and the default value in an attributes object need
-     * not be the size that will actually be used. Solaris 2.5
+     * not be the size that will actually be used.  Solaris 2.5
      * uses a value of 0 to indicate the default.
      */
     status = pthread_attr_getstacksize (&thread_attr, &stack_size);
@@ -359,7 +358,7 @@ int pthread_setcancelstate (int state, int *oldstate);
 int pthread_setcanceltype (int type, int *oldtype);
 void pthread_testcancel (void);
 void pthread_cleanup_push (
-void (*routine)(void *), void *arg);
+    void (*routine)(void *), void *arg);
 void pthread_cleanup_pop (int execute);
 ```
 
@@ -385,29 +384,29 @@ Asynchronous | enabled | asynchronous | Cancellation may be processed at any tim
 
 <center>**TABLE 5.1** *Cancellation states*</center>
 
-Pthreads supports three cancellation modes, described in Table 5.1, which are encoded as two binarv values called "cancellation state" and "cancellation type." Each essentially can be on or off. (While that technically gives four modes, one of them is redundant.) As shown in the table, cancellation state is said to be *enabled* or *disabled*, and cancellation type is said to be *deferred* or *asynchronous*.
+Pthreads supports three cancellation modes, described in Table 5.1, which are encoded as two binary values called "cancellation state" and "cancellation type." Each essentially can be on or off. (While that technically gives four modes, one of them is redundant.) As shown in the table, cancellation state is said to be *enabled* or *disabled*, and cancellation type is said to be *deferred* or *asynchronous*.
 
-By default, cancellation is *deferred*, and can occur only at specific points in the program that check whether the thread has been requested to terminate, called cancellation points. Most functions that can wait for an unbounded time should be deferred cancellation points. Deferred cancellation points include waiting on a condition variable, reading or writing a file, and other functions where the thread may be blocked for a substantial period of time. There is also a special function called `pthread_testcancel` that is nothing but a deferred cancellation point. It will return immediately if the thread hasn't been asked to terminate, which allows you to turn any of your functions into cancellation points.
+By default, cancellation is *deferred*, and can occur only at specific points in the program that check whether the thread has been requested to terminate, called *cancellation points*. Most functions that can wait for an unbounded time should be deferred cancellation points. Deferred cancellation points include waiting on a condition variable, reading or writing a file, and other functions where the thread may be blocked for a substantial period of time. There is also a special function called `pthread_testcancel` that is nothing but a deferred cancellation point. It will return immediately if the thread hasn't been asked to terminate, which allows you to turn any of your functions into cancellation points.
 
-Some systems provide a function to terminate a thread immediately. Although that sounds useful, it is difficult to use such a function safely. In fact, it is nearly impossible in a normal modular programming environment. If a thread is terminated with a mutex locked, for example, the next thread trying to lock that mutex will be stuck waiting forever.
+Some systems provide a function to *terminate* a thread immediately. Although that sounds useful, it is difficult to use such a function safely. In fact, it is nearly impossible in a normal modular programming environment. If a thread is terminated with a mutex locked, for example, the next thread trying to lock that mutex will be stuck waiting forever.
 
 It might seem that the thread system could automatically release the mutex; but most of the time that's no help. Threads lock mutexes because they're modifying shared data. No other thread can know what data has been modified or what the thread was trying to change, which makes it difficult to fix the data. Now the program is broken. When the mutex is left locked, you can usually tell that something's broken because one or more threads will hang waiting for the mutex.
 
 The only way to recover from terminating a thread with a locked mutex is for the application to be able to analyze all shared data and repair it to achieve a consistent and correct state. That is not impossible, and it is worth substantial effort when an application must be fail-safe. However, it is generally not practical for anything but an embedded system where the application designers control every bit of shared state in the process. You would have to rebuild not only your own program or library state, but also the state affected by any library functions that might be called by the thread (for example, the ANSI C library).
 
-To cancel a thread, you need the thread's identifier, the `pthread_t` value returned to the creator by `pthread_create` or returned to the thread itself by `pthread_self`. Cancelling a thread is asynchronous-that is, when the call to `pthread_cancel` returns, the thread has not necessarily been canceled, it may have only been notified that a cancel request is pending against it. If you need to know when the thread has actually terminated, you must join with it by calling `pthread_join` after cancelling it.
+To cancel a thread, you need the thread's identifier, the `pthread_t` value returned to the creator by `pthread_create` or returned to the thread itself by `pthread_self`. Cancelling a thread is asynchronous-that is, when the call to `pthread_cancel` returns, the thread has not necessarily been canceled, it may have only been notified that a cancel request is *pending* against it. If you need to know when the thread has actually terminated, you must *join* with it by calling `pthread_join` after cancelling it.
 
-If the thread had asynchronous cancelability type set, or when the thread next reaches a deferred cancellation point, the cancel request will be delivered by the system. When that happens, the system will set the thread's cancelability type to `pthread_cancel_deferred` and the cancelability state to `pthread_cancel_disable`. That is, the thread can clean up and terminate without having to worry about being canceled again.
+If the thread had asynchronous cancelability type set, or when the thread next reaches a deferred cancellation point, the cancel request will be *delivered* by the system. When that happens, the system will set the thread's cancelability type to `PTHREAD_CANCEL_DEFERRED` and the cancelability state to `PTHREAD_CANCEL_DISABLE`. That is, the thread can clean up and terminate without having to worry about being canceled again.
 
 When a function that is a cancellation point detects a pending cancel request, the function does not return to the caller. The active cleanup handlers will be called, if there are any, and the thread will terminate. There is no way to "handle" cancellation and continue execution-the thread must either defer cancellation entirely or terminate. This is analogous to C++ object destructors, rather than C++ exceptions-the object is allowed to clean up after itself, but it is not allowed to avoid destruction.
 
-The following program, called cancel.c, shows how to write a thread that responds "reasonably quickly" to deferred cancellation, by calling `pthread_testcancel` within a loop.
+The following program, called `cancel.c`, shows how to write a thread that responds "reasonably quickly" to deferred cancellation, by calling `pthread_testcancel` within a loop.
 
-The thread function `thread_routine` loops indefinitely, until canceled, testing periodically for a pending cancellation request. It minimizes the overhead of calling `pthread_testcancel` by doing so only every 1000 iterations (line 17).
+[12-20] The thread function `thread_routine` loops indefinitely, until canceled, testing periodically for a pending cancellation request. It minimizes the overhead of calling `pthread_testcancel` by doing so only every 1000 iterations (line 18).
 
-On a Solaris system, set the thread concurrency level to 2, by calling `thr_setconcurrency`. Without the call to `thr_setconcurrency`, this program will hang on Solaris because `thread_routine` is "compute bound" and will not block. The main program would never have another chance to run once `thread_routine` started, and could not call `pthread_cancel`.
+[28-36] On a Solaris system, set the thread concurrency level to 2, by calling `thr_setconcurrency`. Without the call to `thr_setconcurrency`, this program will hang on Solaris because `thread_routine` is "compute bound" and will not block. The main program would never have another chance to run once `thread_routine` started, and could not call `pthread_cancel`.
 
-The main program creates a thread running `thread_routine`, sleeps for two seconds, and then cancels the thread. It joins with the thread, and checks the return value, which should be `pthread_canceled` to indicate that it was canceled, rather than terminated normally.
+[37-55] The main program creates a thread running `thread_routine`, sleeps for two seconds, and then cancels the thread. It joins with the thread, and checks the return value, which should be `PTHREAD_CANCELED` to indicate that it was canceled, rather than terminated normally.
 
 ```c
 /*  cancel.c  */
@@ -417,17 +416,17 @@ The main program creates a thread running `thread_routine`, sleeps for two secon
 static int counter;
 
 /*
- * Loop until canceled. The thread can be canceled only
+ * Loop until cancelled. The thread can be cancelled only
  * when it calls pthread_testcancel, which it does each 1000
  * iterations.
  */
 void *thread_routine (void *arg)
 {
     DPRINTF (("thread_routine starting\n"));
-    for (counter =0; ; counter++)
+    for (counter = 0; ; counter++)
         if ((counter % 1000) == 0) {
             DPRINTF (("calling testcancel\n"));
-            pthread_testcancel ( );
+            pthread_testcancel ();
         }
 }
 
@@ -462,116 +461,71 @@ int main (int argc, char *argv[])
     if (status != 0)
         err_abort (status, "Join thread");
     if (result == PTHREAD_CANCELED)
-        printf ("Thread canceled at iteration %d\n", counter);
+        printf ("Thread cancelled at iteration %d\n", counter);
     else
-        printf ("Thread was not canceled\n");
+        printf ("Thread was not cancelled\n");
     return 0;
 }
 ```
-A thread can disable cancellation around sections of code that need to complete without interruption, by calling `pthread_setcancelstate`. For example, if a database update operation takes two separate write calls, you wouldn't want to complete the first and have the second canceled. If you request that a thread be canceled while cancellation is disabled, the thread remembers that it was canceled but won't do anything about it until after cancellation is enabled again.
+A thread can disable cancellation around sections of code that need to complete without interruption, by calling `pthread_setcancelstate`. For example, if a database update operation takes two separate `write` calls, you wouldn't want to complete the first and have the second canceled. If you request that a thread be canceled while cancellation is disabled, the thread remembers that it was canceled but won't do anything about it until after cancellation is enabled again. Because enabling cancellation isn't a *cancellation point*, you also need to test for a pending cancel request if you want a cancel processed immediately.
 
-Because enabling cancellation isn't a cancellation point, you also need to test for a pending cancel request if you want a cancel processed immediately. When a thread may be canceled while it holds private resources, such as a locked mutex or heap storage that won't ever be freed by any other thread, those resources need to be released when the thread is canceled. If the thread has a mutex locked, it may also need to "repair" shared data to restore program invariants. Cleanup handlers provide the mechanism to accomplish the cleanup, somewhat like process atexit handlers. After acquiring a resource, and before any cancellation points, declare a cleanup handler by calling `pthread_cleanup_push`. Before releasing the resource, but after any cancellation points, remove the cleanup handler by calling `pthread_cleanup_pop`.
+When a thread may be canceled while it holds private resources, such as a locked mutex or heap storage that won't ever be freed by any other thread, those resources need to be released when the thread is canceled. If the thread has a mutex locked, it may also need to "repair" shared data to restore program invariants. *Cleanup handlers* provide the mechanism to accomplish the cleanup, somewhat like process `atexit` handlers. After acquiring a resource, and before any cancellation points, declare a cleanup handler by calling `pthread_cleanup_push`. Before releasing the resource, but after any cancellation points, remove the cleanup handler by calling `pthread_cleanup_pop`.
 
 If you don't have a thread's identifier, you can't cancel the thread. That means that, at least using portable POSIX functions, you can't write an "idle thread killer" that will arbitrarily terminate threads in the process. You can only cancel threads that you created, or threads for which the creator (or the thread itself) gave you an identifier. That generally means that cancellation is restricted to operating within a subsystem.
 
 ### 5.3.1 Deferred cancelability
-"Deferred cancelability" means that the thread's cancelability type has been set to `pthread_cancel_deferred` and the thread's cancelability enable has been set to `pthread_cancel_enable`. The thread will only respond to cancellation requests when it reaches one of a set of "cancellation points."
+"Deferred cancelability" means that the thread's cancelability type has been set to `PTHREAD_CANCEL_DEFERRED` and the thread's cancelability enable has been set to `PTHREAD_CANCEL_ENABLE`. The thread will only respond to cancellation requests when it reaches one of a set of "cancellation points."
 
 The following functions are always cancellation points on any Pthreads system:
-- `pthread_cond_wait`
-- `pthread_cond_timedwait`
-- `pthread_join`
-- `pthread_testcancel`
-- `sigwait`
-- `aio_suspend`
-- `close`
-- `creat`
-- `fcntl (F_SETLCKW)`
-- `fsync`
-- `mq_receive`
-- `mq_send`
-- `msync`
-- `nanosleep`
-- `open`
-- `pause`
-- `read`
-- `sem_wait`
-- `sigwaitinfo`
-- `sigsuspend`
-- `sigtimedwait`
-- `sleep`
-- `system`
-- `tcdrain`
-- `wait`
-- `waitpid`
-- `write`
+
+|                          |              |                |
+| ----                     | ----         | ----           |
+| `pthread_cond_wait`      | `fsync`      | `sigwaitinfo`  |
+| `pthread_cond_timedwait` | `mq_receive` | `sigsuspend`   |
+| `pthread_join`           | `mq_send`    | `sigtimedwait` |
+| `pthread_testcancel`     | `msync`      | `sleep`        |
+| `sigwait`                | `nanosleep`  | `system`       |
+| `aio_suspend`            | `open`       | `tcdrain`      |
+| `close`                  | `pause`      | `wait`         |
+| `creat`                  | `read`       | `waitpid`      |
+| `fcntl (F_SETLCKW)`      | `sem_wait`   | `write`        |
+|                          |              |                |
 
 The following list of functions may be cancellation points. You should write your code so that it will function correctly if any of these are cancellation points and also so that it will not break if any of them are not. If you depend upon any particular behavior, you may limit the portability of your code. You'll have to look at the conformance documentation to find out which, if any, are cancellation points for the system you are using:
-- `closedir`
-- `ctermid`
-- `fclose`
-- `fcntl (except F_SETLCKW)`
-- `fflush`
-- `fgetc`
-- `fgets`
-- `fopen`
-- `fprintf`
-- `fputc`
-- `fputs`
-- `fread`
-- `freopen`
-- `fscanf`
-- `fseek`
-- `ftell`
-- `fwrite`
-- `getc`
-- `getc_unlocked`
-- `getchar`
-- `getchar_unlocked`
-- `getcwd`
-- `getgrgid`
-- `getgrgid_r`
-- `getrtnam`
-- `getgrnam_r`
-- `getlogin`
-- `getlogin_r`
-- `getpwnam`
-- `getpwnam r`
-- `getpwuid`
-- `getpwuid_r`
-- `gets`
-- `lseek`
-- `opendir`
-- `perror`
-- `printf`
-- `putc`
-- `putc_unlocked`
-- `putchar`
-- `putchar_unlocked`
-- `puts`
-- `readdir`
-- `remove`
-- `rename`
-- `rewind`
-- `rewinddir`
-- `scanf`
-- `tmpfile`
-- `tmpname`
-- `ttyname`
-- `ttyname_r`
-- `ungetc`
 
-Pthreads specifies that any ANSI C or POSIX function not specified in one of the two lists cannot be a cancellation point. However, your system probably has many additional cancellation points. That's because few UNIX systems are "POSIX." That is, they support other programming interfaces as well-such as BSD 4.3, System V Release 4, UNIX95, and so forth. POSIX doesn't recognize the existence of functions such as select or poll, and therefore it can't say whether or not they are cancellation points. Yet clearly both are functions that may block for an arbitrary period of time, and programmers using them with cancellation would reasonably expect them to behave as cancellation points. X/Open is currently addressing this problem for UNIX98 [X/Open System Interfaces, Issue 5). by extending the Pthreads list of cancellation points.
+|                            |                    |                    |
+| --                         | --                 | --                 |
+| `closedir`                 | `getc_unlocked`    | `printf`           |
+| `ctermid`                  | `getchar`          | `putc`             |
+| `fclose`                   | `getchar_unlocked` | `putc_unlocked`    |
+| `fcntl (except F_SETLCKW)` | `getcwd`           | `putchar`          |
+| `fflush`                   | `getgrgid`         | `putchar_unlocked` |
+| `fgetc`                    | `getgrgid_r`       | `puts`             |
+| `fgets`                    | `getrtnam`         | `readdir`          |
+| `fopen`                    | `getgrnam_r`       | `remove`           |
+| `fprintf`                  | `getlogin`         | `rename`           |
+| `fputc`                    | `getlogin_r`       | `rewind`           |
+| `fputs`                    | `getpwnam`         | `rewinddir`        |
+| `fread`                    | `getpwnam r`       | `scanf`            |
+| `freopen`                  | `getpwuid`         | `tmpfile`          |
+| `fscanf`                   | `getpwuid_r`       | `tmpname`          |
+| `fseek`                    | `gets`             | `ttyname`          |
+| `ftell`                    | `lseek`            | `ttyname_r`        |
+| `fwrite`                   | `opendir`          | `ungetc`           |
+| `getc`                     | `perror`           |                    |
+|                            |                    |                    |
+
+Pthreads specifies that any ANSI C or POSIX function not specified in one of the two lists cannot be a cancellation point. However, your system probably has many additional cancellation points. That's because few UNIX systems are "POSIX." That is, they support other programming interfaces as well-such as BSD 4.3, System V Release 4, UNIX95, and so forth. POSIX doesn't recognize the existence of functions such as `select` or `poll`, and therefore it can't say whether or not they are cancellation points. Yet clearly both are functions that may block for an arbitrary period of time, and programmers using them with cancellation would reasonably expect them to behave as cancellation points. X/Open is currently addressing this problem for UNIX98 (*X/Open System Interfaces, Issue 5*). by extending the Pthreads list of cancellation points.
 
 Most cancellation points involve I/O operations that may block the thread for an "unbounded" time. They're cancelable so that the waits can be interrupted. When a thread reaches a cancellation point the system determines whether a cancel is pending for the current ("target") thread. A cancel will be pending if another thread has called `pthread_cancel` for the target thread since the last time the target thread returned from a cancellation point. If a cancel is pending, the system will immediately begin calling cleanup functions, and then the thread will terminate.
 
 If no cancel is currently pending, the function will proceed. If another thread requests that the thread be canceled while the thread is waiting for something (such as I/O) then the wait will be interrupted and the thread will begin its cancellation cleanup.
 
-If you need to ensure that cancellation can't occur at a particular cancellation point, or during some sequence of cancellation points, you can temporarily disable cancellation in that region of code. The following program, called `cancel_disable.c`, is a variant of cancel.c. The "target" thread periodically calls sleep, and does not want the call to be cancelable.
+If you need to ensure that cancellation can't occur at a particular cancellation point, or during some sequence of cancellation points, you can temporarily disable cancellation in that region of code. The following program, called `cancel_disable.c`, is a variant of `cancel.c`. The "target" thread periodically calls `sleep`, and does not want the call to be cancelable.
 
-second. (The value 755 is just an arbitrary number that popped into my head. Do arbitrary numbers ever pop into your head?) Prior to sleeping, `thread_routine` disables cancellation by setting the cancelability state to `pthread_cancel_disable`. After sleep returns, it restores the saved cancelability state by calling `pthread_setcancelstate` again.
+[24-33] After each cycle of 755 iterations, `thread_routine` will call `sleep` to wait a second. (The value 755 is just an arbitrary number that popped into my head. Do arbitrary numbers ever pop into your head?) Prior to sleeping, `thread_routine` disables cancellation by setting the cancelability state to `PTHREAD_CANCEL_DISABLE`. After `sleep` returns, it restores the saved cancelability state by calling `pthread_setcancelstate` again.
 
-Just as in cancel. c, test for a pending cancel every 1000 iterations.
+[34-36] Just as in `cancel.c`, test for a pending cancel every 1000 iterations.
 
 ```c
 /*  cancel_disable.c  */
@@ -588,7 +542,7 @@ void *thread_routine (void *arg)
     int state;
     int status;
 
-    for (counter =0; ; counter++) {
+    for (counter = 0; ; counter++) {
 
         /*
          * Each 755 iterations, disable cancellation and sleep
@@ -628,13 +582,13 @@ int main (int argc, char *argv[])
     if (status != 0)
         err_abort (status, "Cancel thread");
 
-    status = pthread_join (thread_id, Sresult);
+    status = pthread_join (thread_id, &result);
     if (status != 0)
         err_abort (status, "Join thread");
     if (result == PTHREAD_CANCELED)
-        printf ("Thread canceled at iteration %d\n", counter);
+        printf ("Thread cancelled at iteration %d\n", counter);
     else
-        printf ("Thread was not canceled\n");
+        printf ("Thread was not cancelled\n");
     return 0;
 }
 ```
@@ -648,7 +602,7 @@ Asynchronous cancellation is useful because the "target thread" doesn't need to 
 
 The problem is that you're limited in what you can do with asynchronous cancellation enabled. You can't acquire any resources, for example, including locking a mutex. That's because the cleanup code would have no way to determine whether the mutex had been locked. Asynchronous cancellation can occur at any hardware instruction. On some computers it may even be possible to interrupt some instructions in the middle. That makes it really difficult to determine what the canceled thread was doing.
 
-For example, when you call ma Hoc the system allocates some heap memory for you, stores a pointer to that memory somewhere (possibly in a hardware register), and then returns to your code, which probably moves the return value into some local storage for later use. There are lots of places that malloc might be interrupted by an asynchronous cancel, with varying effects. It might be interrupted before the memory was allocated. Or it might be interrupted after allocating storage but before it stored the address for return. Or it might even return to your code, but get interrupted before the return value could be copied to a local variable. In any of those cases the variable where your code expects to find a pointer to the allocated memory will be uninitialized. You can't tell whether the memory really was allocated yet. You can't free the memory, so that memory (if it was allocated to you) will remain allocated for the life of the program. That's a memory leak, which is not a desirable feature.
+For example, when you call `malloc` the system allocates some heap memory for you, stores a pointer to that memory somewhere (possibly in a hardware register), and then returns to your code, which probably moves the return value into some local storage for later use. There are lots of places that `malloc` might be interrupted by an asynchronous cancel, with varying effects. It might be interrupted before the memory was allocated. Or it might be interrupted after allocating storage but before it stored the address for return. Or it might even return to your code, but get interrupted before the return value could be copied to a local variable. In any of those cases the variable where your code expects to find a pointer to the allocated memory will be uninitialized. You can't tell whether the memory really was allocated yet. You can't free the memory, so that memory (if it was allocated to you) will remain allocated for the life of the program. That's a memory leak, which is not a desirable feature.
 
 Or when you call `pthread_mutex_lock`, the system might be interrupted within a function call either before or after locking the mutex. Again, there's no way for your program to find out, because the interrupt may have occurred between any two instructions, even within the `pthread_mutex_lock` function, which might leave the mutex unusable. If the mutex is locked, the application will likely end up hanging because it will never be unlocked.
 
@@ -658,29 +612,50 @@ You are not allowed to call any function that acquires resources while asynchron
 
 Pthreads suggests that all library functions should document whether or not they are async-cancel safe. However if the description of a function does not specifically say it is async-cancel safe you should always assume that it is not. The consequences of asynchronous cancellation in a function that is not async-cancel safe can be severe. And worse, the effects are sensitive to timing-so a function that appears to be async-cancel safe during experimentation may in fact cause all sorts of problems later when it ends up being canceled in a slightly different place.
 
-The following program. `cancel_async.c`, shows the use of asynchronous cancellation in a compute-bound loop. Use of asynchronous cancellation makes this loop "more responsive" than the deferred cancellation loop in cancel.c. However, the program would become unreliable if any function calls were made within the loop, whereas the deferred cancellation version would continue to function correctly. In most cases, synchronous cancellation is preferable.
+The following program. `cancel_async.c`, shows the use of asynchronous cancellation in a compute-bound loop. Use of asynchronous cancellation makes this loop "more responsive" than the deferred cancellation loop in `cancel.c`. However, the program would become unreliable if any function calls were made within the loop, whereas the deferred cancellation version would continue to function correctly. In most cases, synchronous cancellation is preferable.
 
-To keep the thread running awhile with something more interesting than an empty loop, `cancel_async.c` uses a simple matrix multiply nested loop. The matrixa and matrixb arrays are initialized with, respectively, their major or minor array index.
+[25-29] To keep the thread running awhile with something more interesting than an empty loop, `cancel_async.c` uses a simple matrix multiply nested loop. The matrixa and matrixb arrays are initialized with, respectively, their major or minor array index.
 
-The cancellation type is changed to `PTHREAD_CANCEL_ASYNCHRONOUS`, allowing asynchronous cancellation within the matrix multiply loops.
+[35-37] The cancellation type is changed to `PTHREAD_CANCEL_ASYNCHRONOUS`, allowing asynchronous cancellation within the matrix multiply loops.
 
-The thread repeats the matrix multiply until canceled, on each iteration replacing the first source array (matrixa) with the result of the previous multiplication (matrixc).
+[40-45] The thread repeats the matrix multiply until canceled, on each iteration replacing the first source array (matrixa) with the result of the previous multiplication (matrixc).
 
-Once again, on a Solaris system, set the thread concurrency level to 2, allowing the main thread and `thread_routine` to run concurrently on a uniprocessor. The program will hang without this step, since user mode threads are not timesliced on Solaris.
+[67-75] Once again, on a Solaris system, set the thread concurrency level to 2, allowing the main thread and `thread_routine` to run concurrently on a uniprocessor. The program will hang without this step, since user mode threads are not timesliced on Solaris.
 
 ```c
 /*  cancel_async.c  */
 #include <pthread.h>
 #include "errors.h"
 
-#define SIZE 10 /* array size */
+#define SIZE    10      /* array size */
 
-static int matrixa[SIZE][SIZE] ;
+static int matrixa[SIZE][SIZE];
 static int matrixb[SIZE][SIZE];
 static int matrixc[SIZE][SIZE];
 
+#ifdef DEBUG
+void print_array (int matrix[SIZE][SIZE])
+{
+    int i, j;
+    int first;
+
+    for (i = 0; i < SIZE; i++) {
+        printf ("[");
+        first = 1;
+        for (j = 0; j < SIZE; j++) {
+            if (!first)
+                printf (",");
+            printf ("%x", matrix[i][j]);
+            first = 0;
+        }
+        printf ("]\n");
+    }
+        
+}
+#endif
+
 /*
- * Loop until canceled. The thread can be canceled at any
+ * Loop until cancelled. The thread can be cancelled at any
  * point within the inner loop, where asynchronous cancellation
  * is enabled. The loop multiplies the two matrices matrixa
  * and matrixb.
@@ -689,7 +664,7 @@ void *thread_routine (void *arg)
 {
     int cancel_type, status;
     int i, j, k, value = 1;
-
+    
     /*
      * Initialize the matrices to something arbitrary.
      */
@@ -699,34 +674,34 @@ void *thread_routine (void *arg)
             matrixb[i][j] = j;
         }
 
-        while (1) {
-            /*
-             * Compute the matrix product of matrixa and matrixb.
-             */
-            status = pthread_setcanceltype (
-                    PTHREAD_CANCEL_ASYNCHRONOUS,
-                    &cancel_type);
-            if (status != 0)
-                err_abort (status, "Set cancel type");
-            for (i = 0; i < SIZE; i++)
-                for (j = 0; j < SIZE; j++) {
-                    matrixc[i][j] = 0;
-                    for (k = 0; k < SIZE; k++)
-                        matrixc[i][j] += matrixa[i][k] * matrixb[k][j];
-                }
-            status = pthread_setcanceltype (
-                    cancel_type,
-                    &cancel_type);
-            if (status != 0)
-                err_abort (status, "Set cancel type");
+    while (1) {
+        /*
+         * Compute the matrix product of matrixa and matrixb.
+         */
+        status = pthread_setcanceltype (
+                PTHREAD_CANCEL_ASYNCHRONOUS,
+                &cancel_type);
+        if (status != 0)
+            err_abort (status, "Set cancel type");
+        for (i = 0; i < SIZE; i++)
+            for (j = 0; j < SIZE; j++) {
+                matrixc[i][j] = 0;
+                for (k = 0; k < SIZE; k++)
+                    matrixc[i][j] += matrixa[i][k] * matrixb[k][j];
+            }
+        status = pthread_setcanceltype (
+                cancel_type,
+                &cancel_type);
+        if (status != 0)
+            err_abort (status, "Set cancel type");
 
-            /*
-             * Copy the result (matrixc) into matrixa to start again
-             */
-            for (i = 0; i < SIZE; i++)
-                for (j = 0; j < SIZE; j++)
-                    matrixa[i][j] = matrixcfi][j];
-        }
+        /*
+         * Copy the result (matrixc) into matrixa to start again
+         */
+        for (i = 0; i < SIZE; i++)
+            for (j = 0; j < SIZE; j++)
+                matrixa[i][j] = matrixc[i][j];
+    }
 }
 
 int main (int argc, char *argv[])
@@ -756,9 +731,17 @@ int main (int argc, char *argv[])
     if (status != 0)
         err_abort (status, "Join thread");
     if (result == PTHREAD_CANCELED)
-        printf ("Thread canceled\n");
+        printf ("Thread cancelled\n");
     else
-        printf ("Thread was not canceled\n");
+        printf ("Thread was not cancelled\n");
+#ifdef DEBUG
+    printf ("Matrix a:\n");
+    print_array (matrixa);
+    printf ("\nMatrix b:\n");
+    print_array (matrixb);
+    printf ("\nMatrix c:\n");
+    print_array (matrixc);
+#endif
     return 0;
 }
 ```
@@ -783,15 +766,15 @@ You cannot push a cleanup handler in one function and pop it in another function
 
 The following program, `cancel_cleanup`.c, shows the use of a cleanup handler to release a mutex when a condition variable wait is canceled.
 
-The control structure (control) is used by all threads to maintain shared synchronization objects and invariants. Each thread increases the member counter by one when it starts, and decreases it at termination. The member busy is used as a dummy condition wait predicate-it is initialized to 1, and never cleared, which means that the condition wait loops will never terminate (in this example) until the threads are canceled.
+[11-18] The control structure (control) is used by all threads to maintain shared synchronization objects and invariants. Each thread increases the member counter by one when it starts, and decreases it at termination. The member busy is used as a dummy condition wait predicate-it is initialized to 1, and never cleared, which means that the condition wait loops will never terminate (in this example) until the threads are canceled.
 
-The function `cleanup_handler` is installed as the cancellation cleanup handler for each thread. It is called on normal termination as well as through cancellation, to decrease the count of active threads and unlock the mutex.
+[25-35] The function `cleanup_handler` is installed as the cancellation cleanup handler for each thread. It is called on normal termination as well as through cancellation, to decrease the count of active threads and unlock the mutex.
 
-The function `thread_routine` establishes `cleanup_handler` as the active cancellation cleanup handler.
+[48] The function `thread_routine` establishes `cleanup_handler` as the active cancellation cleanup handler.
 
-Wait until the control structure's busy member is set to 0, which, in this example, will never occur. The condition wait loop will exit only when the wait is canceled.
+[55-59] Wait until the control structure's busy member is set to 0, which, in this example, will never occur. The condition wait loop will exit only when the wait is canceled.
 
-Although the condition wait loop in this example will not exit, the function cleans up by removing the active cleanup handler. The nonzero argument to `pthread_cleanup_pop`, remember, means that the cleanup handler will be called even though cancellation did not occur.
+[61] Although the condition wait loop in this example will not exit, the function cleans up by removing the active cleanup handler. The nonzero argument to `pthread_cleanup_pop`, remember, means that the cleanup handler will be called even though cancellation did not occur.
 
 In some cases, you may omit "unreachable statements" like this `pthread_cleanup_pop` call. However, in this case, your code might not compile without it. The `pthread_cleanup_push` and `pthread_cleanup_pop` macros are special, and may expand to form, respectively, the beginning and ending of a block. Digital UNIX does this, for example, to implement cancellation on top of the common structured exception handling provided by the operating system.
 
@@ -807,25 +790,25 @@ In some cases, you may omit "unreachable statements" like this `pthread_cleanup_
  * the synchronization and invariant data.
  */
 typedef struct control_tag {
-    int counter, busy;
-    pthread_mutex_t mutex;
-    pthread_cond_t cv;
+    int                 counter, busy;
+    pthread_mutex_t     mutex;
+    pthread_cond_t      cv;
 } control_t;
 
 control_t control =
-{0, 1, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER};
+    {0, 1, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER};
 
 /*
  * This routine is installed as the cancellation cleanup
- * handler around the cancelable condition wait. It will
- * be called by the system when the thread is canceled.
+ * handler around the cancellable condition wait. It will
+ * be called by the system when the thread is cancelled.
  */
 void cleanup_handler (void *arg)
 {
     control_t *st = (control_t *)arg;
     int status;
 
-    st->counter-;
+    st->counter--;
     printf ("cleanup_handler: counter == %d\n", st->counter);
     status = pthread_mutex_unlock (&st->mutex);
     if (status != 0)
@@ -843,7 +826,7 @@ void *thread_routine (void *arg)
 {
     int status;
 
-    pthread_cleanup_push (cleanup_handler, (void*)scontrol);
+    pthread_cleanup_push (cleanup_handler, (void*)&control);
 
     status = pthread_mutex_lock (&control.mutex);
     if (status != 0)
@@ -871,7 +854,7 @@ int main (int argc, char *argv[])
         status = pthread_create (
             &thread_id[count], NULL, thread_routine, NULL);
         if (status != 0)
-            err abort (status, "Create thread");
+            err_abort (status, "Create thread");
     }
 
     sleep (2);
@@ -881,15 +864,15 @@ int main (int argc, char *argv[])
         if (status != 0)
             err_abort (status, "Cancel thread");
 
-        status = pthread_join (thread_id[count], Sresult);
+        status = pthread_join (thread_id[count], &result);
         if (status != 0)
             err_abort (status, "Join thread");
         if (result == PTHREAD_CANCELED)
-            printf ("thread %d canceled\n", count);
+            printf ("thread %d cancelled\n", count);
         else
-            printf ("thread %d was not canceled\n", count);
+            printf ("thread %d was not cancelled\n", count);
     }
-    return 0;
+    return 0;    
 }
 ```
 
@@ -899,15 +882,15 @@ If you had originally intended to join with the subcontractors, remember that th
 
 The following program, `cancel_subcontract.c`, shows one way to propagate cancellation to subcontractors.
 
-The `team_t` structure defines the state of the team of subcontractor threads. The `join_i` member records the index of the last subcontractor with which the contractor had joined, so on cancellation from within `pthread_join`, it can cancel the threads it had not yet joined. The workers member is an array recording the thread identifiers of the subcontractor threads.
+[10-13] The `team_t` structure defines the state of the team of subcontractor threads. The `join_i` member records the index of the last subcontractor with which the contractor had joined, so on cancellation from within `pthread_join`, it can cancel the threads it had not yet joined. The workers member is an array recording the thread identifiers of the subcontractor threads.
 
-The subcontractor threads are started running the `worker_routine` function. This function loops until canceled, calling `pthread_testcancel` every 1000 iterations.
+[19-26] The subcontractor threads are started running the `worker_routine` function. This function loops until canceled, calling `pthread_testcancel` every 1000 iterations.
 
-The cleanup function is established as the active cleanup handler within the contractor thread. When the contractor is canceled, cleanup iterates through the remaining (unjoined) subcontractors, cancelling and detaching each. Note that it does not join the subcontractors-in general, it is not a good idea to wait in a cleanup handler. The thread, after all, is expected to clean up and terminate, not to wait around for something to happen. But if your cleanup handler really needs to wait for something, don't be afraid, it will work just fine.
+[32-47] The cleanup function is established as the active cleanup handler within the contractor thread. When the contractor is canceled, cleanup iterates through the remaining (unjoined) subcontractors, cancelling and detaching each. Note that it does not join the subcontractors-in general, it is not a good idea to wait in a cleanup handler. The thread, after all, is expected to clean up and terminate, not to wait around for something to happen. But if your cleanup handler really needs to wait for something, don't be afraid, it will work just fine.
 
-The contractor thread is started running `thread_routine`. This function creates a set of subcontractors, then joins with each subcontractor. As it joins each thread, it records the current index within the workers array in the `team_t` member `join_i`. The cleanup handler is established with a pointer to the team structure so that it can determine the last offset and begin cancelling the remaining subcontractors.
+[54-77] The contractor thread is started running `thread_routine`. This function creates a set of subcontractors, then joins with each subcontractor. As it joins each thread, it records the current index within the workers array in the `team_t` member `join_i`. The cleanup handler is established with a pointer to the team structure so that it can determine the last offset and begin cancelling the remaining subcontractors.
 
-The main program creates the contractor thread, running `thread_routine`, and then sleeps for five seconds. When it wakes up, it cancels the contractor thread, and waits for it to terminate.
+[79-105] The main program creates the contractor thread, running `thread_routine`, and then sleeps for five seconds. When it wakes up, it cancels the contractor thread, and waits for it to terminate.
 
 ```c
 /*  cancel_subcontract.c  */
@@ -915,27 +898,28 @@ The main program creates the contractor thread, running `thread_routine`, and th
 #include "errors.h"
 
 #define THREADS 5
+
 /*
- * Structure that defines the threads in a "team.1
+ * Structure that defines the threads in a "team".
  */
 typedef struct team_tag {
-    int join_i; /* join index */
-    pthread_t workers[THREADS]; /* thread identifiers */
-} team t;
-
-
-
+   int          join_i;                 /* join index */
+   pthread_t    workers[THREADS];       /* thread identifiers */
+} team_t;
 
 /*
  * Start routine for worker threads. They loop waiting for a
  * cancellation request.
  */
 void *worker_routine (void *arg)
+{
     int counter;
-    for (counter =0; ; counter++)
-if ((counter % 1000) == 0)
-    pthread_testcancel ();
-    }
+
+    for (counter = 0; ; counter++)
+        if ((counter % 1000) == 0)
+            pthread_testcancel ();
+}
+
 /*
  * Cancellation cleanup handler for the contractor thread. It
  * will cancel and detach each worker in the team.
@@ -944,26 +928,29 @@ void cleanup (void *arg)
 {
     team_t *team = (team_t *)arg;
     int count, status;
+
     for (count = team->join_i; count < THREADS; count++) {
         status = pthread_cancel (team->workers[count]);
         if (status != 0)
             err_abort (status, "Cancel worker");
+
         status = pthread_detach (team->workers[count]);
         if (status != 0)
             err_abort (status, "Detach worker");
-        printf ("Cleanup: canceled %d\n", count);
+        printf ("Cleanup: cancelled %d\n", count);
     }
 }
+
 /*
  * Thread start routine for the contractor. It creates a team of
- * worker threads, and then joins with them. When canceled, the
+ * worker threads, and then joins with them. When cancelled, the
  * cleanup handler will cancel and detach the remaining threads.
  */
-void *thread routine (void *arg)
+void *thread_routine (void *arg)
 {
-    team_t team;            /* team info */
+    team_t team;                        /* team info */
     int count;
-    void *result;           /* Return status */
+    void *result;                       /* Return status */
     int status;
 
     for (count = 0; count < THREADS; count++) {
@@ -1006,10 +993,11 @@ int main (int argc, char *argv[])
     printf ("Cancelling...\n");
     status = pthread_cancel (thread_id);
     if (status != 0)
-        err abort (status, "Cancel team");
+        err_abort (status, "Cancel team");
     status = pthread_join (thread_id, NULL);
     if (status != 0)
         err_abort (status, "Join team");
+    return 0;
 }
 ```
 ## 5.4 Thread-specific data
@@ -1063,11 +1051,11 @@ If you need to create a thread-specific data key later, you have to ensure that 
 
 When you can't add code to main, the easiest way to ensure that a thread-specific data key is created only once is to use `pthread_once`, the one-time initialization function, as shown in the following program, `tsd_once.c`.
 
-The `tsd_t` structure is used to contain per-thread data. Each thread allocates a private `tsd_t` structure, and stores a pointer to that structure as its value for the thread-specific data key `tsd_key`. The `thread_id` member holds the thread's identifier (`pthread_t`), and the string member holds the pointer to a "name" string for the thread. The variable `tsd_key` holds the thread-specific data key used to access the `tsd_t` structures.
+[8-11] The `tsd_t` structure is used to contain per-thread data. Each thread allocates a private `tsd_t` structure, and stores a pointer to that structure as its value for the thread-specific data key `tsd_key`. The `thread_id` member holds the thread's identifier (`pthread_t`), and the string member holds the pointer to a "name" string for the thread. The variable `tsd_key` holds the thread-specific data key used to access the `tsd_t` structures.
 
-One-time initialization (`pthread_once`) is used to ensure that the key `tsd_key` is created before the first access.
+[20-28] One-time initialization (`pthread_once`) is used to ensure that the key `tsd_key` is created before the first access.
 
-The threads begin in the thread start function `thread_routine`. The argument (arg) is a pointer to a character string naming the thread. Each thread calls `pthread_once` to ensure that the thread-specific data key has been created. The thread then allocates a `tsd_t` structure, initializes the `thread_id` member with the thread's identifier, and copies its argument to the string member.
+[34-57] The threads begin in the thread start function `thread_routine`. The argument (arg) is a pointer to a character string naming the thread. Each thread calls `pthread_once` to ensure that the thread-specific data key has been created. The thread then allocates a `tsd_t` structure, initializes the `thread_id` member with the thread's identifier, and copies its argument to the string member.
 
 The thread gets the current thread-specific data value by calling `pthread_getspecific`, and prints a message using the thread's name. It then sleeps for a few seconds and prints another message to demonstrate that the thread-specific data value remains the same, even though another thread has assigned a different `tsd_t` structure address to the same thread-specific data key.
 
@@ -1080,11 +1068,11 @@ The thread gets the current thread-specific data value by calling `pthread_getsp
  * Structure used as the value for thread-specific data key.
  */
 typedef struct tsd_tag {
-    pthread_t thread_id;
-    char *string;
+    pthread_t   thread_id;
+    char        *string;
 } tsd_t;
 
-pthread_key_t tsd_key;          /* Thread-specific data key */
+pthread_key_t tsd_key;           /* Thread-specific data key */
 pthread_once_t key_once = PTHREAD_ONCE_INIT;
 
 /*
@@ -1123,16 +1111,16 @@ void *thread_routine (void *arg)
     value->thread_id = pthread_self ();
     value->string = (char*)arg;
     value = (tsd_t*)pthread_getspecific (tsd_key);
-    printf ("%s starting...\n" , value->string);
+    printf ("%s starting...\n", value->string);
     sleep (2);
     value = (tsd_t*)pthread_getspecific (tsd_key);
     printf ("%s done...\n", value->string);
     return NULL;
 }
 
-void main (int argc, char *argv[])
+int main (int argc, char *argv[])
 {
-    pthread_t threadl, thread2;
+    pthread_t thread1, thread2;
     int status;
 
     status = pthread_create (
@@ -1197,17 +1185,17 @@ Usually, new thread-specific data values are set within a destructor only when s
 
 The following program, `tsd_destructor.c`, demonstrates using thread- specific data destructors to release memory when a thread terminates. It also keeps track of how many threads are using the thread-specific data, and deletes the thread-specific data key when the destructor is run for the final thread. This program is similar in structure to `tsd_once.c`, from Section 5.3, so only the relevant differences will be annotated here.
 
-In addition to the key value (`identity_key`), the program maintains a count of threads that are using the key (`identity_key_counter`), which is protected by a mutex (`identity_key_mutex`).
+[13-15] In addition to the key value (`identity_key`), the program maintains a count of threads that are using the key (`identity_key_counter`), which is protected by a mutex (`identity_key_mutex`).
 
-The function `identity_key_destructor` is the thread-specific data key's destructor function. It begins by printing a message so we can observe when it runs in each thread. It frees the storage used to maintain thread-specific data, the `private_t` structure. Then it locks the mutex associated with the thread- specific data key (`identity_key_mutex`) and decreases the count of threads using the key. If the count reaches 0, it deletes the key and prints a message.
+[23-43] The function `identity_key_destructor` is the thread-specific data key's destructor function. It begins by printing a message so we can observe when it runs in each thread. It frees the storage used to maintain thread-specific data, the `private_t` structure. Then it locks the mutex associated with the thread- specific data key (`identity_key_mutex`) and decreases the count of threads using the key. If the count reaches 0, it deletes the key and prints a message.
 
-The function `identity_key_get` can be used anywhere (in this example, it is used only once per thread) to get the value of `identity_key` for the calling thread. If there is no current value (the value is NULL), then it allocates a new `private_t` structure and assigns it to the key for future reference.
+[49-64] The function `identity_key_get` can be used anywhere (in this example, it is used only once per thread) to get the value of `identity_key` for the calling thread. If there is no current value (the value is NULL), then it allocates a new `private_t` structure and assigns it to the key for future reference.
 
-The function `thread_routine` is the thread start function used by the example. It acquires a value for the key by calling `identity_key_get`, and sets the members of the structure. The string member is set to the thread's argument, creating a global "name" for the thread, which can be used for printing messages.
+[69-79] The function `thread_routine` is the thread start function used by the example. It acquires a value for the key by calling `identity_key_get`, and sets the members of the structure. The string member is set to the thread's argument, creating a global "name" for the thread, which can be used for printing messages.
 
-The main program creates the thread-specific data key `tsd_key`. Notice that, unlike `tsd_once.c`, this program does not bother to use `pthread_once`. As I mentioned in the annotation for that example, in a main program it is perfectly safe, and more efficient, to create the key inside main, before creating any threads.
+[81-115] The main program creates the thread-specific data key `tsd_key`. Notice that, unlike `tsd_once.c`, this program does not bother to use `pthread_once`. As I mentioned in the annotation for that example, in a main program it is perfectly safe, and more efficient, to create the key inside main, before creating any threads.
 
-The main program initializes the reference counter (`identity_key_counter`) to 3. It is critical that you define in advance how many threads will reference a key that will be deleted based on a reference count, as we intend to do. The counter must be set before any thread using the key can possibly terminate.
+[102] The main program initializes the reference counter (`identity_key_counter`) to 3. It is critical that you define in advance how many threads will reference a key that will be deleted based on a reference count, as we intend to do. The counter must be set before any thread using the key can possibly terminate.
 
 You cannot, for example, code `identity_key_get` so that it dynamically increases the counter when it first assigns a thread-specific value for `identity_key`. That is because one thread might assign a thread-specific value for `identity_key` and then terminate before another thread using the key had a chance to start. If that happened, the first thread's destructor would find no remaining references to the key, and it would delete the key. Later threads would then fail when trying to set thread-specific data values.
 
@@ -1220,8 +1208,8 @@ You cannot, for example, code `identity_key_get` so that it dynamically increase
  * Structure used as value of thread-specific data key.
  */
 typedef struct private_tag {
-    pthread_t thread_id;
-    char *string;
+    pthread_t   thread_id;
+    char        *string;
 } private_t;
 
 pthread_key_t identity_key;         /* Thread-specific data key */
@@ -1244,7 +1232,7 @@ void identity_key_destructor (void *value)
     status = pthread_mutex_lock (&identity_key_mutex);
     if (status != 0)
         err_abort (status, "Lock key mutex");
-    identity_key_counter-;
+    identity_key_counter--;
     if (identity_key_counter <= 0) {
         status = pthread_key_delete (identity_key);
         if (status != 0)
@@ -1266,15 +1254,14 @@ void *identity_key_get (void)
     int status;
 
     value = pthread_getspecific (identity_key);
-    Thread-specific data 171
-        if (value == NULL) {
-            value = malloc (sizeof (private_t));
-            if (value == NULL)
-                errno_abort ("Allocate key value");
-            status = pthread_setspecific (identity_key, (void*)value);
-            if (status != 0)
-                err_abort (status, "Set TSD");
-        }
+    if (value == NULL) {
+        value = malloc (sizeof (private_t));
+        if (value == NULL)
+            errno_abort ("Allocate key value");
+        status = pthread_setspecific (identity_key, (void*)value);
+        if (status != 0)
+            err_abort (status, "Set TSD");
+    }
     return value;
 }
 
@@ -1289,11 +1276,11 @@ void *thread_routine (void *arg)
     value->thread_id = pthread_self ();
     value->string = (char*)arg;
     printf ("thread \"%s\" starting...\n", value->string);
-    sleep B);
+    sleep (2);
     return NULL;
 }
 
-void main (int argc, char *argv[])
+int main (int argc, char *argv[])
 {
     pthread_t thread_1, thread_2;
     private_t *value;
@@ -1310,8 +1297,7 @@ void main (int argc, char *argv[])
      * Note that there's rarely any good reason to delete a
      * thread-specific data key.
      */
-    status = pthread_key_create (
-        &identity_key, identity_key_destructor);
+    status = pthread_key_create (&identity_key, identity_key_destructor);
     if (status != 0)
         err_abort (status, "Create key");
     identity_key_counter = 3;
@@ -1404,7 +1390,7 @@ The inheritsched attribute, which you can set by calling `pthread_attr_setinheri
 
 Set the inheritsched attribute to `pthread_inherit_sched` to cause a new thread to inherit the scheduling policy and parameters of the creating thread. Scheduling inheritance is useful when you're creating "helper" threads that are working on behalf of the creator-it generally makes sense for them to run at the same policy and priority. Whenever you need to control the scheduling policy or parameters of a thread you create, you must set the inheritsched attribute to `PTHREAD_EXPLICIT_SCHED`.
 
-The following program, `sched_attr.c`, shows how to use an attributes object to create a thread with an explicit scheduling policy and priority. Notice that it uses conditional code to determine whether the priority scheduling feature of Pthreads is supported at compilation time. It will print a message if the option is not supported and continue, although the program in that case will not do much. (It creates a thread with default scheduling behavior, which can only say that it ran.)
+[59-119] The following program, `sched_attr.c`, shows how to use an attributes object to create a thread with an explicit scheduling policy and priority. Notice that it uses conditional code to determine whether the priority scheduling feature of Pthreads is supported at compilation time. It will print a message if the option is not supported and continue, although the program in that case will not do much. (It creates a thread with default scheduling behavior, which can only say that it ran.)
 
 Although Solaris 2.5 defines `_POSIX_THREAD_PRIORITY_SCHEDULING`, it does not support the POSIX realtime scheduling policies, and attempting to set the policy attribute to `SCHED_RR` would fail. This program treats Solaris as if it did not define the `_POSIX_THREAD_PRIORITY_SCHEDULLNG` option.
 
@@ -1430,17 +1416,17 @@ void *thread_routine (void *arg)
      * can do nothing with the output of pthread_getschedparam,
      * so just report that the thread ran, and exit.
      */
-#if defined (_POSIX_THREAD_PRIORITY_SCHEDULING) && #defined (sun)
+#if defined (_POSIX_THREAD_PRIORITY_SCHEDULING) && !defined (sun)
     status = pthread_getschedparam (
-            pthread_self (), &my_policy, &my_param);
+        pthread_self (), &my_policy, &my_param);
     if (status != 0)
         err_abort (status, "Get sched");
     printf ("thread_routine running at %s/%d\n",
-            (my_policy == SCHED_FIFO ? "FIFO"
-             : (my_policy == SCHED_RR ? "RR"
-                 : (my_policy == SCHED_OTHER ? "OTHER"
-                     : "unknown"))),
-            my_param.sched_priority);
+        (my_policy == SCHED_FIFO ? "FIFO"
+            : (my_policy == SCHED_RR ? "RR"
+            : (my_policy == SCHED_OTHER ? "OTHER"
+            : "unknown"))),
+        my_param.sched_priority);
 #else
     printf ("thread_routine running\n");
 #endif
@@ -1455,37 +1441,37 @@ int main (int argc, char *argv[])
     struct sched_param thread_param;
     int status, rr_min_priority, rr_max_priority;
 
-    status = pthread_attr_init (&thread_attr); 
+    status = pthread_attr_init (&thread_attr);
     if (status != 0)
         err_abort (status, "Init attr");
 
     /*
-     * If the priority scheduling option is defined, set various
-     * scheduling parameters. Note that it is particularly important
-     * that you remember to set the inheritsched attribute to
-     * PTHREAD_EXPLICIT_SCHED, or the policy and priority that you've
-     * set will be ignored! The default behavior is to inherit
-     * scheduling information from the creating thread.
+     * If the priority scheduling option is defined, set various scheduling
+     * parameters. Note that it is particularly important that you remember
+     * to set the inheritsched attribute to PTHREAD_EXPLICIT_SCHED, or the
+     * policy and priority that you've set will be ignored! The default
+     * behavior is to inherit scheduling information from the creating
+     * thread.
      */
-#if defined (_POSIX_THREAD_PRIORITY_SCHEDULING) && #defined (sun)
+#if defined (_POSIX_THREAD_PRIORITY_SCHEDULING) && !defined (sun)
     status = pthread_attr_getschedpolicy (
-            &thread_attr, &thread_policy);
+        &thread_attr, &thread_policy);
     if (status != 0)
         err_abort (status, "Get policy");
     status = pthread_attr_getschedparam (
-            &thread_attr, &thread_param);
+        &thread_attr, &thread_param);
     if (status != 0)
         err_abort (status, "Get sched param");
     printf (
-            "Default policy is %s, priority is %d\n",
-            (thread_policy == SCHED FIFO ? "FIFO"
-             : (thread_policy == SCHED_RR ? "RR"
-                 : (thread_policy == SCHED_OTHER ? "OTHER"
-                     : "unknown"))),
-            thread_param.sched_priority);
+        "Default policy is %s, priority is %d\n",
+        (thread_policy == SCHED_FIFO ? "FIFO"
+         : (thread_policy == SCHED_RR ? "RR"
+            : (thread_policy == SCHED_OTHER ? "OTHER"
+               : "unknown"))),
+        thread_param.sched_priority);
 
     status = pthread_attr_setschedpolicy (
-            &thread_attr, SCHED_RR);
+        &thread_attr, SCHED_RR);
     if (status != 0)
         printf ("Unable to set SCHED_RR policy.\n");
     else {
@@ -1535,7 +1521,7 @@ int main (int argc, char *argv[])
     status = pthread_join (thread_id, NULL);
     if (status != 0)
         err_abort (status, "Join thread");
-    printf ("Main exitingW);
+    printf ("Main exiting\n");
     return 0;
 }
 ```
@@ -1543,9 +1529,9 @@ The next program, `sched_thread.c`, shows how to modify the realtime scheduling 
 
 You cannot modify the scheduling policy of a running thread separately from the thread's parameters, because the policy and parameters must always be consistent for scheduling to operate correctly. Each scheduling policy may have a unique range of valid scheduling priorities, and a thread cannot operate at a priority that isn't valid for its current policy. To ensure consistency of the policy and parameters, they are set with a single call.
 
-Unlike `sched_attr.c`, `sched_thread.c` does not check the compile-time feature macro `_POSIX_THREAD_PRIORITY_SCHEDULING`. That means it will probably not compile, and almost certainly won't run correctly, on a system that does not support the option. There's nothing wrong with writing a program that way-in fact, that's what you are likely to do most of the time. If you need priority scheduling, you would document that your application requires the `_POSIX_THREAD_PRIORITY_SCHEDULING` option, and use it.
+[56] Unlike `sched_attr.c`, `sched_thread.c` does not check the compile-time feature macro `_POSIX_THREAD_PRIORITY_SCHEDULING`. That means it will probably not compile, and almost certainly won't run correctly, on a system that does not support the option. There's nothing wrong with writing a program that way-in fact, that's what you are likely to do most of the time. If you need priority scheduling, you would document that your application requires the `_POSIX_THREAD_PRIORITY_SCHEDULING` option, and use it.
 
-Solaris 2.5, despite denning `_POSIX_THREAD_PRIORITY_SCHEDULING`, does not support realtime scheduling policies. For this reason, the `ENOSYS` from `sched_get_priority_min` is handled as a special case.
+[58-63] Solaris 2.5, despite denning `_POSIX_THREAD_PRIORITY_SCHEDULING`, does not support realtime scheduling policies. For this reason, the `ENOSYS` from `sched_get_priority_min` is handled as a special case.
 
 ```c
 /*  sched_thread.c  */
@@ -1560,15 +1546,15 @@ Solaris 2.5, despite denning `_POSIX_THREAD_PRIORITY_SCHEDULING`, does not suppo
  * Structure describing each thread.
  */
 typedef struct thread_tag {
-    int index;
-    pthread_t id;
+    int         index;
+    pthread_t   id;
 } thread_t;
 
-thread_t threads[THREADS];
-int rr_min_priority;
+thread_t        threads[THREADS];
+int             rr_min_priority;
 
 /*
- * Thread start routine that will set its own priority.
+ * Thread start routine that will set its own priority
  */
 void *thread_routine (void *arg)
 {
@@ -1583,18 +1569,18 @@ void *thread_routine (void *arg)
         self->index, my_param.sched_priority));
     status = pthread_setschedparam (
         self->id, SCHED_RR, &my_param);
-if (status != 0)
+    if (status != 0)
         err_abort (status, "Set sched");
     status = pthread_getschedparam (
         self->id, &my_policy, &my_param);
-if (status != 0)
+    if (status != 0)
         err_abort (status, "Get sched");
     printf ("thread_routine %d running at %s/%d\n",
         self->index,
         (my_policy == SCHED_FIFO ? "FIFO"
-         : (my_policy == SCHED_RR ? "RR"
-         : (my_policy == SCHED_OTHER ? "OTHER"
-         : "unknown"))),
+            : (my_policy == SCHED_RR ? "RR"
+            : (my_policy == SCHED_OTHER ? "OTHER"
+            : "unknown"))),
         my_param.sched_priority);
     return NULL;
 }
@@ -1616,7 +1602,7 @@ int main (int argc, char *argv[])
     for (count = 0; count < THREADS; count++) {
         threads[count].index = count;
         status = pthread_create (
-            &threadsfcount].id, NULL,
+            &threads[count].id, NULL,
             thread_routine, (void*)&threads[count]);
         if (status != 0)
             err_abort (status, "Create thread");
