@@ -614,11 +614,11 @@ Pthreads suggests that all library functions should document whether or not they
 
 The following program. `cancel_async.c`, shows the use of asynchronous cancellation in a compute-bound loop. Use of asynchronous cancellation makes this loop "more responsive" than the deferred cancellation loop in `cancel.c`. However, the program would become unreliable if any function calls were made within the loop, whereas the deferred cancellation version would continue to function correctly. In most cases, synchronous cancellation is preferable.
 
-[25-29] To keep the thread running awhile with something more interesting than an empty loop, `cancel_async.c` uses a simple matrix multiply nested loop. The matrixa and matrixb arrays are initialized with, respectively, their major or minor array index.
+[25-29] To keep the thread running awhile with something more interesting than an empty loop, `cancel_async.c` uses a simple matrix multiply nested loop. The `matrixa` and `matrixb` arrays are initialized with, respectively, their major or minor array index.
 
 [35-37] The cancellation type is changed to `PTHREAD_CANCEL_ASYNCHRONOUS`, allowing asynchronous cancellation within the matrix multiply loops.
 
-[40-45] The thread repeats the matrix multiply until canceled, on each iteration replacing the first source array (matrixa) with the result of the previous multiplication (matrixc).
+[40-45] The thread repeats the matrix multiply until canceled, on each iteration replacing the first source array (`matrixa`) with the result of the previous multiplication (`matrixc`).
 
 [67-75] Once again, on a Solaris system, set the thread concurrency level to 2, allowing the main thread and `thread_routine` to run concurrently on a uniprocessor. The program will hang without this step, since user mode threads are not timesliced on Solaris.
 
@@ -632,27 +632,6 @@ The following program. `cancel_async.c`, shows the use of asynchronous cancellat
 static int matrixa[SIZE][SIZE];
 static int matrixb[SIZE][SIZE];
 static int matrixc[SIZE][SIZE];
-
-#ifdef DEBUG
-void print_array (int matrix[SIZE][SIZE])
-{
-    int i, j;
-    int first;
-
-    for (i = 0; i < SIZE; i++) {
-        printf ("[");
-        first = 1;
-        for (j = 0; j < SIZE; j++) {
-            if (!first)
-                printf (",");
-            printf ("%x", matrix[i][j]);
-            first = 0;
-        }
-        printf ("]\n");
-    }
-        
-}
-#endif
 
 /*
  * Loop until cancelled. The thread can be cancelled at any
@@ -734,27 +713,19 @@ int main (int argc, char *argv[])
         printf ("Thread cancelled\n");
     else
         printf ("Thread was not cancelled\n");
-#ifdef DEBUG
-    printf ("Matrix a:\n");
-    print_array (matrixa);
-    printf ("\nMatrix b:\n");
-    print_array (matrixb);
-    printf ("\nMatrix c:\n");
-    print_array (matrixc);
-#endif
     return 0;
 }
 ```
 
 > Warning: do not let "DCE threads'" habits carry over to Pthreads!
 
-I'll end this section with a warning. DCE threads, a critical component of the Open Software Foundation's Distributed Computing Environment, was designed to be independent of the underlying UNIX kernel. Systems with no thread support at all often emulated "thread synchronous" I/O in user mode, using nonblocking I/O mode, so that a thread attempting I/O on a busy file was blocked on a condition variable until a later select or poll showed that the I/O could complete. DCE listener threads might block indefinitely on a socket read, and it was important to be able to cancel that read.
+I'll end this section with a warning. DCE threads, a critical component of the Open Software Foundation's Distributed Computing Environment, was designed to be independent of the underlying UNIX kernel. Systems with no thread support at all often emulated "thread synchronous" I/O in user mode, using nonblocking I/O mode, so that a thread attempting I/O on a busy file was blocked on a condition variable until a later `select` or `poll` showed that the I/O could complete. DCE listener threads might block indefinitely on a socket read, and it was important to be able to cancel that read.
 
-When DCE was ported to newer kernels that had thread support, but not Pthreads support, the user mode I/O wrappers were usually omitted, resulting in a thread blocked within a kernel that did not support deferred cancellation. Users discovered that, in many cases, these systems implemented asynchronous cancellation in such a way that, quite by coincidence, a kernel wait might be canceled "safely" if the thread switched to asynchronous cancellation immediately before the kernel call, and switched back to deferred cancellation immediately after. This observation was publicized in DCE documentation, but it is a very dangerous hack, even on systems where it seems to work. You should never try this on any Pthreads system! If your system conforms to POSIX 1003. lc-1995 (or POSIX 1003.1, 1996 edition, or later), it supports deferred cancellation of, at minimum, kernel functions such as read and write. You do not need asynchronous cancellation, and using it can be extremely dangerous.
+When DCE was ported to newer kernels that had thread support, but not Pthreads support, the user mode I/O wrappers were usually omitted, resulting in a thread blocked within a kernel that did not support deferred cancellation. Users discovered that, in many cases, these systems implemented asynchronous cancellation in such a way that, quite by coincidence, a kernel wait might be canceled "safely" if the thread switched to asynchronous cancellation immediately before the kernel call, and switched back to deferred cancellation immediately after. This observation was publicized in DCE documentation, but it is a very dangerous hack, even on systems where it seems to work. You should never try this on any Pthreads system! If your system conforms to POSIX 1003.1c-1995 (or POSIX 1003.1, 1996 edition, or later), it supports deferred cancellation of, at minimum, kernel functions such as read and write. You do not need asynchronous cancellation, and using it can be extremely dangerous.
 
 ### 5.3.3 Cleaning up
 
-> I When you write any library code, design it to handle deferred cancellation gracefully. Disable cancellation where it is not appropriate, and always use cleanup handlers at cancellation points.
+> When you write any library code, design it to handle deferred cancellation gracefully. Disable cancellation where it is not appropriate, and always use cleanup handlers at cancellation points.
 
 If a section of code needs to restore some state when it is canceled, it must use cleanup handlers. When a thread is canceled while waiting for a condition variable, it will wake up with the mutex locked. Before the thread terminates it usually needs to restore invariants, and it always needs to release the mutex.
 
@@ -764,15 +735,15 @@ Pthreads cleanup handlers are designed so that you can often use the cleanup han
 
 You cannot push a cleanup handler in one function and pop it in another function. The `pthread_cleanup_push` and `pthread_cleanup_pop` operations may be defined as macros, such that `pthread_cleanup_push` contains the opening brace "{" of a block, while `pthread_cleanup_pop` contains the matching closing brace "}" of the block. You must always keep this restriction in mind while using cleanup handlers, if you wish your code to be portable.
 
-The following program, `cancel_cleanup`.c, shows the use of a cleanup handler to release a mutex when a condition variable wait is canceled.
+The following program, `cancel_cleanup.c`, shows the use of a cleanup handler to release a mutex when a condition variable wait is canceled.
 
-[11-18] The control structure (control) is used by all threads to maintain shared synchronization objects and invariants. Each thread increases the member counter by one when it starts, and decreases it at termination. The member busy is used as a dummy condition wait predicate-it is initialized to 1, and never cleared, which means that the condition wait loops will never terminate (in this example) until the threads are canceled.
+[11-18] The control structure (`control`) is used by all threads to maintain shared synchronization objects and invariants. Each thread increases the member `counter` by one when it starts, and decreases it at termination. The member `busy` is used as a dummy condition wait predicate-it is initialized to 1, and never cleared, which means that the condition wait loops will never terminate (in this example) until the threads are canceled.
 
 [25-35] The function `cleanup_handler` is installed as the cancellation cleanup handler for each thread. It is called on normal termination as well as through cancellation, to decrease the count of active threads and unlock the mutex.
 
 [48] The function `thread_routine` establishes `cleanup_handler` as the active cancellation cleanup handler.
 
-[55-59] Wait until the control structure's busy member is set to 0, which, in this example, will never occur. The condition wait loop will exit only when the wait is canceled.
+[55-59] Wait until the control structure's `busy` member is set to 0, which, in this example, will never occur. The condition wait loop will exit only when the wait is canceled.
 
 [61] Although the condition wait loop in this example will not exit, the function cleans up by removing the active cleanup handler. The nonzero argument to `pthread_cleanup_pop`, remember, means that the cleanup handler will be called even though cancellation did not occur.
 
@@ -882,13 +853,13 @@ If you had originally intended to join with the subcontractors, remember that th
 
 The following program, `cancel_subcontract.c`, shows one way to propagate cancellation to subcontractors.
 
-[10-13] The `team_t` structure defines the state of the team of subcontractor threads. The `join_i` member records the index of the last subcontractor with which the contractor had joined, so on cancellation from within `pthread_join`, it can cancel the threads it had not yet joined. The workers member is an array recording the thread identifiers of the subcontractor threads.
+[10-13] The `team_t` structure defines the state of the team of subcontractor threads. The `join_i` member records the index of the last subcontractor with which the contractor had joined, so on cancellation from within `pthread_join`, it can cancel the threads it had not yet joined. The `workers` member is an array recording the thread identifiers of the subcontractor threads.
 
 [19-26] The subcontractor threads are started running the `worker_routine` function. This function loops until canceled, calling `pthread_testcancel` every 1000 iterations.
 
 [32-47] The cleanup function is established as the active cleanup handler within the contractor thread. When the contractor is canceled, cleanup iterates through the remaining (unjoined) subcontractors, cancelling and detaching each. Note that it does not join the subcontractors-in general, it is not a good idea to wait in a cleanup handler. The thread, after all, is expected to clean up and terminate, not to wait around for something to happen. But if your cleanup handler really needs to wait for something, don't be afraid, it will work just fine.
 
-[54-77] The contractor thread is started running `thread_routine`. This function creates a set of subcontractors, then joins with each subcontractor. As it joins each thread, it records the current index within the workers array in the `team_t` member `join_i`. The cleanup handler is established with a pointer to the team structure so that it can determine the last offset and begin cancelling the remaining subcontractors.
+[54-77] The contractor thread is started running `thread_routine`. This function creates a set of subcontractors, then joins with each subcontractor. As it joins each thread, it records the current index within the `workers` array in the `team_t` member `join_i`. The cleanup handler is established with a pointer to the team structure so that it can determine the last offset and begin cancelling the remaining subcontractors.
 
 [79-105] The main program creates the contractor thread, running `thread_routine`, and then sleeps for five seconds. When it wakes up, it cancels the contractor thread, and waits for it to terminate.
 
@@ -1009,25 +980,27 @@ Lewis Carroll, Alice's Adventures in Wonderland:
 > then, if I like being that person, I'll come up: if not, I'll stay down here till  
 > I'm somebody else."  
 
-When a function in a single threaded program needs to create private data that persists across calls to that function, the data can be allocated statically in memory. The name's scope can be limited to the function or file that uses it (static) or it can be made global (extern).
+When a function in a single threaded program needs to create private data that persists across calls to that function, the data can be allocated statically in memory. The name's scope can be limited to the function or file that uses it (`static`) or it can be made global (`extern`).
 
-It is not quite that simple when you use threads. All threads within a process share the same address space, which means that any variable declared as static or extern, or in the process heap, may be read and written by all threads within the process. That has several important implications for code that wants to store "persistent" data between a series of function calls within a thread:
+It is not quite that simple when you use threads. All threads within a process share the same address space, which means that any variable declared as `static` or `extern`, or in the process heap, may be read and written by all threads within the process. That has several important implications for code that wants to store "persistent" data between a series of function calls within a thread:
 
-> The value in a static or extern variable, or in the heap, will be the value last written by any thread. In some cases this may be what you want, for example, to maintain the seed of a pseudorandom number sequence. In other cases, it may not be what you want.  
-> The only storage a thread has that's truly "private" are processor registers. Even stack addresses can be shared, although only if the "owner" deliberately exposes an address to another thread. In any event, neither registers nor "private" stack can replace uses of persistent static storage in non-threaded code.  
+- The value in a `static` or `extern` variable, or in the heap, will be the value last written by any thread. In some cases this may be what you want, for example, to maintain the seed of a pseudorandom number sequence. In other cases, it may not be what you want.
 
-So when you need a private variable, you must first decide whether all threads share the same value, or whether each thread should have its own value. If they share, then you can use static or extern data, just as you could in a single threaded program; however, you must synchronize access to the shared data across multiple threads, usually by adding one or more mutexes.
+- The only storage a thread has that's truly "private" are processor registers. Even stack addresses can be shared, although only if the "owner" deliberately exposes an address to another thread. In any event, neither registers nor "private" stack can replace uses of persistent static storage in non-threaded code.
+
+So when you need a private variable, you must first decide whether all threads share the same value, or whether each thread should have its own value. If they share, then you can use `static` or `extern` data, just as you could in a single threaded program; however, you must synchronize access to the shared data across multiple threads, usually by adding one or more mutexes.
 
 If each thread needs its own value for a private variable, then you must store all the values somewhere, and each thread must be able to locate the proper value. In some cases you might be able to use static data, for example, a table where you can search for a value unique to each thread, such as the thread's `pthread_t`. In many interesting cases you cannot predict how many threads might call the function-imagine you were implementing a thread-safe library that could be called by arbitrary code, in any number of threads.
 
-The most general solution is to malloc some heap in each thread and store the values there, but your code will need to be able to find the proper private data in any thread. You could create a linked list of all the private values, storing the creating thread's identifier (`pthread_t`) so it could be found again, but that will be slow if there are many threads. You need to search the list to find the proper value, and it would be difficult to recover the storage that was allocated by terminated threads-your function cannot know when a thread terminates.
+The most general solution is to `malloc` some heap in each thread and store the values there, but your code will need to be able to find the proper private data in any thread. You could create a linked list of all the private values, storing the creating thread's identifier (`pthread_t`) so it could be found again, but that will be slow if there are many threads. You need to search the list to find the proper value, and it would be difficult to recover the storage that was allocated by terminated threads-your function cannot know when a thread terminates.
 
 > New interfaces should not rely on implicit persistent storage!
 
 When you are designing new interfaces, there's a better solution. You should require the caller to allocate the necessary persistent state, and tell you where it is. There are many advantages to this model, including, most importantly:
 
-> In many cases, you can avoid internal synchronization using this model, and, in rare cases where the caller wishes to share the persistent state between threads, the caller can supply the needed synchronization.  
-> The caller can instead choose to allocate more than one state buffer for use within a single thread. The result is several independent sequences of calls to your function within the same thread, with no conflict.  
+- In many cases, you can avoid internal synchronization using this model, and, in rare cases where the caller wishes to share the persistent state between threads, the caller can supply the needed synchronization.
+
+- The caller can instead choose to allocate more than one state buffer for use within a single thread. The result is several independent sequences of calls to your function within the same thread, with no conflict.
 
 The problem is that you often need to support implicit persistent states. You may be making an existing interface thread-safe, and cannot add an argument to the functions, or require that the caller maintain a new data structure for your benefit. That's where thread-specific data comes in.
 
@@ -1045,17 +1018,17 @@ int pthread_key_create (
 int pthread_key_delete (pthread_key_t key);
 ```
 
-A thread-specific data key is represented in your program by a variable of type `pthread_key_t`. Like most Pthreads types, `pthread_key_t` is opaque and you should never make any assumptions about the structure or content. The easiest way to create a thread-specific data key is to call `pthread_key_create` before any threads try to use the key, for example early in the program's main function.
+A thread-specific data key is represented in your program by a variable of type `pthread_key_t`. Like most Pthreads types, `pthread_key_t` is opaque and you should never make any assumptions about the structure or content. The easiest way to create a thread-specific data key is to call `pthread_key_create` before any threads try to use the key, for example early in the program's `main` function.
 
 If you need to create a thread-specific data key later, you have to ensure that `pthread_key_create` is called only once for each `pthread_key_t` variable. That's because if you create a key twice, you are really creating two different keys. The second key will overwrite the first, which will be lost forever along with the values any threads might have set for the first key.
 
-When you can't add code to main, the easiest way to ensure that a thread-specific data key is created only once is to use `pthread_once`, the one-time initialization function, as shown in the following program, `tsd_once.c`.
+When you can't add code to `main`, the easiest way to ensure that a thread-specific data key is created only once is to use `pthread_once`, the one-time initialization function, as shown in the following program, `tsd_once.c`.
 
 [8-11] The `tsd_t` structure is used to contain per-thread data. Each thread allocates a private `tsd_t` structure, and stores a pointer to that structure as its value for the thread-specific data key `tsd_key`. The `thread_id` member holds the thread's identifier (`pthread_t`), and the string member holds the pointer to a "name" string for the thread. The variable `tsd_key` holds the thread-specific data key used to access the `tsd_t` structures.
 
 [20-28] One-time initialization (`pthread_once`) is used to ensure that the key `tsd_key` is created before the first access.
 
-[34-57] The threads begin in the thread start function `thread_routine`. The argument (arg) is a pointer to a character string naming the thread. Each thread calls `pthread_once` to ensure that the thread-specific data key has been created. The thread then allocates a `tsd_t` structure, initializes the `thread_id` member with the thread's identifier, and copies its argument to the string member.
+[34-57] The threads begin in the thread start function `thread_routine`. The argument (`arg`) is a pointer to a character string naming the thread. Each thread calls `pthread_once` to ensure that the thread-specific data key has been created. The thread then allocates a `tsd_t` structure, initializes the `thread_id` member with the thread's identifier, and copies its argument to the `string` member.
 
 The thread gets the current thread-specific data value by calling `pthread_getspecific`, and prints a message using the thread's name. It then sleeps for a few seconds and prints another message to demonstrate that the thread-specific data value remains the same, even though another thread has assigned a different `tsd_t` structure address to the same thread-specific data key.
 
@@ -1155,45 +1128,46 @@ void *pthread_getspecific (pthread_key_t key);
 ```
 You can use the `pthread_getspecific` function to determine the thread's current value for a key, or `pthread_setspecific` to change the current value. Take a look at Section 7.3.1 for ideas on using thread-specific data to adapt old libraries that rely on static data to be thread-safe.
 
-> A thread-specific data value of null means something special to Pthreads-do not set a thread-specific data value of null unless you really mean it,
+> A thread-specific data value of `NULL` means something special to Pthreads-do not set a thread-specific data value of `NULL` unless you really mean it.
 
-The initial value for any new key (in all threads) is null. Also, Pthreads sets the thread-specific data value for a key to null before calling that key's destructor (passing the previous value of the key) when a thread terminates.(see **Hint** below) If your thread-specific data value is the address of heap storage, for example, and you want to free that storage in your destructor, you must use the argument passed to the destructor rather than calling `pthread_getspecific`.
+The initial value for any new key (in all threads) is `NULL`. Also, Pthreads sets the thread-specific data value for a key to `NULL` before calling that key's destructor (passing the previous value of the key) when a thread terminates.(see **Hint** below) If your thread-specific data value is the address of heap storage, for example, and you want to free that storage in your destructor, you must use the argument passed to the destructor rather than calling `pthread_getspecific`.
 
 > **Hint**:  
-> "That is, unfortunately, not what the standard says. This is one of the problems with formal standards-they say what they say, not what they were intended to say. Somehow, an error crept in, and the sentence specifying that "the implementation clears the thread-specific data value before calling the destructor" was deleted. Nobody noticed, and the standard was approved with the error. So the standard says (by omission) that if you want to write a portable application using thread-specific data, that will not hang on thread termination, you must call `pthread_setspecific` within your destructor function to change the value to null. This would be silly, and any serious implementation of Pthreads will violate the standard in this respect. Of course, the standard will be fixed, probably by the 1003. In amendment (assorted corrections to 1003.1c-1995), but that will take a while.
+> "That is, unfortunately, not what the standard says. This is one of the problems with formal standards-they say what they say, not what they were intended to say. Somehow, an error crept in, and the sentence specifying that "the implementation clears the thread-specific data value before calling the destructor" was deleted. Nobody noticed, and the standard was approved with the error. So the standard says (by omission) that if you want to write a portable application using thread-specific data, that will not hang on thread termination, you must call `pthread_setspecific` within your destructor function to change the value to `NULL`. This would be silly, and any serious implementation of Pthreads will violate the standard in this respect. Of course, the standard will be fixed, probably by the 1003. In amendment (assorted corrections to 1003.1c-1995), but that will take a while.
 
-Pthreads will not call the destructor for a thread-specific data key if the terminating thread has a value of NULL for that key. null is special, meaning "this key has no value." If you ever use `pthread_setspecific` to set the value of a thread-specific data key to null, you need to remember that you are not setting the value null, but rather stating that the key no longer has a value in the current thread.
+Pthreads will not call the destructor for a thread-specific data key if the terminating thread has a value of `NULL` for that key. `NULL` is special, meaning "this key has no value." If you ever use `pthread_setspecific` to set the value of a thread-specific data key to `NULL`, you need to remember that you are not setting the value `NULL`, but rather stating that the key no longer has a value in the current thread.
 
 > Destructor functions are called only when the thread terminates, not when the value of a thread-specific data key is changed.
 
 Another important thing to remember is that thread-specific data key destructor functions are not called when you replace an existing value for that key. That is, if you allocate a structure in heap and assign a pointer to that structure as the value of a thread-specific data key, and then later allocate a new structure and assign a pointer to that new structure to the same thread-specific data key, in the same thread, you are responsible for freeing the old structure. Pthreads will not free the old structure, nor will it call your destructor function with a pointer to the old structure.
 
 ### 5.4.3 Using destructor functions
-When a thread exits while it has a value defined for some thread-specific data key, you usually need to do something about it. If your key's value is a pointer to heap memory, you will need to free the memory to avoid a memory leak each time a thread terminates. Pthreads allows you to define a destructor function when you create a thread-specific data key. When a thread terminates with a non-NULL value for a thread-specific data key, the key's destructor (if any) is called with the current value of the key.
+
+When a thread exits while it has a value defined for some thread-specific data key, you usually need to do something about it. If your key's value is a pointer to heap memory, you will need to free the memory to avoid a memory leak each time a thread terminates. Pthreads allows you to define a destructor function when you create a thread-specific data key. When a thread terminates with a non-`NULL` value for a thread-specific data key, the key's destructor (if any) is called with the current value of the key.
 
 > Thread-specific data destructors are called in "unspecified order."
 
-Pthreads checks all thread-specific data keys in the process when a thread exits, and for each thread-specific data key with a value that's not NULL, it sets the value to null and then calls the key's destructor function. Going back to our analogy, someone might collect the identity badges of all programmers by removing whatever is hanging from each programmer's left shirt pocket, safe in the knowledge that it will always be the programmer's badge. Be careful, because the order in which destructors are called is undefined. Try to make each destructor as independent as possible.
+Pthreads checks all thread-specific data keys in the process when a thread exits, and for each thread-specific data key with a value that's not `NULL`, it sets the value to `NULL` and then calls the key's destructor function. Going back to our analogy, someone might collect the identity badges of all programmers by removing whatever is hanging from each programmer's left shirt pocket, safe in the knowledge that it will always be the programmer's badge. Be careful, because the order in which destructors are called is undefined. Try to make each destructor as independent as possible.
 
-Thread-specific data destructors can set a new value for the key for which a value is being destroyed or for any other key. You should never do this directly, but it can easily happen indirectly if you call other functions from your destructor. For example, the ANSI C library's destructors might be called before yours- and calling an ANSI C function, for example, using fprintf to write a log message to a file, could cause a new value to be assigned to a thread-specific data key. The system must recheck the list of thread-specific data values for you after all destructors have been called.
+Thread-specific data destructors can set a new value for the key for which a value is being destroyed or for any other key. You should never do this directly, but it can easily happen indirectly if you call other functions from your destructor. For example, the ANSI C library's destructors might be called before yours-and calling an ANSI C function, for example, using `fprintf` to write a log message to a file, could cause a new value to be assigned to a thread-specific data key. The system must recheck the list of thread-specific data values for you after all destructors have been called.
 
-& If your thread-specific data destructor creates a new thread-specific data value,you will get another chance. Maybe too many chancesl
+> If your thread-specific data destructor creates a new thread-specific data value,you will get another chance. Maybe too many chances.
 
-The standard requires that a Pthreads implementation may recheck the list some fixed number of times and then give up. When it gives up, the final thread- specific data value is not destroyed. If the value is a pointer to heap memory, the result may be a memory leak, so be careful. The `<limits.h>` header defines `_pthread_destructor_iterations` to the number of times the system will check, and the value must be at least 4. Alternately, the system is allowed to keep checking forever, so a destructor function that always sets thread-specific data values may cause an infinite loop.
+The standard requires that a Pthreads implementation may recheck the list some fixed number of times and then give up. When it gives up, the final thread-specific data value is not destroyed. If the value is a pointer to heap memory, the result may be a memory leak, so be careful. The `<limits.h>` header defines `_PTHREAD_DESTRUCTOR_ITERATIONS` to the number of times the system will check, and the value must be at least 4. Alternately, the system is allowed to keep checking forever, so a destructor function that always sets thread-specific data values may cause an infinite loop.
 
-Usually, new thread-specific data values are set within a destructor only when subsystem 1 uses thread-specific data that depends on another independent subsystem 2 that also uses thread-specific data. Because the order in which destructor functions run is unspecified, the two may be called in the wrong order. If the subsystem 1 destructor needs to call into subsystem 2, it may inadvertently result in allocating new thread-specific data for subsystem 2. Although the subsystem 2 destructor will need to be called again to free the new data, the subsystem 1 thread-specific data remains NULL, so the loop will terminate.
+Usually, new thread-specific data values are set within a destructor only when subsystem 1 uses thread-specific data that depends on another independent subsystem 2 that also uses thread-specific data. Because the order in which destructor functions run is unspecified, the two may be called in the wrong order. If the subsystem 1 destructor needs to call into subsystem 2, it may inadvertently result in allocating new thread-specific data for subsystem 2. Although the subsystem 2 destructor will need to be called again to free the new data, the subsystem 1 thread-specific data remains `NULL`, so the loop will terminate.
 
-The following program, `tsd_destructor.c`, demonstrates using thread- specific data destructors to release memory when a thread terminates. It also keeps track of how many threads are using the thread-specific data, and deletes the thread-specific data key when the destructor is run for the final thread. This program is similar in structure to `tsd_once.c`, from Section 5.3, so only the relevant differences will be annotated here.
+The following program, `tsd_destructor.c`, demonstrates using thread-specific data destructors to release memory when a thread terminates. It also keeps track of how many threads are using the thread-specific data, and deletes the thread-specific data key when the destructor is run for the final thread. This program is similar in structure to `tsd_once.c`, from Section 5.3, so only the relevant differences will be annotated here.
 
 [13-15] In addition to the key value (`identity_key`), the program maintains a count of threads that are using the key (`identity_key_counter`), which is protected by a mutex (`identity_key_mutex`).
 
-[23-43] The function `identity_key_destructor` is the thread-specific data key's destructor function. It begins by printing a message so we can observe when it runs in each thread. It frees the storage used to maintain thread-specific data, the `private_t` structure. Then it locks the mutex associated with the thread- specific data key (`identity_key_mutex`) and decreases the count of threads using the key. If the count reaches 0, it deletes the key and prints a message.
+[23-43] The function `identity_key_destructor` is the thread-specific data key's destructor function. It begins by printing a message so we can observe when it runs in each thread. It frees the storage used to maintain thread-specific data, the `private_t` structure. Then it locks the mutex associated with the thread-specific data key (`identity_key_mutex`) and decreases the count of threads using the key. If the count reaches 0, it deletes the key and prints a message.
 
-[49-64] The function `identity_key_get` can be used anywhere (in this example, it is used only once per thread) to get the value of `identity_key` for the calling thread. If there is no current value (the value is NULL), then it allocates a new `private_t` structure and assigns it to the key for future reference.
+[49-64] The function `identity_key_get` can be used anywhere (in this example, it is used only once per thread) to get the value of `identity_key` for the calling thread. If there is no current value (the value is `NULL`), then it allocates a new `private_t` structure and assigns it to the key for future reference.
 
-[69-79] The function `thread_routine` is the thread start function used by the example. It acquires a value for the key by calling `identity_key_get`, and sets the members of the structure. The string member is set to the thread's argument, creating a global "name" for the thread, which can be used for printing messages.
+[69-79] The function `thread_routine` is the thread start function used by the example. It acquires a value for the key by calling `identity_key_get`, and sets the members of the structure. The `string` member is set to the thread's argument, creating a global "name" for the thread, which can be used for printing messages.
 
-[81-115] The main program creates the thread-specific data key `tsd_key`. Notice that, unlike `tsd_once.c`, this program does not bother to use `pthread_once`. As I mentioned in the annotation for that example, in a main program it is perfectly safe, and more efficient, to create the key inside main, before creating any threads.
+[81-115] The main program creates the thread-specific data key `tsd_key`. Notice that, unlike `tsd_once.c`, this program does not bother to use `pthread_once`. As I mentioned in the annotation for that example, in a main program it is perfectly safe, and more efficient, to create the key inside `main`, before creating any threads.
 
 [102] The main program initializes the reference counter (`identity_key_counter`) to 3. It is critical that you define in advance how many threads will reference a key that will be deleted based on a reference count, as we intend to do. The counter must be set before any thread using the key can possibly terminate.
 
@@ -1324,7 +1298,7 @@ Lewis Carroll, Through the Looking-Glass:
 > "You wo'n't make yourself a bit realler by crying," Tweedledee remarked:  
 > "there's nothing to cry about."  
 
-Once upon a time, realtime programming was considered an arcane and rare art. Realtime programmers were doing unusual things, outside of the programming mainstream, like controlling nuclear reactors or airplane navigational systems. But the POSIX. lb realtime extension defines realtime as "the ability of the operating system to provide a required level of service in a bounded response time."
+Once upon a time, realtime programming was considered an arcane and rare art. Realtime programmers were doing unusual things, outside of the programming mainstream, like controlling nuclear reactors or airplane navigational systems. But the POSIX.1b realtime extension defines realtime as "the ability of the operating system to provide a required level of service in a bounded response time."
 
 What applies to the operating system also applies to your application or library. "Bounded" response time does not necessarily mean "fast" response, but it does mean "predictable" response. There must be some way to define a span of time during which a sequence of operations is guaranteed to complete. A system controlling a nuclear reactor has more strict response requirements than most programs you will write, and certainly the consequences of failing to meet the reactor's response requirements are more severe. But a lot of code you write will need to provide some "required level of service" within some "bounded response time." Realtime programming just means that the software lives in the real world.
 
@@ -1337,58 +1311,63 @@ Threads are useful for all types of realtime programming, because coding for pre
 Achieving predictability requires a lot more than just separating operations into different threads, however. For one thing, you need to make sure that the thread you need to run "soon" won't be left sitting on a run queue somewhere while another thread uses the processor. Most systems, by default, will try to distribute resources more or less fairly between threads. That's nice for a lot of things-but realtime isn't fair. Realtime means carefully giving precedence to the parts of the program that limit external response time.
 
 ### 5.5.1 POSIX realtime options
+
 The POSIX standards are flexible, because they're designed to be useful in a wide range of environments. In particular, since traditional UNIX systems don't support any form of realtime scheduling control, all of the tools for controlling realtime response are optional. The fact that a given implementation of UNIX "conforms to 1003.1c-1995" does not mean you can write predictable realtime programs.
 
-If the system defines `_posix_thread_priority_scheduling`, it provides support for assigning realtime scheduling priorities to threads. The POSIX priority scheduling model is a little more complicated than the traditional UNIX priority model, but the principle is similar. Priority scheduling allows the programmer to give the system an idea of how important any two threads are, relative to each other. Whenever more than one thread is ready to execute, the system will choose the thread with the highest priority.
+If the system defines `_POSIX_THREAD_PRIORITY_SCHEDULING`, it provides support for assigning realtime scheduling priorities to threads. The POSIX priority scheduling model is a little more complicated than the traditional UNIX priority model, but the principle is similar. Priority scheduling allows the programmer to give the system an idea of how important any two threads are, relative to each other. Whenever more than one thread is ready to execute, the system will choose the thread with the highest priority.
 
 ### 5.5.2 Scheduling policies and priorities
+
 ```c
 int sched_get_priority_max (int policy);
 int sched_get_priority_min (int policy);
+
 int pthread_attr_getinheritsched (
     const pthread_attr_t *attr, int *inheritsched);
 int pthread_attr_setinheritsched (
     pthread_attr_t *attr, int inheritsched);
+
 int pthread_attr_getschedparam (
     const pthread_attr_t *attr,
     struct sched_param *param);
 int pthread_attr_setschedparam (
     pthread_attr_t *attr,
     const struct sched_param *param);
+
 int pthread_attr_getschedpolicy (
     const pthread_attr_t *attr, int *policy);
 int pthread_attr_setschedpolicy (
     pthread_attr_t *attr, int policy);
+
 int pthread_getschedparam (pthread_t thread,
     int *policy, struct sched_param *param);
 int pthread_setschedparam (
     pthread_t thread, int>policy,
     const struct sched_param *param);
 ```
-A Pthreads system that supports `_posix_thread_priority_scheduling` must provide a definition of the struct `sched_param` structure that includes at least the member `sched_priority`. The `sched_priority` member is the only scheduling parameter used by the standard Pthreads scheduling policies, `SCHED_FIFO` and `SCHED_RR`. The minimum and maximum priority values (`sched_priority` member) that are allowed for each scheduling policy can be determined by calling `sched_get_priority_min` or `sched_get_priority_max`, respectively, for the scheduling policy. Pthreads systems that support additional, nonstandard scheduling policies may include additional members.
+A Pthreads system that supports `_POSIX_THREAD_PRIORITY_SCHEDULING` must provide a definition of the struct `sched_param` structure that includes at least the member `sched_priority`. The `sched_priority` member is the only scheduling parameter used by the standard Pthreads scheduling policies, `SCHED_FIFO` and `SCHED_RR`. The minimum and maximum priority values (`sched_priority` member) that are allowed for each scheduling policy can be determined by calling `sched_get_priority_min` or `sched_get_priority_max`, respectively, for the scheduling policy. Pthreads systems that support additional, nonstandard scheduling policies may include additional members.
 
-The `SCHED_FIFO` (first in, first out) policy allows a thread to run until another thread with a higher priority becomes ready, or until it blocks voluntarily. When a thread with `SCHED_FIFO` scheduling policy becomes ready, it begins executing immediately unless a thread with equal or higher priority is already executing.
+The `SCHED_FIFO` (*first in, first out*) policy allows a thread to run until another thread with a higher priority becomes ready, or until it blocks voluntarily. When a thread with `SCHED_FIFO` scheduling policy becomes ready, it begins executing immediately unless a thread with equal or higher priority is already executing.
 
-The `SCHED_RR` [round-robin] policy is much the same, except that if a thread with `SCHED_RR` policy executes for more than a fixed period of time (the timeslice interval) without blocking, and another thread with `SCHED_RR` or `SCHED_FIFO` policy and the same priority is ready, the running thread will be preempted so the ready thread can be executed.
+The `SCHED_RR` (*round-robin*) policy is much the same, except that if a thread with `SCHED_RR` policy executes for more than a fixed period of time (the timeslice interval) without blocking, and another thread with `SCHED_RR` or `SCHED_FIFO` policy and the same priority is ready, the running thread will be preempted so the ready thread can be executed.
 
 When threads with `SCHED_FIFO` or `SCHED_RR` policy wait on a condition variable or wait to lock a mutex, they will be awakened in priority order. That is, if a low-priority `SCHED_FIFO` thread and a high-priority `SCHED_FIFO` thread are both waiting to lock the same mutex, the high-priority thread will always be unblocked first when the mutex is unlocked.
-
 
 Pthreads defines the name of an additional scheduling policy, called `SCHED_OTHER`. Pthreads, however, says nothing at all regarding what this scheduling policy does. This is an illustration of an unofficial POSIX philosophy that has been termed "a standard way to be nonstandard" (or, alternately, "a portable way to be nonportable"). That is, when you use any implementation of Pthreads that supports the priority scheduling option, you can write a portable program that creates threads running in `SCHED_OTHER` policy, but the behavior of that program is nonportable. (The official explanation of `SCHED_OTHER` is that it provides a portable way for a program to declare that it does not need a realtime scheduling policy.)
 
 The `SCHED_OTHER` policy may be an alias for `SCHED_FIFO`, or it may be `SCHED_RR`, or it may be something entirely different. The real problem with this ambiguity is not that you don't know what `SCHED_OTHER` does, but that you have no way of knowing what scheduling parameters it might require. Because the meaning of `SCHED_OTHER` is undefined, it does not necessarily use the `sched_priority` member of the struct `sched_param` structure, and it may require additional, nonstandard members that an implementation may add to the structure. If there's any point to this, it is simply that `SCHED_OTHER` is not portable. If you write any code that uses `SCHED_OTHER` you should be aware that the code is not portable-you are, by definition, depending on the `SCHED_OTHER` of the particular Pthreads implementation for which you wrote the code.
 
-The *schedpolicy* and *schedparam* attributes, set respectively by `pthread_attr_setschedpolicy` and `pthread_attr` setschedparam, specify the explicit scheduling policy and parameters for the attributes object. Pthreads does not specify a default value for either of these attributes, which means that each implementation may choose some "appropriate" value. A realtime operating system intended for embedded controller applications, for example, might choose to create threads by default with `SCHED_FIFO` policy, and, perhaps, some medium-range priority.
+The *schedpolicy* and *schedparam* attributes, set respectively by `pthread_attr_setschedpolicy` and `pthread_attr_setschedparam`, specify the explicit scheduling policy and parameters for the attributes object. Pthreads does not specify a default value for either of these attributes, which means that each implementation may choose some "appropriate" value. A realtime operating system intended for embedded controller applications, for example, might choose to create threads by default with `SCHED_FIFO` policy, and, perhaps, some medium-range priority.
 
 Most multiuser operating systems are more likely to use a nonstandard "time-share" scheduling policy by default, causing threads to be scheduled more or less as processes have always been scheduled. The system may, for example, temporarily reduce the priority of "CPU hogs" so that they cannot prevent other threads from making progress.
 
-One example of a multiuser operating system is Digital UNIX, which supports two nonstandard timeshare scheduling policies. The foreground policy (`sched_fg_np`), which is the default, is used for normal interactive activity, and corresponds to the way nonthreaded processes are scheduled. The background policy (`SCHED_BG_NP`) can be used for less important support activities.
+One example of a multiuser operating system is Digital UNIX, which supports two nonstandard timeshare scheduling policies. The *foreground* policy (`SCHED_FG_NP`), which is the default, is used for normal interactive activity, and corresponds to the way nonthreaded processes are scheduled. The *background* policy (`SCHED_BG_NP`) can be used for less important support activities.
 
 > When you set the scheduling policy or priority attributes in an attributes object,you must also set the inheritsched attribute!
 
-The inheritsched attribute, which you can set by calling `pthread_attr_setinheritsched`, controls whether a thread you create inherits scheduling information from the creating thread, or uses the explicit scheduling information in the schedpolicy and schedparam attributes. Pthreads does not specify a default value for inheritsched, either, so if you care about the policy and scheduling parameters of your thread, you must always set this attribute.
+The *inheritsched* attribute, which you can set by calling `pthread_attr_setinheritsched`, controls whether a thread you create inherits scheduling information from the creating thread, or uses the explicit scheduling information in the *schedpolicy* and *schedparam* attributes. Pthreads does not specify a default value for *inheritsched*, either, so if you care about the policy and scheduling parameters of your thread, you must always set this attribute.
 
-Set the inheritsched attribute to `pthread_inherit_sched` to cause a new thread to inherit the scheduling policy and parameters of the creating thread. Scheduling inheritance is useful when you're creating "helper" threads that are working on behalf of the creator-it generally makes sense for them to run at the same policy and priority. Whenever you need to control the scheduling policy or parameters of a thread you create, you must set the inheritsched attribute to `PTHREAD_EXPLICIT_SCHED`.
+Set the `inheritsched` attribute to `PTHREAD_INHERIT_SCHED` to cause a new thread to inherit the scheduling policy and parameters of the creating thread. Scheduling inheritance is useful when you're creating "helper" threads that are working on behalf of the creator-it generally makes sense for them to run at the same policy and priority. Whenever you need to control the scheduling policy or parameters of a thread you create, you must set the *inheritsched* attribute to `PTHREAD_EXPLICIT_SCHED`.
 
 [59-119] The following program, `sched_attr.c`, shows how to use an attributes object to create a thread with an explicit scheduling policy and priority. Notice that it uses conditional code to determine whether the priority scheduling feature of Pthreads is supported at compilation time. It will print a message if the option is not supported and continue, although the program in that case will not do much. (It creates a thread with default scheduling behavior, which can only say that it ran.)
 
@@ -1626,17 +1605,18 @@ int pthread_attr_setscope (
 
 Besides scheduling policy and parameters, two other controls are important in realtime scheduling. Unless you are writing a realtime application, they probably don't matter. If you are writing a realtime application, you will need to find out which settings of these controls are supported by a system.
 
-The first control is called contention scope. It is a description of how your threads compete for processor resources. System contention scope means that your thread competes for processor resources against threads outside your process. A high-priority system contention scope thread in your process can keep system contention scope threads in other processes from running (or vice versa). Process contention scope means that your threads compete only among themselves. Usually, process contention scope means that the operating system chooses a process to execute, possibly using only the traditional UNIX priority, and some additional scheduler within the process applies the POSIX scheduling rules to determine which thread to execute.
+The first control is called *contention scope*. It is a description of how your threads compete for processor resources. *System contention scope* means that your thread competes for processor resources against threads outside your process. A high-priority system contention scope thread in your process can keep system contention scope threads in other processes from running (or vice versa). *Process contention scope* means that your threads compete only among themselves. Usually, process contention scope means that the operating system chooses a process to execute, possibly using only the traditional UNIX priority, and some additional scheduler within the process applies the POSIX scheduling rules to determine which thread to execute.
 
-Pthreads provides the thread scope attribute so that you can specify whether each thread you create should have process or system contention scope. A Pthreads system may choose to support `pthread_scope_process`, `pthread_scope_system`, or both. If you try to create a thread with a scope that is not supported by the system, `pthread_attr_setscope` will return ENOTSUP.
+Pthreads provides the thread scope attribute so that you can specify whether each thread you create should have process or system contention scope. A Pthreads system may choose to support `PTHREAD_SCOPE_PROCESS`, `PTHREAD_SCOPE_SYSTEM`, or both. If you try to create a thread with a scope that is not supported by the system, `pthread_attr_setscope` will return `ENOTSUP`.
 
-The second control is allocation domain. An allocation domain is the set of processors within the system for which threads may compete. A system may have one or more allocation domains, each containing one or more processors. In a uniprocessor system, an allocation domain will contain only one processor, but you may still have more than one allocation domain. On a multiprocessor, each allocation domain may contain from one processor to the number of processors in the system.
+The second control is *allocation domain*. An allocation domain is the set of processors within the system for which threads may compete. A system may have one or more allocation domains, each containing one or more processors. In a uniprocessor system, an allocation domain will contain only one processor, but you may still have more than one allocation domain. On a multiprocessor, each allocation domain may contain from one processor to the number of processors in the system.
 
 There is no Pthreads interface to set a thread's allocation domain. The POSIX.14 (Multiprocessor Profile) working group considered proposing standard interfaces, but the effort was halted by the prospect of dealing with the wide range of hardware architectures and existing software interfaces. Despite the lack of a standard, any system supporting multiprocessors will have interfaces to affect the allocation domain of a thread.
 
 Because there is no standard interface to control allocation domain, there is no way to describe precisely all the effects of any particular hypothetical situation. Still, you may need to be concerned about these things if you use a system that supports multiprocessors. A few things to think about:
 
-1. How do system contention scope threads and process contention scope threads, within the same allocation domain, interact with each other? They are competing for resources in some manner, but the behavior is not denned by the standard.
+1. How do system contention scope threads and process contention scope threads, within the same allocation domain, interact with each other? They are competing for resources in some manner, but the behavior is not defined by the standard.
+
 2. If the system supports "overlapping" allocation domains, in other words, if a processor can appear in more than one allocation domain within the system, and you have one system contention scope thread in each of two overlapping allocation domains, what happens?
 
 > System contention scope is predictable.  
@@ -1645,7 +1625,9 @@ Because there is no standard interface to control allocation domain, there is no
 
 On most systems, you will get better performance, and lower cost, by using only process contention scope. Context switches between system contention scope threads usually require at least one call into the kernel, and those calls are relatively expensive compared to the cost of saving and restoring thread state in user mode. Each system contention scope thread will be permanently associated with one "kernel entity," and the number of kernel entities is usually more limited than the number of Pthreads threads. Process contention scope threads may share one kernel entity, or some small number of kernel entities. On a given system configuration, for example, you may be able to create thousands of process contention scope threads, but only hundreds of system contention scope threads.
 
-On the other hand, process contention scope gives you no real control over the scheduling priority of your thread-while a high priority may give it precedence over other threads in the process, it has no advantage over threads in other processes with lower priority. System contention scope gives you better predictability by allowing control, often to the extent of being able to make your thread "more important" than threads running within the operating system kernel. I System contention scope is less predictable with an allocation domain greater than one.
+On the other hand, process contention scope gives you no real control over the scheduling priority of your thread-while a high priority may give it precedence over other threads in the process, it has no advantage over threads in other processes with lower priority. System contention scope gives you better predictability by allowing control, often to the extent of being able to make your thread "more important" than threads running within the operating system kernel. 
+
+> System contention scope is less predictable with an allocation domain greater than one.
 
 When a thread is assigned to an allocation domain with more than a single processor, the application can no longer rely on completely predictable scheduling behavior. Both high- and low-priority threads may run at the same time, for example, because the scheduler will not allow processors to be idle just because a high-priority thread is running. The uniprocessor behavior would make little sense on a multiprocessor.
 
@@ -1654,6 +1636,7 @@ When thread 1 awakens thread 2 by unlocking a mutex, and thread 2 has a higher p
 For some applications, the predictability afforded by guaranteed preemption in the case outlined in the previous paragraph may be important. In most cases, it is not that important as long as thread 3 will eventually run. Although POSIX does not require any Pthreads system to implement this type of "cross processor preemption," you are more likely to find it when you use system contention scope threads. If predictability is critical, of course, you should be using system contention scope anyway.
 
 ### 5.5.4 Problems with realtime scheduling
+
 One of the problems of relying on realtime scheduling is that it is not modular. In real applications you will generally be working with libraries from a variety of sources, and those libraries may rely on threads for important functions like network communication and resource management. Now, it may seem reasonable to make "the most important thread" in your library run with `SCHED_FIFO` policy and maximum priority. The resulting thread, however, isn't just the most important thread for your library-it is (or, at least, behaves as) the most important thread in the entire process, including the main program and any other libraries. Your high-priority thread may prevent all other libraries, and in some cases even the operating system, from performing work on which the application relies.
 
 Another problem, which really isn't a problem with priority scheduling, but with the way many people think about priority scheduling, is that it doesn't do what many people expect. Many people think that "realtime priority" threads somehow "go faster" than other threads, and that's not true. Realtime priority threads may actually go slower, because there is more overhead involved in making all of the required preemption checks at all the right times-especially on a multiprocessor.
@@ -1662,9 +1645,9 @@ A more severe problem with fixed priority scheduling is called priority inversio
 
 Priority inversion occurs when low-priority thread acquires a shared resource (such as a mutex), and is preempted by a high-priority thread that then blocks on that same resource. With only two threads, the low-priority thread would then be allowed to run, eventually (we assume) releasing the mutex. However, if a third thread with a priority between those two is ready to run, it can prevent the low-priority thread from running. Because the low-priority thread holds the mutex that the high-priority thread needs, the middle-priority thread is also keeping the higher-priority thread from running.
 
-There are a number of ways to prevent priority inversion. The simplest is to avoid using realtime scheduling, but that's not always practical. Pthreads provides several mutex locking protocols that help avoid priority inversion, priority ceiling and priority inheritance. These are discussed in Section 5.5.5.
+There are a number of ways to prevent priority inversion. The simplest is to avoid using realtime scheduling, but that's not always practical. Pthreads provides several mutex locking protocols that help avoid priority inversion, *priority ceiling* and *priority inheritance*. These are discussed in Section 5.5.5.
 
-& Most threaded programs do not need realtime scheduling.
+> Most threaded programs do not need realtime scheduling.
 
 A final problem is that priority scheduling isn't completely portable. Pthreads defines the priority scheduling features under an option, and many implementations that are not primarily intended for realtime programming may choose not to support the option. Even if the option is supported, there are many important aspects of priority scheduling that are not covered by the standard. When you use system contention scope, for example, where your threads may compete directly against threads within the operating system, setting a high priority on your threads might prevent kernel I/O drivers from functioning on some systems.
 
@@ -1673,7 +1656,9 @@ Pthreads does not specify a thread's default scheduling policy or priority, or h
 If you really need priority scheduling, then use it-and be aware that it has special requirements beyond simply Pthreads. If you need priority scheduling, keep the following in mind:
 
 1. Process contention scope is "nicer" than system contention scope, because you will not prevent a thread in another process, or in the kernel, from running.
+
 2. `SCHED_RR` is "nicer" than `SCHED_FIFO`, and slightly more portable, because `SCHED_RR` threads will be preempted at intervals to share the available processor time with other threads at the same priority.
+
 3. Lower priorities for `SCHED_FIFO` and `SCHED_RR` policies are nicer than higher priorities, because you are less likely to interfere with something else that's important.
 
 Unless your code really needs priority scheduling, avoid it. In most cases, introducing priority scheduling will cause more problems than it will solve.
@@ -1682,44 +1667,47 @@ Unless your code really needs priority scheduling, avoid it. In most cases, intr
 ```c
 #if defined (_POSIX_THREAD_PRIO_PROTECT) \
     || defined (_POSIX_THREAD_PRIO_INHERIT)
-int pthread_mutexattr_getprotocol (
-    const pthread_mutexattr_t *attr, int *protocol);
-int pthread_mutexattr_setprotocol (
-    pthread_mutexattr_t *attr, int protocol);
+    int pthread_mutexattr_getprotocol (
+        const pthread_mutexattr_t *attr, int *protocol);
+    int pthread_mutexattr_setprotocol (
+        pthread_mutexattr_t *attr, int protocol);
 #endif
+
 #ifdef _POSIX_THREAD_PRIO_PROTECT
-int pthread_mutexattr_getprioceiling (
-    const pthread_attr_t *attr, int *prioceiling);
-int pthread_rautexattr_setprioceiling (
-    pthread_mutexattr_t *attr, int prioceiling);
-int pthread_mutex_getprioceiling (
-    const pthread_mutex_t *mutex, int *prioceiling);
-int pthread_mutex_setprioceiling (
-    pthread_mutex_t *mutex,
-    int prioceiling, int *old_ceiling);
+    int pthread_mutexattr_getprioceiling (
+        const pthread_attr_t *attr, int *prioceiling);
+    int pthread_rautexattr_setprioceiling (
+        pthread_mutexattr_t *attr, int prioceiling);
+
+    int pthread_mutex_getprioceiling (
+        const pthread_mutex_t *mutex, int *prioceiling);
+    int pthread_mutex_setprioceiling (
+        pthread_mutex_t *mutex,
+        int prioceiling, int *old_ceiling);
 #endif
 ```
 
 Pthreads provides several special mutex attributes that can help to avoid priority inversion deadlocks. Locking, or waiting for, a mutex with one of these attributes may change the priority of the thread-or the priority of other threads- to ensure that the thread that owns the mutex cannot be preempted by another thread that needs to lock the same mutex.
 
-These mutex attributes may not be supported by your implementation of Pthreads, because they are optional features. If your code needs to function with or without these options, you can conditionally compile references based on the feature test macros `_POSIX_THREAD_PRIO_PROTECT` or `_POSIX_THREAD_PRIO_INHERIT`, defined in `<unistd.h>`, or you can call sysconf during program execution to check for SC THREAD PRIO PROTECT or SC THREAD PRIO INHERIT.
+These mutex attributes may not be supported by your implementation of Pthreads, because they are optional features. If your code needs to function with or without these options, you can conditionally compile references based on the feature test macros `_POSIX_THREAD_PRIO_PROTECT` or `_POSIX_THREAD_PRIO_INHERIT`, defined in `<unistd.h>`, or you can call `sysconf` during program execution to check for `_SC_THREAD_PRIO_PROTECT` or `_SC_THREAD_PRIO_INHERIT`.
 
 Once you've created a mutex using one of these attributes, you can lock and unlock the mutex exactly like any other mutex. As a consequence, you can easily convert any mutex you create by changing the code that initializes the mutex. (You must call `pthread_mutex_init`, however, because you cannot statically initialize a mutex with nondefault attributes.)
 
-& "Priority ceiling" protocol means that while a thread owns the mutex, it runs at the specified priority.
+> "Priority ceiling" protocol means that while a thread owns the mutex, it runs at the specified priority.
 
-If your system defines `_POSIX_THREAD_PRIO_PROTECT` then it supports the protocol and prioceiling attributes. You set the protocol attribute by calling `pthread_mutexattr_setprotocol`. If you set the protocol attribute to the value `pthread_prio_protect`, then you can also specify the priority ceiling for mutexes created using the attributes object by setting the prioceiling attribute.
+If your system defines `_POSIX_THREAD_PRIO_PROTECT` then it supports the protocol and prioceiling attributes. You set the protocol attribute by calling `pthread_mutexattr_setprotocol`. If you set the protocol attribute to the value `PTHREAD_PRIO_PROTECT`, then you can also specify the priority ceiling for mutexes created using the attributes object by setting the *prioceiling* attribute.
 
-You set the prioceiling attribute by calling the function `pthread_mutexattr_setprioceiling`. When any thread locks a mutex defined with such an attributes object, the thread's priority will be set to the priority ceiling of the mutex, unless the thread's priority is already the same or higher. Note that locking the mutex in a thread running at a priority above the priority ceiling of the mutex breaks the protocol, removing the protection against priority inversion.
+You set the *prioceiling* attribute by calling the function `pthread_mutexattr_setprioceiling`. When any thread locks a mutex defined with such an attributes object, the thread's priority will be set to the priority ceiling of the mutex, unless the thread's priority is already the same or higher. Note that locking the mutex in a thread running at a priority above the priority ceiling of the mutex breaks the protocol, removing the protection against priority inversion.
 
-& "Priority inheritance" means that when a thread waits on a mutex owned by a lower-priority thread, the priority of the owner is increased to that of the waiter.
+> "Priority inheritance" means that when a thread waits on a mutex owned by a lower-priority thread, the priority of the owner is increased to that of the waiter.
 
-If your system defines `_POSIX_THREAD_PRIO_INHERIT` then it supports the protocol attribute. If you set the protocol attribute to the value `pthread_prio_inherit`, then no thread holding the mutex can be preempted by another thread with a priority lower than that of any thread waiting for the mutex. When any thread attempts to lock the mutex while a lower-priority thread holds the mutex, the priority of the thread currently holding the mutex will be raised to the priority of the waiter as long as it owns the mutex.
+If your system defines `_POSIX_THREAD_PRIO_INHERIT` then it supports the protocol attribute. If you set the protocol attribute to the value `PTHREAD_PRIO_INHERIT`, then no thread holding the mutex can be preempted by another thread with a priority lower than that of any thread waiting for the mutex. When any thread attempts to lock the mutex while a lower-priority thread holds the mutex, the priority of the thread currently holding the mutex will be raised to the priority of the waiter as long as it owns the mutex.
 
-If your system does not define either `_POSIX_THREAD_PRIO_PROTECT` or `_POSIX_THREAD_PRIO_INHERIT` then the protocol attribute may not be defined. The default value of the protocol attribute (or the effective value if the attribute isn't defined) is `posix_prio_none`, which means that thread priorities are not modified by the act of locking (or waiting for) a mutex.
+If your system does not define either `_POSIX_THREAD_PRIO_PROTECT` or `_POSIX_THREAD_PRIO_INHERIT` then the protocol attribute may not be defined. The default value of the protocol attribute (or the effective value if the attribute isn't defined) is `POSIX_PRIO_NONE`, which means that thread priorities are not modified by the act of locking (or waiting for) a mutex.
 
 #### 5.5.5.1 Priority ceiling mutexes
-The simplest of the two types of "priority aware" mutexes is the priority ceiling (or "priority protection") protocol (Figure 5.3). When you create a mutex using a priority ceiling, you specify the highest priority at which a thread will ever be running when it locks the mutex. Any thread locking that mutex will have its priority automatically raised to that value, which will allow it to finish with the mutex before it can be preempted by any other thread that might try to lock the mutex. You can also examine or modify the priority ceiling of a mutex that was created with the priority ceiling [protect) protocol.
+
+The simplest of the two types of "priority aware" mutexes is the *priority ceiling* (or "priority protection") protocol (Figure 5.3). When you create a mutex using a priority ceiling, you specify the highest priority at which a thread will ever be running when it locks the mutex. Any thread locking that mutex will have its priority automatically raised to that value, which will allow it to finish with the mutex before it can be preempted by any other thread that might try to lock the mutex. You can also examine or modify the priority ceiling of a mutex that was created with the priority ceiling (*protect*) protocol.
 
 <center>![**FIGURE 5.3** *Priority ceiling mutex operation*](./img/fig5.3.png)</center>
 
@@ -1730,11 +1718,12 @@ Priority ceiling is perfect for an embedded realtime application where the devel
 You can use priority ceiling within almost any main program, even when you don't control the code in libraries you use. That's because while it is common for threads that call into library functions to lock library mutexes, it is not common for threads created by a library to call into application code and lock application mutexes. If you use a library that has "callbacks" into your code, you must either ensure that those callbacks (and any functions they call) don't use the priority ceiling mutexes or that no thread in which the callback might be invoked will run at a priority above the ceiling priority of the mutex.
 
 #### 5.5.5.2 Priority inheritance mutexes
-The other Pthreads mutex protocol is priority inheritance. In the priority inheritance protocol, when a thread locks a mutex the thread's priority is controlled through the mutex (Figure 5.4). When another thread needs to block on thai mutex, it looks at the priority of the thread that owns the mutex. If the thread that owns the mutex has a lower priority than the thread attempting to block on the mutex, the priority of the owner is raised to the priority of the blocking thread.
+
+The other Pthreads mutex protocol is *priority inheritance*. In the priority inheritance protocol, when a thread locks a mutex the thread's priority is controlled through the mutex (Figure 5.4). When another thread needs to block on that mutex, it looks at the priority of the thread that owns the mutex. If the thread that owns the mutex has a lower priority than the thread attempting to block on the mutex, the priority of the owner is raised to the priority of the blocking thread.
 
 The priority increase ensures that the thread that has the mutex locked cannot be preempted unless the waiting thread would also have been preempted-in a sense, the thread owning the mutex is working on behalf of the higher-priority thread. When the thread unlocks the mutex, the thread's priority is automatically lowered to its normal priority and the highest-priority waiter is awakened. If a second thread of even higher priority blocks on the mutex, the thread that has the mutex blocked will again have its priority increased. The thread will still be returned to its original priority when the mutex is unlocked.
 
-The priority inheritance protocol is more general and powerful than priority celling, but also more complicated and expensive. If a library package must make use of priority scheduling, and cannot avoid use of a mutex from threads of different priority, then priority inheritance is the only currently available solution. If you are writing a main program, and know that none of your mutexes can be locked by threads created within a library, then priority ceiling will accomplish the same result as priority inheritance, and with less overhead.
+The priority inheritance protocol is more general and powerful than priority ceiling, but also more complicated and expensive. If a library package must make use of priority scheduling, and cannot avoid use of a mutex from threads of different priority, then priority inheritance is the only currently available solution. If you are writing a main program, and know that none of your mutexes can be locked by threads created within a library, then priority ceiling will accomplish the same result as priority inheritance, and with less overhead.
 
 <center>![**FIGURE 5.4** *Priority inheritance mutex operation*](./img/fig5.4.png)</center>
 
@@ -1753,7 +1742,7 @@ Pthreads deliberately says very little about implementation details. This leaves
 > **Hint:**  
 > Strictly conforming is used by POSIX to mean something quite specific: a strictly conforming application is one that does not rely on any options or extensions to the standard and requires only the specified minimum value for all implementation limits (but will work correctly with any allowed value).
 
-Any Pthreads implementation must ensure that "system services invoked by one thread do not suspend other threads" so that you do not need to worry that calling read might block all threads in the process on some systems. On the other hand, this does not mean that your process will always have the maximum possible level of concurrency.
+Any Pthreads implementation must ensure that "system services invoked by one thread do not suspend other threads" so that you do not need to worry that calling `read` might block all threads in the process on some systems. On the other hand, this does not mean that your process will always have the maximum possible level of concurrency.
 
 Nevertheless, when using a system it is often useful to understand the ways in which the system may be implemented. When writing ANSI C expressions, for example, it is often helpful to understand what the code generator, and even the hardware, will do with those expressions. With that in mind, the following sections describe, briefly, a few of the main variations you're likely to encounter.
 
@@ -1762,46 +1751,52 @@ The important terms used in these sections are "Pthreads thread," "kernel entity
 Most operating systems have at least one additional level of abstraction between "Pthreads thread" and "processor" and I refer to that as a "kernel entity," because that is the term used by Pthreads. In some systems, "kernel entity" may be a traditional UNIX process. It may be a Digital UNIX Mach thread, or a Solaris 2.x LWP, or an IRIX sproc process. The exact meaning of "kernel entity," and how it interacts with the Pthreads thread, is the crucial difference between the three models described in the following sections.
 
 ### 5.6.1 Many-to-one (user level)
+
 The many-to-one method is also sometimes called a "library implementation." In general, "many-to-one" implementations are designed for operating systems with no support for threads. Pthreads implementations that run on generic UNIX kernels usually fall into this category-for example, the classic DCE threads reference implementation, or the SunOS 4.x LWP package (no relation to the Solaris 2.x LWP, which is a kernel entity).
 
-Many-to-one implementations cannot take advantage of parallelism on a multiprocessor, and any blocking system service, for example, a call to read, will block all threads in the process. Some implementations may help you avoid this problem by using features such as UNIX nonblocking I/O, or POSIX. lb asynchronous I/O, where available. However, these features have limitations; for example, not all device drivers support nonblocking I/O, and traditional UNIX disk file system response is usually considered "instantaneous" and will ignore the nonblocking I/O mode.
+Many-to-one implementations cannot take advantage of parallelism on a multiprocessor, and any blocking system service, for example, a call to `read`, will block all threads in the process. Some implementations may help you avoid this problem by using features such as UNIX nonblocking I/O, or POSIX.1b asynchronous I/O, where available. However, these features have limitations; for example, not all device drivers support nonblocking I/O, and traditional UNIX disk file system response is usually considered "instantaneous" and will ignore the nonblocking I/O mode.
 
-Some many-to-one implementations may not be tightly integrated with the ANSI C library's support functions, and that can cause serious trouble. The stdio functions, for example, might block the entire process (and all threads) while one thread waits for you to enter a command. Any many-to-one implementation that conforms to the Pthreads standard, however, has gotten around these problems, perhaps by including a special version of stdio and other functions.
+Some many-to-one implementations may not be tightly integrated with the ANSI C library's support functions, and that can cause serious trouble. The `stdio` functions, for example, might block the entire process (and all threads) while one thread waits for you to enter a command. Any many-to-one implementation that conforms to the Pthreads standard, however, has gotten around these problems, perhaps by including a special version of `stdio` and other functions.
 
 When you require concurrency but do not need parallelism, a many-to-one implementation may provide the best thread creation performance, as well as the best context switch performance for voluntary blocking using mutexes and condition variables. It is fast because the Pthreads library saves and restores thread context entirely in user mode. You can, for example, create a lot of threads and block most of them on condition variables (waiting for some external event) very quickly, without involving the kernel at all.
 
-Figure 5.5 shows the mapping of Pthreads threads (left column) to the kernel entity (middle column), which is a process, to physical processors (right column). In this case, the process has four Pthreads threads, labeled "Pthread 1" through "Pthread 4." The Pthreads library schedules the four threads onto the single process in user mode by swapping register state (SP, general registers, and so forth). The library may use a timer to preempt a Pthreads thread that runs too long. The kernel schedules the process onto one of the two physical processors, labeled "processor 1" and "processor 2." The important characteristics of this model are shown in Table 5.2.
+<!--```mermaid-->
+<!--graph LR;-->
+<!--    subgraph Thread-->
+<!--    T1[Pthread 1]-->
+<!--    T2[Pthread 2]-->
+<!--    T3[Pthread 3]-->
+<!--    T4[Pthread 4]-->
+<!--    end-->
+<!--    -->
+<!--    subgraph Kernel-->
+<!--    T3==>K1[kernel entity 1]-->
+<!--    end-->
+<!--    -->
+<!--    subgraph Processor-->
+<!--    K1==>P1[Processor 1]-->
+<!--    P2[Processor 2]-->
+<!--    end-->
+<!--```-->
+<!--<center>**FIGURE 5.5** *Many-to-one thread mapping*</center>-->
 
-```mermaid
-graph LR;
-    subgraph Thread
-    T1[Pthread 1]
-    T2[Pthread 2]
-    T3[Pthread 3]
-    T4[Pthread 4]
-    end
-    
-    subgraph Kernel
-    T3==>K1[kernel entity 1]
-    end
-    
-    subgraph Processor
-    K1==>P1[Processor 1]
-    P2[Processor 2]
-    end
-```
-<center>**FIGURE 5.5** *Many-to-one thread mapping*</center>
+<center>![**FIGURE 5.5** *Many-to-one thread mapping*](./img/fig5.5.png)</center>
+
+
+Figure 5.5 shows the mapping of Pthreads threads (left column) to the kernel entity (middle column), which is a process, to physical processors (right column). In this case, the process has four Pthreads threads, labeled "Pthread 1" through "Pthread 4." The Pthreads library schedules the four threads onto the single process in user mode by swapping register state (SP, general registers, and so forth). The library may use a timer to preempt a Pthreads thread that runs too long. The kernel schedules the process onto one of the two physical processors, labeled "processor 1" and "processor 2." The important characteristics of this model are shown in Table 5.2.
 
 Advantages | Disadvantages
  --- | ---
 Fastest context switch time. | Potentially long latency during system service blocking.
-Simple; the implementation may even be (mostly) portable.\* | Single-process applications cannot take advantage of multiprocessor hardware.
+Simple; the implementation may even be (mostly) portable.(see **Hint** below) | Single-process applications cannot take advantage of multiprocessor hardware.
 
 <center>**TABLE 5.2** *Many-to-one thread scheduling*</center>
 
-> \* The DCE threads user-mode scheduler can usually be ported to new operating systems in a few days, involving primarily new assembly language for the register context switching routines. We use the motto "Some Assembly Required."
+> **Hint:**  
+> The DCE threads user-mode scheduler can usually be ported to new operating systems in a few days, involving primarily new assembly language for the register context switching routines. We use the motto "Some Assembly Required."  
 
 ### 5.6.2 One-to-one (kernel level)
+
 One-to-one thread mapping is also sometimes called a "kernel thread" implementation. The Pthreads library assigns each thread to a kernel entity. It generally must use blocking kernel functions to wait on mutexes and condition variables. While synchronization may occur either within the kernel or in user mode, thread scheduling occurs within the kernel.
 
 Pthreads threads can take full advantage of multiprocessor hardware in a one-to-one implementation without any extra effort on your part, for example, separating your code into multiple processes. When a thread blocks in the kernel, it does not affect other threads any more than the blocking of a normal UNIX process affects other processes. One thread can even process a page fault without affecting other threads.
@@ -1810,32 +1805,34 @@ One-to-one implemenations suffer from two main problems. The first is that they 
 
 The second problem is that blocking on a mutex and waiting on a condition variable, which happen frequently in many applications, are substantially more expensive on most one-to-one implementations, because they require entering the machine's protected kernel mode. Note that locking a mutex, when it was not already locked, or unlocking a mutex, when there are no waiting threads, may be no more expensive than on a many-to-one implementation, because on most systems those functions can be completed in user mode.
 
-A one-to-one implementation can be a good choice for CPU-bound applications, which don't block very often. Many high-performance parallel applications begin by creating a worker thread for each physical processor in the system, and. once started, the threads run independently for a substantial time period. Such applications will work well because they do not strain the kernel by creating a lot of threads, and they don't require a lot of calls into the kernel to block and unblock their threads.
+A one-to-one implementation can be a good choice for CPU-bound applications, which don't block very often. Many high-performance parallel applications begin by creating a worker thread for each physical processor in the system, and, once started, the threads run independently for a substantial time period. Such applications will work well because they do not strain the kernel by creating a lot of threads, and they don't require a lot of calls into the kernel to block and unblock their threads.
+
+<!--```mermaid-->
+<!--graph LR;-->
+<!--    subgraph Thread-->
+<!--    T1[Pthread 1]-->
+<!--    T2[Pthread 2]-->
+<!--    T3[Pthread 3]-->
+<!--    T4[Pthread 4]-->
+<!--    end-->
+<!--    -->
+<!--    subgraph Kernel-->
+<!--    T1==>K1[kernel entity 1]-->
+<!--    T2==>K2[kernel entity 2]-->
+<!--    T3==>K3[kernel entity 3]-->
+<!--    T4==>K4[kernel entity 4]-->
+<!--    end-->
+<!--    -->
+<!--    subgraph Processor-->
+<!--    K1==>P1[Processor 1]-->
+<!--    K3==>P2[Processor 2]-->
+<!--    end-->
+<!--```-->
+<!--<center>**FIGURE 5.6** *One-to-one thread mapping*</center>-->
+
+<center>![**FIGURE 5.6** *One-to-one thread mapping*](./img/fig5.6.png)</center>
 
 Figure 5.6 shows the mapping of Pthreads threads (left column) to kernel entities (middle column) to physical processors (right column). In this case, the process has four Pthreads threads, labeled "Pthread 1" through "Pthread 4." Each Pthreads thread is permanently bound to the corresponding kernel entity. The kernel schedules the four kernel entities (along with those from other processes) onto the two physical processors, labeled "processor 1" and "processor 2." The important characteristics of this model are shown in Table 5.3.
-
-```mermaid
-graph LR;
-    subgraph Thread
-    T1[Pthread 1]
-    T2[Pthread 2]
-    T3[Pthread 3]
-    T4[Pthread 4]
-    end
-    
-    subgraph Kernel
-    T1==>K1[kernel entity 1]
-    T2==>K2[kernel entity 2]
-    T3==>K3[kernel entity 3]
-    T4==>K4[kernel entity 4]
-    end
-    
-    subgraph Processor
-    K1==>P1[Processor 1]
-    K3==>P2[Processor 2]
-    end
-```
-<center>**FIGURE 5.6** *One-to-one thread mapping*</center>
 
 Advantages | Disadvantages
 --- | ---
@@ -1845,6 +1842,7 @@ No latency during system service blocking. | Poor scaling when many threads are 
 <center>**TABLE 5.3** *One-to-one thread scheduling*</center>
 
 ### 5.6.3 Many-to-few (two level)
+
 The many-to-few model tries to merge the advantages of both the many-to- one and one-to-one models, while avoiding their disadvantages. This model requires cooperation between the user-level Pthreads library and the kernel. They share scheduling responsibilities and may communicate information about the threads between each other.
 
 When the Pthreads library needs to switch between two threads, it can do so directly, in user mode. The new Pthreads thread runs on the same kernel entity without intervention from the kernel. This gains the performance benefit of many-to-one implementations for the most common cases, when a thread blocks on a mutex or condition variable, and when a thread terminates.
@@ -1853,29 +1851,31 @@ When the kernel needs to block a thread, to wait for an I/O or other resource, i
 
 Many-to-few implementations excel in most real-world applications, because in most applications, threads perform a mixture of CPU-bound and I/O-bound operations, and block both in I/O and in Pthreads synchronization. Most applications also create more threads than there are physical processors, either directly or because an application that creates a few threads also uses a parallel library that creates a few threads, and so forth.
 
+<!--```mermaid-->
+<!--graph LR;-->
+<!--    subgraph Thread-->
+<!--    T1[Pthread 1]-->
+<!--    T2[Pthread 2]-->
+<!--    T3[Pthread 3]-->
+<!--    T4[Pthread 4]-->
+<!--    end-->
+<!--    -->
+<!--    subgraph Kernel-->
+<!--    T1==>K1[kernel entity 1]-->
+<!--    T4==>K2[kernel entity 2]-->
+<!--    end-->
+<!--    -->
+<!--    subgraph Processor-->
+<!--    K1==>P1[Processor 1]-->
+<!--    K2==>P2[Processor 2]-->
+<!--    end-->
+<!--```-->
+<!---->
+<!--<center>**FIGURE 5.7** *Many-to-few thread mapping*</center>-->
+
+<center>![**FIGURE 5.7** *Many-to-few thread mapping*](./img/fig5.7.png)</center>
+
 Figure 5.7 shows the mapping of Pthreads threads (left column) to kernel entities (middle column) to physical processors (right column). In this case, the process has four Pthreads threads, labeled "Pthread 1" through "Pthread 4." The Pthreads library creates some number of kernel entities at initialization (and may create more later). Typically, the library will start with one kernel entity (labeled "kernel entity 1" and "kernel entity 2") for each physical processor. The kernel schedules these kernel entities (along with those from other processes) onto the two physical processors, labeled "processor 1" and "processor 2." The important characteristics of this model are shown in Table 5.4.
-
-```mermaid
-graph LR;
-    subgraph Thread
-    T1[Pthread 1]
-    T2[Pthread 2]
-    T3[Pthread 3]
-    T4[Pthread 4]
-    end
-    
-    subgraph Kernel
-    T1==>K1[kernel entity 1]
-    T4==>K2[kernel entity 2]
-    end
-    
-    subgraph Processor
-    K1==>P1[Processor 1]
-    K2==>P2[Processor 2]
-    end
-```
-
-<center>**FIGURE 5.7** *Many-to-few thread mapping*</center>
 
 Advantages | Disadvantages
  ---- | ----
