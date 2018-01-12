@@ -8,27 +8,28 @@ Lewis Carroll, Alice's Adventures in Wonderland:
 
 Pthreads changes the meaning of a number of traditional POSIX process functions. Most of the changes are obvious, and you'd probably expect them even if the standard hadn't added specific wording. When a thread blocks for I/O, for example, only the calling thread blocks, while other threads in the process can continue to run.
 
-But there's another class of POSIX functions that doesn't extend into the threaded world quite so unambiguously. For example, when you fork a threaded process, what happens to the threads? What does exec do in a threaded process? What happens when one of the threads in a threaded process calls exit?
+But there's another class of POSIX functions that doesn't extend into the threaded world quite so unambiguously. For example, when you `fork` a threaded process, what happens to the threads? What does `exec` do in a threaded process? What happens when one of the threads in a threaded process calls `exit`?
 
 ## 6.1 fork
-> Avoid using fork in a threaded program (if you can)  
-> unless you intend to exec a new program immediately.  
 
-When a threaded process calls fork to create a child process, Pthreads specifies that only the thread calling fork exists in the child. Although only the calling thread exists on return from fork in the child process, all other Pthreads states remain as they were at the time of the call to fork. In the child process, the thread has the same thread state as in the parent. It owns the same mutexes, has the same value for all thread-specific data keys, and so forth. All mutexes and condition variables exist, although any threads that were waiting on a synchronization object at the time of the fork are no longer waiting. (They don't exist in the child process, so how could they be waiting?)
+> Avoid using `fork` in a threaded program (if you can)  
+> unless you intend to `exec` a new program immediately.  
 
-Pthreads does not "terminate" the other threads in a forked process, as if they exited with `pthread_exit` or even as if they were canceled. They simply cease to exist. That is, the threads do not run thread-specific data destructors or cleanup handlers. This is not a problem if the child process is about to call exec to run a new program, but if you use fork to clone a threaded program, beware that you may lose access to memory, especially heap memory stored only as thread-specific data values.
+When a threaded process calls `fork` to create a child process, Pthreads specifies that only the thread calling `fork` exists in the child. Although only the calling thread exists on return from `fork` in the child process, all other Pthreads states remain as they were at the time of the call to `fork`. In the child process, the thread has the same thread state as in the parent. It owns the same mutexes, has the same value for all thread-specific data keys, and so forth. All mutexes and condition variables exist, although any threads that were waiting on a synchronization object at the time of the `fork` are no longer waiting. (They don't exist in the child process, so how could they be waiting?)
 
-> The state of mutexes is not affected by a fork. If it was locked in the parent it is locked in the child!
+Pthreads does not "terminate" the other threads in a forked process, as if they exited with `pthread_exit` or even as if they were canceled. They simply cease to exist. That is, the threads do not run thread-specific data destructors or cleanup handlers. This is not a problem if the child process is about to call `exec` to run a new program, but if you use `fork` to clone a threaded program, beware that you may lose access to memory, especially heap memory stored only as thread-specific data values.
 
-If a mutex was locked at the time of the call to fork, then it is still locked in the child. Because a locked mutex is owned by the thread that locked it, the mutex can be unlocked in the child only if the thread that locked the mutex was the one that called fork. This is important to remember-if another thread has a mutex locked when you call fork, you will lose access to that mutex and any data controlled by that mutex.
+> The state of mutexes is not affected by a `fork`. If it was locked in the parent it is locked in the child!
 
-Despite the complications, you can fork a child that continues running and even continues to use Pthreads. You must use fork handlers carefully to protect your mutexes and the shared data that the mutexes are protecting. Fork handlers are described in Section 6.1.1.
+If a mutex was locked at the time of the call to `fork`, then it is still locked in the child. Because a locked mutex is owned by the thread that locked it, the mutex can be unlocked in the child only if the thread that locked the mutex was the one that called `fork`. This is important to remember-if another thread has a mutex locked when you call `fork`, you will lose access to that mutex and any data controlled by that mutex.
 
-Because thread-specific data destructors and cleanup handlers are not called, you may need to worry about memory leaks. One possible solution would be to cancel threads created by your subsystem in the prepare fork handler, and wait for them to terminate before allowing the fork to continue (by returning), and then create new threads in the parent handler that is called after fork completes. This could easily become messy, and I am not recommending it as a solution. Instead, take another look at the warning back at the beginning of this section: Avoid using fork in threaded code except where the child process will immediately exec a new program.
+Despite the complications, you can `fork` a child that continues running and even continues to use Pthreads. You must use fork handlers carefully to protect your mutexes and the shared data that the mutexes are protecting. Fork handlers are described in Section 6.1.1.
 
-POSIX specifies a small set of functions that may be called safely from within signal-catching functions ("async-signal safe" functions), and fork is one of them. However, none of the POSIX threads functions is async-signal safe (and there are good reasons for this, because being async-signal safe generally makes a function substantially more expensive). With the introduction of fork handlers, however, a call to fork is also a call to some set of fork handlers.
+Because thread-specific data destructors and cleanup handlers are not called, you may need to worry about memory leaks. One possible solution would be to cancel threads created by your subsystem in the *prepare* fork handler, and wait for them to terminate before allowing the `fork` to continue (by returning), and then create new threads in the *parent* handler that is called after `fork` completes. This could easily become messy, and I am not recommending it as a solution. Instead, take another look at the warning back at the beginning of this section: Avoid using fork in threaded code except where the child process will immediately `exec` a new program.
 
-The purpose of a fork handler is to allow threaded code to protect synchronization state and data invariants across a fork, and in most cases that requires locking mutexes. But you cannot lock mutexes from a signal-catching function. So while it is legal to call fork from within a signal-catching function, doing so may (beyond the control or knowledge of the caller) require performing other operations that cannot be performed within a signal-catching function.
+POSIX specifies a small set of functions that may be called safely from within signal-catching functions ("async-signal safe" functions), and `fork` is one of them. However, none of the POSIX threads functions is async-signal safe (and there are good reasons for this, because being async-signal safe generally makes a function substantially more expensive). With the introduction of fork handlers, however, a call to `fork` is also a call to some set of fork handlers.
+
+The purpose of a fork handler is to allow threaded code to protect synchronization state and data invariants across a `fork`, and in most cases that requires locking mutexes. But you cannot lock mutexes from a signal-catching function. So while it is legal to call `fork` from within a signal-catching function, doing so may (beyond the control or knowledge of the caller) require performing other operations that cannot be performed within a signal-catching function.
 
 This is an inconsistency in the POSIX standard that will need to be fixed. Nobody yet knows what the eventual solution will be. My advice is to avoid using fork in a signal-catching function.
 
@@ -37,35 +38,37 @@ This is an inconsistency in the POSIX standard that will need to be fixed. Nobod
 int pthread_atfork (void (*prepare)(void),
     void (*parent)(void), void (*child)(void));
 ```
-Pthreads added the `pthread_atfork` "fork handler" mechanism to allow your code to protect data invariants across fork. This is somewhat analogous to atexit, which allows a program to perform cleanup when a process terminates. With `pthread_atfork` you supply three separate handler addresses. The prepare fork handler is called before the fork takes place in the parent process. The parent fork handler is called after the fork in the parent process, and the child fork handler is called after the fork in the child process.
+Pthreads added the `pthread_atfork` "fork handler" mechanism to allow your code to protect data invariants across `fork`. This is somewhat analogous to `atexit`, which allows a program to perform cleanup when a process terminates. With `pthread_atfork` you supply three separate handler addresses. The *prepare* fork handler is called before the fork takes place in the parent process. The *parent* fork handler is called after the fork in the parent process, and the *child* fork handler is called after the fork in the child process.
 
 > If you write a subsystem that uses mutexes and does not establish fork handlers, then that subsystem will not function correctly in a child process after a fork.
 
-Normally a prepare fork handler locks all mutexes used by the associated code (for a library or an application) in the correct order to prevent deadlocks. The thread calling fork will block in the prepare fork handler until it has locked all the mutexes. That ensures that no other threads can have the mutexes locked or be modifying data that the child might need. The parent fork handler need only unlock all of those mutexes, allowing the parent process and all threads to continue normally.
+Normally a *prepare* fork handler locks all mutexes used by the associated code (for a library or an application) in the correct order to prevent deadlocks. The thread calling `fork` will block in the *prepare* fork handler until it has locked all the mutexes. That ensures that no other threads can have the mutexes locked or be modifying data that the child might need. The *parent* fork handler need only unlock all of those mutexes, allowing the parent process and all threads to continue normally.
 
-The child fork handler may often be the same as the parent fork handler; but sometimes you'll need to reset the program or library state. For example, if you use "daemon" threads to perform functions in the background you'll need to either record the fact that those threads no longer exist or create new threads to perform the same function in the child. You may need to reset counters, free heap memory, and so forth.
+The *child* fork handler may often be the same as the *parent* fork handler; but sometimes you'll need to reset the program or library state. For example, if you use "daemon" threads to perform functions in the background you'll need to either record the fact that those threads no longer exist or create new threads to perform the same function in the child. You may need to reset counters, free heap memory, and so forth.
 
 > Your fork handlers are only as good as everyone else's fork handlers.
 
-The system will run all prepare fork handlers declared in the process when any thread calls fork. If you code your prepare and child fork handlers correctly then, in principle, you will be able to continue operating in the child process. But what if someone else didn't supply fork handlers or didn't do it right? The ANSI C library on a threaded system, for example, must use a set of mutexes to synchronize internal data, such as stdio file streams.
+The system will run all *prepare* fork handlers declared in the process when any thread calls `fork`. If you code your *prepare* and *child* fork handlers correctly then, in principle, you will be able to continue operating in the child process. But what if someone else didn't supply fork handlers or didn't do it right? The ANSI C library on a threaded system, for example, must use a set of mutexes to synchronize internal data, such as `stdio` file streams.
 
-If you use an ANSI C library that doesn't supply fork handlers to prepare those mutexes properly for a fork, for example, then, sometimes, you may find that your child process hangs when it calls printf, because another thread in the parent process had the mutex locked when your thread called fork. There's often nothing you can do about this type of problem except to file a problem report against the system. These mutexes are usually private to the library, and aren't visible to your code-you can't lock them in your prepare handler or before calling fork.
+If you use an ANSI C library that doesn't supply fork handlers to prepare those mutexes properly for a fork, for example, then, sometimes, you may find that your child process hangs when it calls `printf`, because another thread in the parent process had the mutex locked when your thread called `fork.` There's often nothing you can do about this type of problem except to file a problem report against the system. These mutexes are usually private to the library, and aren't visible to your code-you can't lock them in your *prepare* handler or before calling `fork`.
 
-The program atfork.c shows the use of fork handlers. When run with no argument, or with a nonzero argument, the program will install fork handlers. When run with a zero argument, such as atf ork 0, it will not.
+The program `atfork.c` shows the use of fork handlers. When run with no argument, or with a nonzero argument, the program will install fork handlers. When run with a zero argument, such as atfork 0, it will not.
 
-With fork handlers installed, the result will be two output lines reporting the result of the fork call and, in parentheses, the pid of the current process. Without fork handlers, the child process will be created while the initial thread owns the mutex. Because the initial thread does not exist in the child, the mutex cannot be unlocked, and the child process will hang-only the parent process will print its message.
+With fork handlers installed, the result will be two output lines reporting the result of the `fork` call and, in parentheses, the pid of the current process. Without fork handlers, the child process will be created while the initial thread owns the mutex. Because the initial thread does not exist in the child, the mutex cannot be unlocked, and the child process will hang-only the parent process will print its message.
 
-Function `fork_prepare` is the prepare handler. This will be called by fork, in the parent process, before creating the child process. Any state changed by this function, in particular, mutexes that are locked, will be copied into the child process. The `fork_prepare` function locks the program's mutex.
+[14-26] Function `fork_prepare` is the *prepare* handler. This will be called by `fork`, in the parent process, before creating the child process. Any state changed by this function, in particular, mutexes that are locked, will be copied into the child process. The `fork_prepare` function locks the program's mutex.
 
-Function `fork_parent` is the parent handler. This will be called by fork, in the parent process, after creating the child process. In general, a parent handler should undo whatever was done in the prepare handler, so that the parent process can continue normally. The `fork_parent` function unlocks the mutex that was locked by `fork_prepare`.
+[32-43] Function `fork_parent` is the parent handler. This will be called by `fork`, in the parent process, after creating the child process. In general, a parent handler should undo whatever was done in the prepare handler, so that the parent process can continue normally. The `fork_parent` function unlocks the mutex that was locked by `fork_prepare`.
 
-Function `fork_child` is the child handler. This will be called by fork, in the child process. In most cases, the child handler will need to do whatever was done in the `fork_parent` handler to "unlock" the state so that the child can continue. It may also need to perform additional cleanup, for example, `fork_child` sets the `self_pid` variable to the child process's pid as well as unlocking the process mutex.
+[49-61] Function `fork_child` is the child handler. This will be called by `fork`, in the child process. In most cases, the child handler will need to do whatever was done in the `fork_parent` handler to "unlock" the state so that the child can continue. It may also need to perform additional cleanup, for example, `fork_child` sets the `self_pid` variable to the child process's pid as well as unlocking the process mutex.
 
-After creating a child process, which will continue executing the `thread_routine` code, the `thread_routine` function locks the mutex. When run with fork handlers, the fork call will be blocked (when the prepare handler locks the mutex) until the mutex is available. Without fork handlers, the thread will fork before main unlocks the mutex, and the thread will hang in the child at this point. 99-106 The main program declares fork handlers unless the program is run with an argument of 0.
+[66-92] After creating a child process, which will continue executing the `thread_routine` code, the `thread_routine` function locks the mutex. When run with fork handlers, the `fork` call will be blocked (when the *prepare* handler locks the mutex) until the mutex is available. Without fork handlers, the thread will `fork` before `main` unlocks the mutex, and the thread will hang in the child at this point. 
 
-The main program locks the mutex before creating the thread that will fork. It then sleeps for several seconds, to ensure that the thread will be able to call fork while the mutex is locked, and then unlocks the mutex. The thread running `thread_routine` will always succeed in the parent process, because it will simply block until main releases the lock.
+[100-107] The main program declares fork handlers unless the program is run with an argument of 0.
 
-However, without the fork handlers, the child process will be created while the mutex is locked. The thread (main) that locked the mutex does not exist in the child, and cannot unlock the mutex in the child process. Mutexes can be unlocked in the child only if they were locked by the thread that called fork-and fork handlers provide the best way to ensure that.
+[109-124] The main program locks the mutex before creating the thread that will fork. It then sleeps for several seconds, to ensure that the thread will be able to call `fork` while the mutex is locked, and then unlocks the mutex. The thread running `thread_routine` will always succeed in the parent process, because it will simply block until `main` releases the lock.
+
+However, without the fork handlers, the child process will be created while the mutex is locked. The thread (`main`) that locked the mutex does not exist in the child, and cannot unlock the mutex in the child process. Mutexes can be unlocked in the child only if they were locked by the thread that called `fork`-and fork handlers provide the best way to ensure that.
 
 ```c
 /*  atfork.c  */
@@ -74,7 +77,7 @@ However, without the fork handlers, the child process will be created while the 
 #include <sys/wait.h>
 #include "errors.h"
 
-pid_t self_pid; /* pid of current process */
+pid_t self_pid;                         /* pid of current process */
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*
@@ -104,7 +107,7 @@ void fork_parent (void)
     int status;
 
     /*
-     * Unlock the mutex in the parent after the child has been
+     * Unlock the mutex in the parent after the child has been 
      * created.
      */
     status = pthread_mutex_unlock (&mutex);
@@ -114,15 +117,15 @@ void fork_parent (void)
 
 /*
  * This routine will be called after executing the fork, within
- * the child process.
+ * the child process
  */
 void fork_child (void)
 {
     int status;
 
     /*
-     * Update the file scope "self_pid" within the child process, and
-     * unlock the mutex.
+     * Update the file scope "self_pid" within the child process, and unlock
+     * the mutex.
      */
     self_pid = getpid ();
     status = pthread_mutex_unlock (&mutex);
@@ -143,9 +146,9 @@ void *thread_routine (void *arg)
         errno_abort ("Fork");
 
     /*
-     * Lock the mutex - without the atfork handlers, the mutex will
-     * remain locked in the child process and this lock attempt will
-     * hang (or fail with EDEADLK) in the child.
+     * Lock the mutex -- without the atfork handlers, the mutex will remain
+     * locked in the child process and this lock attempt will hang (or fail
+     * with EDEADLK) in the child.
      */
     status = pthread_mutex_lock (&mutex);
     if (status != 0)
@@ -170,22 +173,19 @@ int main (int argc, char *argv[])
     if (argc > 1)
         atfork_flag = atoi (argv[1]);
     if (atfork_flag) {
-        status = pthread_atfork (
-            fork_prepare, fork_parent, fork_child);
+        status = pthread_atfork (fork_prepare, fork_parent, fork_child);
         if (status != 0)
             err_abort (status, "Register fork handlers");
     }
-    self_pid = getpid ( );
+    self_pid = getpid ();
     status = pthread_mutex_lock (&mutex);
     if (status != 0)
         err_abort (status, "Lock mutex");
     /*
-     * Create a thread while the mutex is locked. It will fork a
-     * process, which (without atfork handlers) will run with the
-     * mutex locked.
+     * Create a thread while the mutex is locked. It will fork a process,
+     * which (without atfork handlers) will run with the mutex locked.
      */
-    status = pthread_create (
-        &fork_thread, NULL, thread_routine, NULL);
+    status = pthread_create (&fork_thread, NULL, thread_routine, NULL);
     if (status != 0)
         err_abort (status, "Create thread");
     sleep (5);
@@ -199,36 +199,41 @@ int main (int argc, char *argv[])
 }
 ```
 
-Now, imagine you are writing a library that manages network server connections, and you create a thread for each network connection that listens for service requests. In your prepare fork handler you lock all of the library's mutexes to make sure the child's state is consistent and recoverable. In your parent fork handler you unlock those mutexes and return. When designing the child fork handler, you need to decide exactly what a fork means to your library. If you want to retain all network connections in the child, then you would create a new listener thread for each connection and record their identifiers in the appropriate data structures before releasing the mutexes. If you want the child to begin with no open connections, then you would locate the existing parent connection data structures and free them, closing the associated files that were propagated by fork.
+Now, imagine you are writing a library that manages network server connections, and you create a thread for each network connection that listens for service requests. In your *prepare* fork handler you lock all of the library's mutexes to make sure the child's state is consistent and recoverable. In your *parent* fork handler you unlock those mutexes and return. When designing the *child* fork handler, you need to decide exactly what a `fork` means to your library. If you want to retain all network connections in the child, then you would create a new listener thread for each connection and record their identifiers in the appropriate data structures before releasing the mutexes. If you want the child to begin with no open connections, then you would locate the existing parent connection data structures and free them, closing the associated files that were propagated by `fork`.
 
 ## 6.2 exec
-The exec function isn't affected much by the presence of threads. The function of exec is to wipe out the current program context and replace it with a new program. A call to exec immediately terminates all threads in the process except the thread calling exec. They do not execute cleanup handlers or thread-specific data destructors-the threads simply cease to exist.
 
-All synchronization objects also vanish, except for pshared mutexes (mutexes created using the `pthread_process_shared` attribute value) and pshared condition variables, which remain usable as long as the shared memory is mapped by some process. You should, however, unlock any pshared mutexes that the current process may have locked-the system will not unlock them for you.
+The `exec` function isn't affected much by the presence of threads. The function of `exec` is to wipe out the current program context and replace it with a new program. A call to `exec` immediately terminates all threads in the process except the thread calling `exec`. They do not execute cleanup handlers or thread-specific data destructors-the threads simply cease to exist.
+
+All synchronization objects also vanish, except for *pshared* mutexes (mutexes created using the `PTHREAD_PROCESS_SHARED` attribute value) and *pshared* condition variables, which remain usable as long as the shared memory is mapped by some process. You should, however, unlock any *pshared* mutexes that the current process may have locked-the system will not unlock them for you.
 
 ## 6.3 Process exit
-In a nonthreaded program, an explicit call to the exit function has the same effect as returning from the program's main function. The process exits. Pthreads adds the `pthread_exit` function, which can be used to cause a single thread to exit while the process continues. In a threaded program, therefore, you call exit when you want the process to exit, or `pthread_exit` when you want only the calling thread to exit.
 
-In a threaded program, main is effectively the "thread start function" for the process's initial thread. Although returning from the start function of any other thread terminates that thread just as if it had called `pthread_exit`, returning from main terminates the process. All memory (and threads) associated with the process evaporate. Threads do not run cleanup handlers or thread-specific data destructors. Calling exit has the same effect.
+In a nonthreaded program, an explicit call to the `exit` function has the same effect as returning from the program's `main` function. The process exits. Pthreads adds the `pthread_exit` function, which can be used to cause a single thread to exit while the process continues. In a threaded program, therefore, you call `exit` when you want the process to exit, or `pthread_exit` when you want only the calling thread to exit.
 
-When you don't want to make use of the initial thread or make it wait for other threads to complete, you can exit from main by calling `pthread_exit` rather than by returning or calling exit. Calling `pthread_exit` from main will terminate the initial thread without affecting the other threads in the process, allowing them to continue and complete normally.
+In a threaded program, `main` is effectively the "thread start function" for the process's initial thread. Although returning from the start function of any other thread terminates that thread just as if it had called `pthread_exit`, returning from `main` terminates the process. All memory (and threads) associated with the process evaporate. Threads do not run cleanup handlers or thread-specific data destructors. Calling `exit` has the same effect.
 
-The exit function provides a simple way to shut down the entire process. For example, if a thread determines that data has been severely corrupted by some error, it may be dangerous to allow the program to continue to operate on the data. When the program is somehow broken, it might be dangerous to attempt to shut down the application threads cleanly. In that case, you might call exit to stop all processing immediately.
+When you don't want to make use of the initial thread or make it wait for other threads to complete, you can exit from `main` by calling `pthread_exit` rather than by returning or calling `exit`. Calling `pthread_exit` from `main` will terminate the initial thread without affecting the other threads in the process, allowing them to continue and complete normally.
+
+The `exit` function provides a simple way to shut down the entire process. For example, if a thread determines that data has been severely corrupted by some error, it may be dangerous to allow the program to continue to operate on the data. When the program is somehow broken, it might be dangerous to attempt to shut down the application threads cleanly. In that case, you might call `exit` to stop all processing immediately.
 
 ## 6.4 Stdio
-Pthreads specifies that the ANSI C standard I/O [stdio) functions are thread-safe. Because the stdio package requires static storage for output buffers and file state, stdio implementations will use synchronization, such as mutexes or semaphores.
 
-### 6.4.1 flockfile and funlockfile
+Pthreads specifies that the ANSI C standard I/O (*stdio*) functions are thread-safe. Because the *stdio* package requires static storage for output buffers and file state, *stdio* implementations will use synchronization, such as mutexes or semaphores.
+
+### 6.4.1 `flockfile` and `funlockfile`
+
 ```c
 void flockfile (FILE *file);
 int ftrylockfile (FILE *file);
 void funlockfile (FILE *file);
 ```
-In some cases, it is important that a sequence of stdio operations occur in uninterrupted sequence; for example, a prompt followed by a read from the terminal, or two writes that need to appear together in the output file even if another thread attempts to write data between the two stdio calls. Therefore, Pthreads adds a mechanism to lock a file and specifies how file locking interacts with internal stdio locking. To write a prompt string to stdin and read a response from stdout without allowing another thread to read from stdin or write to stdout between the two, you would need to lock both stdin and stdout around the two calls as shown in the following program, flock.c.
 
-This is the important part: Two separate calls to flockfile are made, one for each of the two file streams. To avoid possible deadlock problems within stdio, Pthreads recommends always locking input streams before output streams, when you must lock both. That's good advice, and I've taken it by locking stdin before stdout.
+In some cases, it is important that a sequence of *stdio* operations occur in uninterrupted sequence; for example, a prompt followed by a read from the terminal, or two writes that need to appear together in the output file even if another thread attempts to write data between the two *stdio* calls. Therefore, Pthreads adds a mechanism to lock a file and specifies how file locking interacts with internal *stdio* locking. To write a prompt string to *stdout* and read a response from *stdin* without allowing another thread to read from *stdin* or write to *stdout* between the two, you would need to lock both *stdin* and *stdout* around the two calls as shown in the following program, `flock.c`.
 
-The two calls to funlockfile must, of course, be made in the opposite order. Despite the specialized call, you are effectively locking mutexes within the stdio library, and you should respect a consistent lock hierarchy.
+[20-21] This is the important part: Two separate calls to `flockfile` are made, one for each of the two file streams. To avoid possible deadlock problems within *stdio*, Pthreads recommends always locking input streams before output streams, when you must lock both. That's good advice, and I've taken it by locking *stdin* before *stdout.*
+
+[30-31] The two calls to `funlockfile` must, of course, be made in the opposite order. Despite the specialized call, you are effectively locking mutexes within the *stdio* library, and you should respect a consistent lock hierarchy.
 
 ```c
 /*  flock.c  */
@@ -268,7 +273,7 @@ void *prompt_routine (void *arg)
 int main (int argc, char *argv[])
 {
     pthread_t thread1, thread2, thread3;
-    char *string;
+    void *string;
     int status;
 
 #ifdef sun
@@ -292,28 +297,29 @@ int main (int argc, char *argv[])
         &thread3, NULL, prompt_routine, "Thread 3> ");
     if (status != 0)
         err_abort (status, "Create thread");
-    status = pthread_join (thread1, (void**)&string);
+    status = pthread_join (thread1, &string);
     if (status != 0)
         err_abort (status, "Join thread");
-    printf ("Thread 1: \"%s\"\n", string);
+    printf ("Thread 1: \"%s\"\n", (char*)string);
     free (string);
-    status = pthread join (thread2, (void**)&string);
+    status = pthread_join (thread2, &string);
     if (status != 0)
         err_abort (status, "Join thread");
-    printf ("Thread 1: \"%s\"\n", string);
+    printf ("Thread 2: \"%s\"\n", (char*)string);
     free (string);
-    status = pthread_join (thread3, (void**)&string);
+    status = pthread_join (thread3, &string);
     if (status != 0)
         err_abort (status, "Join thread");
-    printf ("Thread 1: \"%s\"\n", string);
+    printf ("Thread 3: \"%s\"\n", (char*)string);
     free (string);
     return 0;
 }
 ```
 
-You can also use the flockfile and funlockfile functions to ensure that a series of writes is not interrupted by a file access from some other thread. The f trylockf ile function works like `pthread_mutex_trylock` in that it attempts to lock the file and, if the file is already locked, returns an error status instead of blocking.
+You can also use the `flockfile` and `funlockfile` functions to ensure that a series of writes is not interrupted by a file access from some other thread. The `ftrylockfile` function works like `pthread_mutex_trylock` in that it attempts to lock the file and, if the file is already locked, returns an error status instead of blocking.
 
 ### 6.4.2 `getchar_unlocked` and `putchar_unlocked`
+
 ```c
 int** getc_unlocked (FILE *stream);
 int getchar_unlocked (void);
@@ -321,17 +327,17 @@ int putc_unlocked (int c, FILE *stream);
 int putchar_unlocked (int c);
 ```
 
-ANSI C provides functions to get and put single characters efficiently into stdio buffers. The functions getchar and putchar operate on stdin and stdout, respectively, and getc and putc can be used on any stdio file stream. These are traditionally implemented as macros for maximum performance, directly reading or writing the file stream's data buffer. Pthreads, however, requires these functions to lock the stdio stream data, to prevent code from accidentally corrupting the stdio buffers.
+ANSI C provides functions to get and put single characters efficiently into *stdio* buffers. The functions `getchar` and `putchar` operate on *stdin* and *stdout*, respectively, and `getc` and `putc` can be used on any *stdio* file stream. These are traditionally implemented as macros for maximum performance, directly reading or writing the file stream's data buffer. Pthreads, however, requires these functions to lock the *stdio* stream data, to prevent code from accidentally corrupting the *stdio* buffers.
 
 The overhead of locking and unlocking mutexes will probably vastly exceed the time spent performing the character copy, so these functions are no longer high performance. Pthreads could have denned new functions that provided the locked variety rather than redefining the existing functions; however, the result would be that existing code would be unsafe for use in threads. The working group decided that it was preferable to make existing code slower, rather than to make it incorrect.
 
-Pthreads adds new functions that replace the old high-performance macros with essentially the same implementation as the traditional macros. The functions `getc_unlocked`, `putc_unlocked`, `getchar_unlocked`, and `putchar_unlocked` do not perform any locking, so you must use flockfile and funlockfile around any sequence of these operations. If you want to read or write a single character, you should usually use the locked variety rather than locking the file stream, calling the new unlocked get or put function, and then unlocking the file stream.
+Pthreads adds new functions that replace the old high-performance macros with essentially the same implementation as the traditional macros. The functions `getc_unlocked`, `putc_unlocked`, `getchar_unlocked`, and `putchar_unlocked` do not perform any locking, so you must use `flockfile` and `funlockfile` around any sequence of these operations. If you want to read or write a single character, you should usually use the locked variety rather than locking the file stream, calling the new unlocked get or put function, and then unlocking the file stream.
 
-If you want to perform a sequence of fast character accesses, where you would have previously used getchar and putchar, you can now use `getchar_unlocked` and `putchar_unlocked`. The following program, putchar.c, shows the difference between using putchar and using a sequence of `putchar_unlocked` calls within a file lock.
+If you want to perform a sequence of fast character accesses, where you would have previously used `getchar` and `putchar`, you can now use `getchar_unlocked` and `putchar_unlocked`. The following program, `putchar.c`, shows the difference between using `putchar` and using a sequence of `putchar_unlocked` calls within a file lock.
 
-When the program is run with a nonzero argument or no argument at all, it creates threads running the `lock_routine` function. This function locks the stdout file stream, and then writes its argument (a string) to stdout one character at a time using `putchar_unlocked`.
+[10-21] When the program is run with a nonzero argument or no argument at all, it creates threads running the `lock_routine` function. This function locks the *stdout* file stream, and then writes its argument (a string) to *stdout* one character at a time using `putchar_unlocked`.
 
-When the program is run with a zero argument, it creates threads running the `unlock_routine` function. This function writes its argument to stdout one character at a time using putchar. Although putchar is internally synchronized to ensure that the stdio buffer is not corrupted, the individual characters may appear in any order.
+[29-38] When the program is run with a zero argument, it creates threads running the `unlock_routine` function. This function writes its argument to *stdout* one character at a time using `putchar`. Although `putchar` is internally synchronized to ensure that the *stdio* buffer is not corrupted, the individual characters may appear in any order.
 
 ```c
 /*  putchar.c  */
@@ -340,8 +346,8 @@ When the program is run with a zero argument, it creates threads running the `un
 
 /*
  * This function writes a string (the function's arg) to stdout,
- * by locking the file stream and using putchar_unlocked to write
- * each character individually.
+ * by locking the file stream and using putchar_unlocked to
+ * write each character individually.
  */
 void *lock_routine (void *arg)
 {
@@ -362,7 +368,7 @@ void *lock_routine (void *arg)
  * Although the internal locking of putchar prevents file stream
  * corruption, the writes of various threads may be interleaved.
  */
-void *unlock routine (void *arg)
+void *unlock_routine (void *arg)
 {
     char *pointer;
 
@@ -387,7 +393,7 @@ int main (int argc, char *argv[])
     else
         thread_func = unlock_routine;
     status = pthread_create (
-        &thread1, NULL, thread_func, "this is thread l\n");
+        &thread1, NULL, thread_func, "this is thread 1\n");
     if (status != 0)
         err_abort (status, "Create thread");
     status = pthread_create (
@@ -402,6 +408,7 @@ int main (int argc, char *argv[])
 }
 ```
 ## 6.5 Thread-safe functions
+
 Although ANSI C and POSIX 1003.1-1990 were not developed with threads in mind, most of the functions they define can be made thread-safe without changing the external interface. For example, although malloc and free must be changed to support threads, code calling these functions need not be aware of the changes. When you call malloc, it locks a mutex (or perhaps several mutexes) to perform the operation, or may use other equivalent synchronization mechanisms. But your code just calls malloc as it always has, and it does the same thing as always.
 
 In two main classes of functions, this is not true:
@@ -437,12 +444,12 @@ Program getlogin.c shows how to call these functions. Notice that these function
  * and dynamically allocating the buffers.
  */
 #ifndef TTY_NAME_MAX
-# define TTY_NAME_MAX       128
+# define TTY_NAME_MAX    128
 #endif
 #ifndef LOGIN_NAME_MAX
-# define LOGIN_NAME_MAX     32
+# define LOGIN_NAME_MAX  32
 #endif
-
+    
 int main (int argc, char *argv[])
 {
     char login_str[LOGIN_NAME_MAX];
@@ -612,25 +619,32 @@ The `resume_signal_handler` function will be established as the signal-catching 
 ```c
 /*  susp.c part 1 signal-catching functions  */
 #include <pthread.h>
+#include <sched.h>
 #include <signal.h>
+#include <semaphore.h>
 #include "errors.h"
 
 #define THREAD_COUNT    20
-#define ITERATIONS      40000
+#define ITERATIONS      80000
 
-unsigned long thread_count = THREAD_COUNT;
-unsigned long iterations = ITERATIONS;
-pthread_mutex_t the_mutex = PTHREAD_MUTEX_INITIALIZER;
+typedef struct {
+    int		inuse;				/* 1 if in use, else 0 */
+    pthread_t	id;				/* Thread ID */
+    } Victim_t;
+
+sem_t sem;
+int thread_count = THREAD_COUNT;
+int iterations = ITERATIONS;
 pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
-volatile int sentinel = 0;
 pthread_once_t once = PTHREAD_ONCE_INIT;
-pthread_t *array = NULL, null_pthread = {0};
+Victim_t *array = NULL;
 int bottom = 0;
-int inited = 0;
 
 /*
- * Handle SIGUSR1 in the target thread, to suspend it until
- * receiving SIGUSR2 (resume).
+ * Handle SIGUSR1 in the target thread, to suspend it until receiving
+ * SIGUSR2 (resume). Note that this is run with both SIGUSR1 and
+ * SIGUSR2 blocked. Having SIGUSR2 blocked prevents a resume before we
+ * can finish the suspend protocol.
  */
 void
 suspend_signal_handler (int sig)
@@ -642,12 +656,11 @@ suspend_signal_handler (int sig)
      */
     sigfillset (&signal_set);
     sigdelset (&signal_set, SIGUSR2);
-    sentinel = 1;
+    sem_post (&sem);
     sigsuspend (&signal_set);
 
     /*
-     * Once I'm here, I've been resumed, and the resume signal
-     * handler has been run to completion.
+     * Once here, the resume signal handler has run to completion.
      */
     return;
 }
@@ -682,32 +695,46 @@ suspend_init_routine (void)
     struct sigaction sigusr1, sigusr2;
 
     /*
-     * Allocate the suspended threads array. This array is used
-     * to guarentee idempotency
+     * Initialize a semaphore, to be used by the signal handler to
+     * confirm suspension. We only need one, because suspend & resume
+     * are fully serialized by a mutex.
+     */
+    status = sem_init (&sem, 0, 1);
+    if (status == -1)
+        errno_abort ("Initializing semaphore");
+
+    /*
+     * Allocate the suspended threads array. This array is used to guarantee
+     * idempotency.
      */
     bottom = 10;
-    array = (pthread_t*) calloc (bottom, sizeof (pthread_t));
+    array = (Victim_t*) calloc (bottom, sizeof (Victim_t));
 
     /*
      * Install the signal handlers for suspend/resume.
+     *
+     * We add SIGUSR2 to the sa_mask field for the SIGUSR1 handler. That
+     * avoids a race if one thread suspends the target while another resumes
+     * that same target. (The SIGUSR2 signal cannot be delivered before the
+     * target thread calls sigsuspend.)
      */
     sigusr1.sa_flags = 0;
     sigusr1.sa_handler = suspend_signal_handler;
-
     sigemptyset (&sigusr1.sa_mask);
+    sigaddset (&sigusr1.sa_mask, SIGUSR2);
+
     sigusr2.sa_flags = 0;
     sigusr2.sa_handler = resume_signal_handler;
-    sigusr2.sa_mask = sigusr1.sa_mask;
+    sigemptyset (&sigusr2.sa_mask);
 
-    status = sigaction (SIGUSRI, &sigusr1, NULL);
+    status = sigaction (SIGUSR1, &sigusr1, NULL);
     if (status == -1)
         errno_abort ("Installing suspend handler");
-
+    
     status = sigaction (SIGUSR2, &sigusr2, NULL);
     if (status == -1)
-        errno abort ("Installing resume handler");
-
-    inited = 1;
+        errno_abort ("Installing resume handler");
+    
     return;
 }
 ```
@@ -724,14 +751,14 @@ The sentinel variable is initialized to 0, to detect when the target thread susp
  * block the thread until another signal (SIGUSR2) arrives.
  *
  * Multiple calls to thd_suspend for a single thread have no
- * additional effect on the thread a single thd_continue
+ * additional effect on the thread -- a single thd_continue
  * call will cause it to resume execution.
  */
-int
+int 
 thd_suspend (pthread_t target_thread)
 {
     int status;
-    int i = 0;
+    int i;
 
     /*
      * The first call to thd_suspend will initialize the
@@ -741,49 +768,55 @@ thd_suspend (pthread_t target_thread)
     if (status != 0)
         return status;
 
-    /*
-     * Serialize access to suspend, makes life easier.
+    /* 
+     * Serialize access to suspend, makes life easier
      */
     status = pthread_mutex_lock (&mut);
     if (status != 0)
         return status;
 
     /*
-     * Threads that are suspended are added to the target_array;
-     * a request to suspend a thread already listed in the array
-     * is ignored. Sending a second SIGUSR1 would cause the
-     * thread to resuspend itself as soon as it is resumed.
+     * Threads that are suspended are added to the target_array; a request to
+     * suspend a thread already listed in the array is ignored.
      */
-    while (i < bottom)
-        if (array[i++] == target_thread) {
+    for (i = 0; i < bottom; i++) {
+        if (array[i].inuse
+	    && pthread_equal (array[i].id, target_thread)) {
             status = pthread_mutex_unlock (&mut);
             return status;
-        }
+	}
+    }
 
     /*
-     * Ok, we really need to suspend this thread. So, let's find
-     * the location in the array that we'll use. If we run off
-     * the end, realloc the array for more space.
+     * Ok, we really need to suspend this thread. So, lets find the location
+     * in the array that we'll use. If we run off the end, realloc the array
+     * for more space. We allocate 2 new array slots; we'll use one, and leave 
+     * the other for the next time.
      */
     i = 0;
-    while (array[i] != 0)
+    while (i < bottom && array[i].inuse)
         i++;
 
-    if (i == bottom) {
-        array = (pthread_t*) realloc (
-            array, (++bottom * sizeof (pthread_t)));
+    if (i >= bottom) {
+	bottom += 2;
+        array = (Victim_t*)realloc (
+            array, (bottom * sizeof (Victim_t)));
         if (array == NULL) {
             pthread_mutex_unlock (&mut);
             return errno;
         }
-
-        array[bottom] = null_pthread;       /* Clear new entry */
+        array[bottom-1].inuse = 0;	/* Clear new last entry */
     }
 
     /*
-     * Clear the sentinel and signal the thread to suspend.
+     * Initialize the target's data. We initialize a semaphore to synchronize
+     * with the signal handler. After sending the signal, we wait until the
+     * signal handler posts the semaphore. Then we can destroy the semaphore,
+     * because we won't need it again.
      */
-    sentinel = 0;
+    array[i].id = target_thread;
+    array[i].inuse = 1;
+
     status = pthread_kill (target_thread, SIGUSR1);
     if (status != 0) {
         pthread_mutex_unlock (&mut);
@@ -791,13 +824,15 @@ thd_suspend (pthread_t target_thread)
     }
 
     /*
-     * Wait for the sentinel to change.
+     * Wait for the victim to acknowledge suspension.
      */
-    while (sentinel == 0)
-        sched_yield ();
-
-    array[i] = target_thread;
-
+    while ((status = sem_wait (&sem)) != 0) {
+	if (errno != EINTR) {
+	    pthread_mutex_unlock (&mut);
+	    return errno;
+	}
+    }
+	
     status = pthread_mutex_unlock (&mut);
     return status;
 }
@@ -815,13 +850,20 @@ Send the resume signal, `SIGUSR2.` There's no need to wait-the thread will resum
  * it out of the sigsuspend() in which it's waiting. If the
  * target thread isn't suspended, return with success.
  */
-int
+int 
 thd_continue (pthread_t target_thread)
 {
     int status;
     int i = 0;
 
     /*
+     * The first call to thd_suspend will initialize the package.
+     */
+    status = pthread_once (&once, suspend_init_routine);
+    if (status != 0)
+        return status;
+
+    /* 
      * Serialize access to suspend, makes life easier.
      */
     status = pthread_mutex_lock (&mut);
@@ -829,20 +871,11 @@ thd_continue (pthread_t target_thread)
         return status;
 
     /*
-     * If we haven't been initialized, then the thread must be
-     * "resumed"; it couldn't have been suspended!
+     * Make sure the thread is in the suspend array. If not, it hasn't been
+     * suspended (or it has already been resumed) and we can just carry on.
      */
-    if (!inited) {
-        status = pthread_mutex_unlock (&mut);
-        return status;
-    }
-
-    /*
-     * Make sure the thread is in the suspend array. If not, it
-     * hasn't been suspended (or it has already been resumed) and
-     * we can just carry on.
-     */
-    while (array[i] != target_thread && i < bottom)
+    while (i < bottom && array[i].inuse
+	   && pthread_equal (array[i].id, target_thread))
         i++;
 
     if (i >= bottom) {
@@ -860,7 +893,7 @@ thd_continue (pthread_t target_thread)
         return status;
     }
 
-    array[i] = 0;                   /* Clear array element */
+    array[i].inuse = 0;			/* Clear array element */
     status = pthread_mutex_unlock (&mut);
     return status;
 }
@@ -871,7 +904,7 @@ Notice that instead of calling printf, the function formats a message with sprin
 
 > Incautious use of suspend and resume can deadlock your application.
 
-In this case, if a thread were suspended while modifying a stdio stream, all other threads that tried to modify that stdio stream might block, waiting for a mutex that is locked by the suspended thread. The write function, on the other hand, is usually a call to the kernel-the kernel is atomic with respect to signals, and therefore can't be suspended. Use of write, therefore, cannot cause a deadlock.
+In this case, if a thread were suspended while modifying a *stdio* stream, all other threads that tried to modify that *stdio* stream might block, waiting for a mutex that is locked by the suspended thread. The write function, on the other hand, is usually a call to the kernel-the kernel is atomic with respect to signals, and therefore can't be suspended. Use of write, therefore, cannot cause a deadlock.
 
 In general, you cannot suspend a thread that may possibly hold any resource, if that resource may be required by some other thread before the suspended thread is resumed. In particular, the result is a deadlock if the thread that would resume the suspended thread first needs to acquire the resource. This prohibition includes, especially, mutexes used by libraries you call-such as the mutexes used by malloc and free, or the mutexes used by stdio.
 
@@ -889,12 +922,12 @@ thread_routine (void *arg)
     int number = (int)arg;
     int status;
     int i;
-    char buffer[128] ;
+    char buffer[128];
 
     for (i = 1; i <= iterations; i++) {
         /*
-         * Every time each thread does 5000 interations, print
-         * a progress report.
+	 * Every time each thread does 2000 interations, print a progress
+         * report.
          */
         if (i % 2000 == 0) {
             sprintf (
@@ -933,7 +966,7 @@ main (int argc, char *argv[])
             err_abort (status, "Create thread");
     }
 
-    sleep (2);
+    sleep (1);
 
     for (i = 0; i < THREAD_COUNT/2; i++) {
         printf ("Suspending thread %d.\n", i);
@@ -943,7 +976,7 @@ main (int argc, char *argv[])
     }
 
     printf ("Sleeping ...\n");
-    sleep (2);
+    sleep (1);
 
     for (i = 0; i < THREAD_COUNT/2; i++) {
         printf ("Continuing thread %d.\n", i);
@@ -952,7 +985,7 @@ main (int argc, char *argv[])
             err_abort (status, "Suspend thread");
     }
 
-    for (i = THREAD_C0UNT/2; i < THREAD_COUNT; i++) {
+    for (i = THREAD_COUNT/2; i < THREAD_COUNT; i++) {
         printf ("Suspending thread %d.\n", i);
         status = thd_suspend (threads[i]);
         if (status != 0)
@@ -960,7 +993,7 @@ main (int argc, char *argv[])
     }
 
     printf ("Sleeping ...\n");
-    sleep (2);
+    sleep (1);
 
     for (i = THREAD_COUNT/2; i < THREAD_COUNT; i++) {
         printf ("Continuing thread %d.\n", i);
@@ -969,7 +1002,15 @@ main (int argc, char *argv[])
             err_abort (status, "Continue thread");
     }
 
-    pthread_exit (NULL);    /* Let threads finish */
+    /*
+     * Request that each thread terminate. We don't bother waiting for them;
+     * just trust that they will terminate in "reasonable time". When the last
+     * thread exits, the process will exit.
+     */
+    for (i = 0; i < THREAD_COUNT; i++)
+	pthread_cancel (threads[i]);
+
+    pthread_exit (NULL);        /* Let threads finish */
 }
 ```
 ### 6.6.4 `sigwait` and `sigwaitinfo`
@@ -983,6 +1024,7 @@ int sigtimedwait (
     const struct timespec *timeout);
 #endif
 ```
+
 > Always use sigwait to work with asynchronous signals within threaded code.
 
 Pthreads adds a function to allow threaded programs to deal with "asynchronous" signals synchronously. That is, instead of allowing a signal to interrupt a thread at some arbitrary point, a thread can choose to receive a signal synchronously. It does this by calling `sigwait`, or one of `sigwait`'s siblings.
@@ -1017,9 +1059,9 @@ int interrupted = 0;
 sigset_t signal_set;
 
 /*
- * Wait for the SIGINT signal. When it has occurred 5 times, set the
- * "interrupted" flag (the main thread's wait predicate) and signal a
- * condition variable. The main thread will exit.
+ * Wait for the SIGINT signal. When it has occurred 5 times, set
+ * the "interrupted" flag (the main thread's wait predicate) and
+ * signal a condition variable. The main thread will exit.
  */
 void *signal_waiter (void *arg)
 {
@@ -1045,7 +1087,7 @@ void *signal_waiter (void *arg)
                 break;
             }
         }
-    }
+    }    
     return NULL;
 }
 
@@ -1059,7 +1101,7 @@ int main (int argc, char *argv[])
      * initial thread. Because all threads inherit the signal mask
      * from their creator, all threads in the process will have
      * SIGINT masked unless one explicitly unmasks it. The
-     * semantics of sigwait requires that all threads (including
+     * semantics of sigwait require that all threads (including
      * the thread calling sigwait) have the signal masked, for
      * reliable operation. Otherwise, a signal that arrives
      * while the sigwaiter is not blocked in sigwait might be
@@ -1067,7 +1109,7 @@ int main (int argc, char *argv[])
      */
     sigemptyset (&signal_set);
     sigaddset (&signal_set, SIGINT);
-    status = pthread_sigmask (SIG_BL0CK, &signal_set, NULL);
+    status = pthread_sigmask (SIG_BLOCK, &signal_set, NULL);
     if (status != 0)
         err_abort (status, "Set signal mask");
 
@@ -1120,7 +1162,7 @@ These statements initialize the sigevent structure, which describes how the syst
 ```c
 /*  sigev_thread.c  */
 #include <pthread.h>
-#include <sys/signal.h>
+#include <signal.h>
 #include <sys/time.h>
 #include "errors.h"
 
@@ -1138,7 +1180,7 @@ int counter = 0;
  * be awakened, and will terminate the program.
  */
 void
-timer_thread (void *arg)
+timer_thread (union sigval si)
 {
     int status;
 
@@ -1154,10 +1196,10 @@ timer_thread (void *arg)
     if (status != 0)
         err_abort (status, "Unlock mutex");
 
-    printf ("Timer %d\n", counter);
+    printf ("Timer (0x%p) %d\n", si.sival_ptr, counter);
 }
 
-main( )
+int main()
 {
     int status;
     struct itimerspec ts;
@@ -1180,11 +1222,11 @@ main( )
     se.sigev_notify_attributes = NULL;
 
     /*
-     * Specify a repeating timer that fires every 5 seconds.
+     * Specify a repeating timer that fires each 5 seconds.
      */
     ts.it_value.tv_sec = 5;
     ts.it_value.tv_nsec = 0;
-    ts.it_interval.tv_sec =5;
+    ts.it_interval.tv_sec = 5;
     ts.it_interval.tv_nsec = 0;
 
     DPRINTF (("Creating timer\n"));
@@ -1309,10 +1351,10 @@ Notice the code to check for eintr return status from the `sem_wait` call. The P
 #include <time.h>
 #include "errors.h"
 
-sem_t semaphore;
+sem_t   semaphore;
 
 /*
- * Signal-catching function.
+ * Signal catching function.
  */
 void signal_catcher (int sig)
 {
@@ -1332,7 +1374,7 @@ void *sem_waiter (void *arg)
      * Each thread waits 5 times.
      */
     for (counter = 1; counter <= 5; counter++) {
-        while (sem wait (&semaphore) == -1) {
+        while (sem_wait (&semaphore) == -1) {
             if (errno != EINTR)
                 errno_abort ("Wait on semaphore");
         }
@@ -1367,8 +1409,8 @@ int main (int argc, char *argv[])
      */
     for (thread_count = 0; thread_count < 5; thread_count++) {
         status = pthread_create (
-            &sem_waiters[thread_count], NULL,
-            sem_waiter, (void*)thread_count);
+                &sem_waiters[thread_count], NULL,
+                sem_waiter, (void*)thread_count);
         if (status != 0)
             err_abort (status, "Create thread");
     }
@@ -1391,7 +1433,7 @@ int main (int argc, char *argv[])
         errno_abort ("Set signal action");
     timer_val.it_interval.tv_sec = 2;
     timer_val.it_interval.tv_nsec = 0;
-    timer_val.it_value.tv_sec = 2 ;
+    timer_val.it_value.tv_sec = 2;
     timer_val.it_value.tv_nsec = 0;
     if (timer_settime (timer_id, 0, &timer_val, NULL) == -1)
         errno_abort ("Set timer");
@@ -1408,4 +1450,5 @@ int main (int argc, char *argv[])
 #endif
 }
 ```
+
 
